@@ -1,0 +1,32 @@
+name: crystal-asciidoctor-pdf
+version: 0.1.0
+
+description: |
+  AsciiDoc to PDF converter for Crystal, equivalent of the asciidoctor-pdf Ruby gem.
+  Depends on crystal-asciidoctor (parser/AST) and crystal-pdf (PDF engine).
+
+authors:
+  - papilip <papilip@aloli.fr>
+
+license: MIT
+
+dependencies:
+  crystal-asciidoctor:
+    github: aloli/crystal-asciidoctor
+    branch: developpement
+  crystal-pdf:
+    github: aloli/crystal-pdf
+    branch: developpement
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: "~> 1.6"
+
+targets:
+  asciidoctor-pdf:
+    main: bin/asciidoctor-pdf
+  test-deps:
+    main: src/main.cr
+
+crystal: ">= 1.0.0"

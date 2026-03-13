@@ -1,0 +1,156 @@
+# crystal-pdf default theme
+# Compatible with asciidoctor-pdf theme format (subset)
+# Colors are expressed as [R, G, B] with values between 0.0 and 1.0
+
+# ----- Page -----
+page:
+  width: 595.28       # A4 width in points
+  height: 841.89      # A4 height in points
+  margin:
+    top: 72.0
+    right: 72.0
+    bottom: 72.0
+    left: 72.0
+
+# ----- Base Font -----
+base:
+  font_family: Helvetica
+  font_size: 10.5
+  font_color: [0.2, 0.2, 0.2]
+  line_height: 1.4
+
+# ----- Heading -----
+heading:
+  font_family: Helvetica
+  font_color: [0.0, 0.0, 0.0]
+  font_style: bold
+  margin_top: 18.0
+  margin_bottom: 12.0
+  h1_font_size: 24.0
+  h2_font_size: 18.0
+  h3_font_size: 15.0
+  h4_font_size: 13.0
+  h5_font_size: 11.0
+  h6_font_size: 10.5
+
+# ----- Title Page -----
+title_page:
+  enabled: true
+  font_size: 28.0
+  font_color: [0.0, 0.0, 0.0]
+  subtitle_font_size: 18.0
+  author_font_size: 14.0
+  revision_font_size: 12.0
+
+# ----- Paragraph -----
+paragraph:
+  margin_bottom: 10.5
+  indent: 0.0
+
+# ----- Lead Paragraph -----
+lead:
+  font_size: 13.0
+  font_color: [0.3, 0.3, 0.3]
+
+# ----- Link -----
+link:
+  font_color: [0.0, 0.35, 0.65]
+
+# ----- Code / Monospace -----
+code:
+  font_family: Courier
+  font_size: 9.5
+  font_color: [0.0, 0.0, 0.0]
+  background_color: [0.96, 0.96, 0.96]
+  border_color: [0.8, 0.8, 0.8]
+  padding: 10.0
+  border_width: 0.5
+  border_radius: 3.0
+
+# ----- List -----
+list:
+  indent: 20.0
+  item_spacing: 6.0
+  marker_font_color: [0.0, 0.0, 0.0]
+  ulist_marker: "•"
+
+# ----- Table -----
+table:
+  border_color: [0.7, 0.7, 0.7]
+  border_width: 0.5
+  header_background_color: [0.9, 0.9, 0.9]
+  header_font_style: bold
+  cell_padding: 6.0
+  stripe_background_color: [0.97, 0.97, 0.97]
+
+# ----- Admonition -----
+admonition:
+  border_width: 0.5
+  padding: 10.0
+  label_font_style: bold
+  label_font_size: 10.5
+  background_color:
+    NOTE: [0.93, 0.95, 1.0]
+    TIP: [0.93, 1.0, 0.93]
+    WARNING: [1.0, 0.97, 0.93]
+    CAUTION: [1.0, 0.93, 0.93]
+    IMPORTANT: [1.0, 0.93, 0.93]
+  border_color:
+    NOTE: [0.2, 0.4, 0.8]
+    TIP: [0.2, 0.6, 0.2]
+    WARNING: [0.8, 0.6, 0.0]
+    CAUTION: [0.8, 0.2, 0.2]
+    IMPORTANT: [0.8, 0.0, 0.0]
+
+# ----- Sidebar -----
+sidebar:
+  background_color: [0.95, 0.95, 0.95]
+  border_color: [0.85, 0.85, 0.85]
+  border_width: 0.5
+  padding: 12.0
+
+# ----- Blockquote -----
+blockquote:
+  border_color: [0.7, 0.7, 0.7]
+  border_width: 3.0
+  padding_left: 15.0
+  font_color: [0.4, 0.4, 0.4]
+  font_style: italic
+
+# ----- Image -----
+image:
+  align: center
+  caption_font_size: 9.0
+  caption_font_color: [0.5, 0.5, 0.5]
+
+# ----- Thematic Break -----
+thematic_break:
+  color: [0.8, 0.8, 0.8]
+  width: 0.5
+  margin: 12.0
+
+# ----- Header -----
+header:
+  enabled: true
+  font_size: 8.0
+  font_color: [0.5, 0.5, 0.5]
+  height: 36.0
+  border_width: 0.5
+  border_color: [0.8, 0.8, 0.8]
+
+# ----- Footer -----
+footer:
+  enabled: true
+  font_size: 8.0
+  font_color: [0.5, 0.5, 0.5]
+  height: 36.0
+  border_width: 0.5
+  border_color: [0.8, 0.8, 0.8]
+
+# ----- TOC -----
+toc:
+  title: "Table of Contents"
+  font_size: 10.5
+  indent: 15.0
+  line_height: 1.8
+  dot_leader: true

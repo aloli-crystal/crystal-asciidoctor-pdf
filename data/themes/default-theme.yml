@@ -1,0 +1,43 @@
+base_font_family: Helvetica
+base_font_size: 10.5
+base_line_height: 1.4
+base_font_color: "333333"
+
+heading_font_family: Helvetica
+heading_font_color: "1a1a1a"
+heading_line_height: 1.2
+
+h1_font_size: 26
+h1_font_style: bold
+h1_margin_top: 12
+h1_margin_bottom: 8
+
+h2_font_size: 20
+h2_font_style: bold
+h2_margin_top: 10
+h2_margin_bottom: 6
+
+h3_font_size: 16
+h3_font_style: bold
+h3_margin_top: 8
+h3_margin_bottom: 4
+
+prose_margin_bottom: 12
+
+code_font_family: Courier
+code_font_size: 9
+code_background_color: "f5f5f5"
+code_border_color: "cccccc"
+code_border_width: 0.5
+code_padding: 8
+
+table_border_color: "dddddd"
+table_border_width: 0.5
+table_header_background_color: "efefef"
+table_cell_padding: 5
+
+footer_enabled: true
+footer_font_size: 9
+footer_font_color: "888888"
+footer_left: "{document_title}"
+footer_right: "{page_number}"

@@ -1,0 +1,26 @@
+module StumpyJPEG
+  module Markers
+    START = 0xFF_u8
+    SKIP  = 0x00_u8
+
+    SOI  = 0xD8_u8
+    EOI  = 0xD9_u8
+    DHT  = 0xC4_u8
+    DAC  = 0xCC_u8
+    JPG  = 0xC8_u8
+    SOS  = 0xDA_u8
+    DQT  = 0xDB_u8
+    DNL  = 0xDC_u8
+    DRI  = 0xDD_u8
+    DHP  = 0xDE_u8
+    EXP  = 0xDF_u8
+    COM  = 0xFE_u8
+    SOF  = 0xC0_u8
+    SOFN = 0xC0_u8..0xCF_u8
+    APP  = 0xE0_u8
+    APPN = 0xE0_u8..0xEF_u8
+    RST  = 0xD0_u8
+    RSTN = 0xD0_u8..0xD7_u8
+    JPGN = 0xF0_u8..0xF8_u8
+  end
+end

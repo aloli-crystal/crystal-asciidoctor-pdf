@@ -1,0 +1,168 @@
+= crystal-pdf
+:toc:
+:toc-placement!:
+:source-highlighter: rouge
+
+A pure Crystal library for PDF generation with AsciiDoc-to-PDF conversion.
+Combines a low-level PDF engine (ported from https://github.com/watzon/pdf.cr[watzon/pdf.cr]) with a high-level AsciiDoc converter (ported from https://github.com/asciidoctor/asciidoctor-pdf[asciidoctor-pdf]).
+
+toc::[]
+
+== Features
+
+=== PDF Engine (ported from Prawn)
+
+The PDF engine provides low-level PDF generation capabilities:
+
+* **Page management** -- create multi-page documents with custom dimensions
+* **Text rendering** -- Type1 and TrueType fonts with Unicode support
+* **Graphics** -- lines, rectangles, circles, curves, colors, opacity
+* **Images** -- JPEG and PNG embedding with scaling
+* **Formatted text** -- rich text layout with word wrapping and alignment
+* **Bounding boxes** -- nested coordinate systems and multi-column layouts
+* **Tables** -- cell-based table rendering with headers and styling
+* **SVG** -- render SVG graphics (rect, circle, line, path, polygon, text)
+
+=== AsciiDoc-to-PDF Converter (ported from asciidoctor-pdf)
+
+The converter transforms AsciiDoc documents into styled PDF output:
+
+* **Document structure** -- title page, sections (6 levels), table of contents
+* **Text** -- paragraphs, inline markup (bold, italic, monospace, links)
+* **Lists** -- unordered, ordered, and description lists with nesting
+* **Code blocks** -- syntax-highlighted source listings
+* **Admonitions** -- NOTE, TIP, WARNING, CAUTION, IMPORTANT
+* **Tables** -- header rows, cell alignment, striped rows
+* **Images** -- block images with captions
+* **Blocks** -- sidebars, blockquotes, examples
+* **Page breaks** and thematic breaks
+* **Theming** -- fully configurable styles (fonts, colors, spacing)
+
+== Installation
+
+Add the dependency to your `shard.yml`:
+
+[source,yaml]
+----
+dependencies:
+  crystal-pdf:
+    github: aloli/crystal-pdf
+----
+
+Then run:
+
+[source,bash]
+----
+shards install
+----
+
+== Usage
+
+=== As a library
+
+[source,crystal]
+----
+require "asciidoc_pdf"
+
+# Convert AsciiDoc to PDF
+source = File.read("document.adoc")
+converter = AsciidocPDF::Converter.convert(source)
+converter.save("document.pdf")
+
+# With custom theme
+theme = AsciidocPDF::Theme.new
+theme.base_font_size = 12.0
+theme.heading_h1_font_size = 28.0
+
+converter = AsciidocPDF::Converter.convert(source, theme)
+converter.save("document.pdf")
+----
+
+=== Low-level PDF generation
+
+[source,crystal]
+----
+require "pdf"
+
+doc = PDF::Document.new
+
+doc.page(width: 595.28, height: 841.89) do |page|
+  page.font("Helvetica", size: 24)
+  page.fill_color(0.0, 0.0, 0.0)
+  page.text("Hello, World!", at: {72, 750})
+
+  page.font("Helvetica", size: 12)
+  page.text("Generated with crystal-pdf", at: {72, 720})
+
+  page.stroke_color(0.0, 0.0, 0.0)
+  page.line_width(1.0)
+  page.rectangle(72, 700, 451, 0.5)
+  page.stroke
+end
+
+File.open("output.pdf", "w") { |f| doc.write(f) }
+----
+
+=== Command-line interface
+
+[source,bash]
+----
+# Build the CLI
+shards build asciidoc-to-pdf
+
+# Convert a document
+./bin/asciidoc-to-pdf document.adoc
+
+# Specify output path
+./bin/asciidoc-to-pdf -o output.pdf document.adoc
+----
+
+== Architecture
+
+The project is organized in three layers:
+
+[cols="1,3"]
+|===
+| Layer | Description
+
+| `PDF::*`
+| Low-level PDF engine: document structure, pages, fonts, graphics, images, content streams, PDF object model.
+
+| `AsciiDoc::*`
+| AsciiDoc parser: tokenizes `.adoc` source into an Abstract Syntax Tree (AST) with Document, Section, Paragraph, List, Table, Block, Image nodes.
+
+| `AsciidocPDF::*`
+| Converter and theme: traverses the AST and generates PDF output using the PDF engine, applying configurable styles from the Theme.
+|===
+
+== Development
+
+[source,bash]
+----
+# Run all tests
+crystal spec
+
+# Run only AsciiDoc parser tests
+crystal spec spec/asciidoc/
+
+# Run only converter tests
+crystal spec spec/asciidoc_pdf/
+
+# Run only PDF engine tests
+crystal spec spec/pdf/
+
+# Check code style
+crystal tool format --check
+----
+
+== Credits
+
+This project builds upon the work of:
+
+* https://github.com/watzon/pdf.cr[watzon/pdf.cr] -- the original Crystal PDF library
+* https://github.com/prawnpdf/prawn[Prawn] -- the Ruby PDF generation library
+* https://github.com/asciidoctor/asciidoctor-pdf[asciidoctor-pdf] -- the Ruby AsciiDoc-to-PDF converter
+
+== License
+
+This project is licensed under the MIT License. See the link:LICENSE[LICENSE] file for details.

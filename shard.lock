@@ -1,0 +1,30 @@
+version: 2.0
+shards:
+  ameba:
+    git: https://github.com/crystal-ameba/ameba.git
+    version: 1.6.4
+
+  crystal-asciidoctor:
+    git: https://github.com/aloli/crystal-asciidoctor.git
+    version: 0.1.0+git.commit.792a7f7fbacb69304c75cac5bd20bb8f88ef3961
+
+  crystal-pdf:
+    git: https://github.com/aloli/crystal-pdf.git
+    version: 0.1.0+git.commit.3a74807f2bd3b3f23c635b80f359afcf5fb42b2f
+
+  matrix:
+    git: https://github.com/exilor/matrix.git
+    version: 0.1.0+git.commit.db74e62dcc0b65e548bf1a8eda65657310f57152
+
+  stumpy_core:
+    git: https://github.com/stumpycr/stumpy_core.git
+    version: 1.9.1
+
+  stumpy_jpeg:
+    git: https://github.com/stumpycr/stumpy_jpeg.git
+    version: 0.1.0+git.commit.714ad6c1f905cb503c53843cda8285f52592e2c2
+
+  stumpy_png:
+    git: https://github.com/stumpycr/stumpy_png.git
+    version: 5.0.1
+

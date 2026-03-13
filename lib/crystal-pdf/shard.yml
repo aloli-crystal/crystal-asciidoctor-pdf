@@ -1,0 +1,29 @@
+name: crystal-pdf
+version: 0.1.0
+
+description: |
+  A pure Crystal library for low-level PDF generation.
+  Ported from the Prawn Ruby gem (watzon/pdf.cr) with additional
+  contributions: formatted text layout, bounding boxes, column layout,
+  table rendering, and SVG rendering.
+
+authors:
+  - Chris Watson <cawatson1993@gmail.com>
+  - aloli
+
+crystal: ">= 1.10.0"
+
+license: MIT
+
+dependencies:
+  stumpy_jpeg:
+    github: stumpycr/stumpy_jpeg
+    branch: master
+  stumpy_png:
+    github: stumpycr/stumpy_png
+    version: "~> 5.0"
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: "~> 1.6"
