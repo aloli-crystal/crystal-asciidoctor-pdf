@@ -1,0 +1,109 @@
+= Plan de Développement - crystal-asciidoctor-pdf
+:toc: left
+:toclevels: 3
+
+Ce document détaille les prochaines étapes pour le développement du projet `crystal-asciidoctor-pdf`, visant à atteindre une parité fonctionnelle avec la gem Ruby `asciidoctor-pdf` de référence.
+
+== 1. État Actuel
+
+Le projet dispose d'une base solide :
+
+*   **Structure du projet** : Le `shard.yml` est configuré, les dépendances sont gérées, et une structure de répertoires `src`, `spec`, `bin` est en place.
+*   **Compilation et Tests** : Le projet compile avec succès, et une suite de tests de base utilisant `crystal spec` valide les fonctionnalités existantes.
+*   **Convertisseur de Base** : Le `Converter` principal peut traiter plusieurs types de blocs AsciiDoc, notamment :
+    ** Paragraphes, Sections, Listes (ordonnées et non ordonnées), Blocs de code (listing), Admonitions, Citations, et Tables simples.
+*   **Thématisation** : Un système de thème (`Theme` et `ThemeLoader`) est implémenté, permettant de charger des styles depuis un fichier YAML. Un thème par défaut est inclus.
+*   **Fonctionnalités PDF** : Le rendu de la page de titre, des en-têtes/pieds de page, et la gestion basique des sauts de page sont fonctionnels.
+
+== 2. Axes de Développement Prioritaires
+
+Les développements sont organisés en jalons (Milestones), du plus prioritaire au moins prioritaire.
+
+=== Milestone 1 : Rendu de Contenu Essentiel
+
+Ce jalon se concentre sur les fonctionnalités manquantes les plus critiques pour produire des documents de base complets.
+
+[cols="1,2,1"]
+|===
+| Tâche | Description | Priorité
+
+| **Gestion des Polices TTF**
+| Implémenter le chargement et l'utilisation de polices TrueType/OpenType (.ttf, .otf) définies dans le thème. Ceci est indispensable pour la personnalisation et la gestion des caractères non-latins.
+| **Haute**
+
+| **Rendu du Markup Inline**
+| Actuellement, le markup inline (`*gras*`, `_italique_`, `+mono+`, etc.) est supprimé (`strip_inline_markup`). Il faut implémenter un parser/renderer pour ce markup afin de changer la police, le style et la couleur à la volée.
+| **Haute**
+
+| **Intégration des Images**
+| Remplacer le placeholder actuel par un vrai rendu d'images (PNG, JPG). Gérer les chemins locaux et les attributs de taille/alignement.
+| **Haute**
+
+| **Liens et Références Internes (XRefs)**
+| Gérer les liens hypertextes externes (`http://...`) et les références internes au document (`<<section_id,texte>>`).
+| **Moyenne**
+
+|===
+
+=== Milestone 2 : Fonctionnalités Avancées du Document
+
+Ce jalon ajoute les fonctionnalités qui structurent les documents longs et complexes.
+
+[cols="1,2,1"]
+|===
+| Tâche | Description | Priorité
+
+| **Table des Matières (TOC)**
+| Générer une page de table des matières complète avec les titres de section, les numéros de page et des liens cliquables.
+| **Haute**
+
+| **Génération de l'Index**
+| Implémenter la collecte des termes d'index (`indexterm`) et la génération d'une page d'index alphabétique à la fin du document.
+| **Moyenne**
+
+| **Gestion des Notes de bas de page**
+| Ajouter le support pour les notes de bas de page (`footnote:[]`), en les collectant et en les affichant dans le pied de page de la page correspondante.
+| **Moyenne**
+
+|===
+
+=== Milestone 3 : Améliorations du Rendu et de la Thématisation
+
+Ce jalon vise à affiner la qualité visuelle et la flexibilité du rendu.
+
+[cols="1,2,1"]
+|===
+| Tâche | Description | Priorité
+
+| **Coloration Syntaxique du Code**
+| Intégrer une bibliothèque de coloration syntaxique (ex: un portage de Rouge ou Pygments) pour les blocs de code, en utilisant les couleurs définies dans le thème.
+| **Haute**
+
+| **Amélioration des Tableaux**
+| Ajouter le support pour les fonctionnalités avancées des tableaux : alignement du texte, largeur des colonnes, fusion de cellules (colspan/rowspan), et styles d'en-tête/pied de page.
+| **Moyenne**
+
+| **Support pour les Blocs STEM (Maths)**
+| Intégrer un moteur de rendu LaTeX (ou similaire) pour convertir les blocs `stem` en images ou en commandes de dessin vectoriel.
+| **Basse**
+
+| **Support pour les Icônes**
+| Gérer les icônes basées sur des polices (ex: Font Awesome) via `icon:[]`.
+| **Basse**
+
+|===
+
+== 3. Tâches Transversales
+
+Ces tâches doivent être menées en parallèle des jalons de développement.
+
+*   **Expansion de la Suite de Tests** : Pour chaque nouvelle fonctionnalité, des tests unitaires et d'intégration doivent être ajoutés pour garantir la non-régression et la conformité avec Asciidoctor.
+*   **Documentation** : Le `README.adoc` et d'autres documents devront être mis à jour pour refléter les nouvelles fonctionnalités et options de configuration.
+*   **Amélioration du CLI** : Enrichir l'exécutable `bin/asciidoctor-pdf` pour accepter plus d'options de la ligne de commande (ex: `--theme`, `-a attribute=value`).
+*   **Refactoring et Optimisation** : Surveiller les performances et la clarté du code, notamment dans les boucles de rendu et les algorithmes de césure de texte (`wrap_text`).
+
+== 4. Prochaines Étapes Immédiates
+
+1.  Créer les *Issues* GitHub correspondant aux tâches du **Milestone 1**.
+2.  Commencer le développement de la **gestion des polices TTF**, qui est un prérequis pour de nombreuses autres fonctionnalités de rendu.
+3.  Mettre en place une branche de développement `feature/ttf-fonts` pour ce travail.
