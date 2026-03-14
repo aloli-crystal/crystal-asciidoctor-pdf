@@ -24,9 +24,7 @@ development_dependencies:
     version: "~> 1.6"
 
 targets:
-  asciidoctor-pdf:
-    main: bin/asciidoctor-pdf
-  test-deps:
-    main: src/main.cr
+  crystal-asciidoctor-pdf:
+    main: bin/crystal-asciidoctor-pdf
 
 crystal: ">= 1.0.0"

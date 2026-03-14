@@ -1,5 +1,8 @@
-# Binaires compilés (le source Crystal dans bin/ est versionné)
-bin/asciidoctor-pdf
+# Binaire compilé (produit par `shards build`, pas le source Crystal)
+# Le source Crystal bin/crystal-asciidoctor-pdf est versionné
+# Note : shards build écrase le fichier source par le binaire ELF,
+# il faut donc utiliser `shards build --no-progress` et recréer le source après.
+# Le binaire ELF est un exécutable, le source est un script ASCII text.
 
 # Artefacts de compilation Crystal
 .crystal/
