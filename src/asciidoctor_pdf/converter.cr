@@ -134,9 +134,12 @@ module AsciidoctorPDF
         render_toc(toc_page_index)
       end
 
+      # Générer la page d'index si activée et si des entrées ont été collectées
+      if @theme.index_enabled && !@index_entries.empty?
+        render_index
+      end
       # Rendre les en-têtes et pieds de page sur toutes les pages
       render_headers_footers
-
       # Écrire le PDF
       write_pdf
       ""
@@ -872,9 +875,139 @@ module AsciidoctorPDF
     end
 
     # =========================================================================
+    # Index
+    # =========================================================================
+    # Rend la page d'index alphabétique à la fin du document.
+    # Les entrées sont groupées par lettre initiale et affichées sur plusieurs colonnes.
+    private def render_index : Nil
+      return if @index_entries.empty?
+
+      # Créer une nouvelle page pour l'index
+      new_page
+      page = @current_page.not_nil!
+
+      font_size  = @theme.index_font_size
+      line_h     = font_size * 1.5
+      col_count  = @theme.index_columns.clamp(1, 4)
+      col_width  = @content_width / col_count
+      col_gap    = 8.0
+      entry_w    = col_width - col_gap
+
+      # Titre de l'index
+      title_font_size = font_size + 6.0
+      page.font("Helvetica-Bold", size: title_font_size)
+      page.fill_color(@theme.heading_font_color)
+      page.text(@theme.index_title, at: {@margin, @page_height - @margin - title_font_size})
+      y_start = @page_height - @margin - title_font_size * 2.0
+
+      # Regrouper et trier les entrées
+      # Structure : Hash(String, Hash(String, Array(Int32)))
+      # lettre => terme => [pages]
+      grouped = {} of String => Hash(String, Array(Int32))
+
+      @index_entries.each do |entry|
+        term = entry.term.strip
+        next if term.empty?
+        # Gestion des sous-termes (séparés par virgule : "terme principal, sous-terme")
+        parts = term.split(",", 2).map(&.strip)
+        primary   = parts[0]
+        secondary = parts[1]?
+        letter = primary[0..0].upcase
+        grouped[letter] ||= {} of String => Array(Int32)
+        key = secondary ? "#{primary}\t#{secondary}" : primary
+        grouped[letter][key] ||= [] of Int32
+        grouped[letter][key] << entry.page_number unless grouped[letter][key].includes?(entry.page_number)
+      end
+
+      # Trier les lettres et les termes
+      sorted_letters = grouped.keys.sort
+
+      # Construire la liste aplatie des lignes à rendre
+      # Chaque ligne est un tuple {type, text, pages}
+      # type : :letter (en-tête de lettre), :primary, :secondary
+      lines = [] of {Symbol, String, Array(Int32)}
+      sorted_letters.each do |letter|
+        lines << {:letter, letter, [] of Int32}
+        sorted_terms = grouped[letter].keys.sort
+        sorted_terms.each do |key|
+          pages = grouped[letter][key].sort.uniq
+          if key.includes?("\t")
+            parts = key.split("\t", 2)
+            lines << {:primary,   parts[0], [] of Int32}
+            lines << {:secondary, parts[1], pages}
+          else
+            lines << {:primary, key, pages}
+          end
+        end
+      end
+
+      # Rendre les lignes en colonnes
+      col_idx = 0
+      x = @margin + col_idx * col_width
+      y = y_start
+
+      lines.each do |type, text, pages|
+        # Saut de colonne si nécessaire
+        if y < @margin + line_h
+          col_idx += 1
+          if col_idx >= col_count
+            # Nouvelle page
+            new_page
+            page = @current_page.not_nil!
+            col_idx = 0
+            y = @page_height - @margin
+          else
+            y = y_start
+          end
+          x = @margin + col_idx * col_width
+        end
+
+        case type
+        when :letter
+          # En-tête de lettre (ex. : "A")
+          page.font("Helvetica-Bold", size: font_size + 1.0)
+          page.fill_color(@theme.heading_font_color)
+          page.text(text, at: {x, y - (font_size + 1.0)})
+          y -= (font_size + 1.0) * 1.8
+        when :primary
+          # Terme principal
+          page.font("Helvetica", size: font_size)
+          page.fill_color(@theme.base_font_color)
+          entry_text = text
+          unless pages.empty?
+            page_str = pages.map(&.to_s).join(", ")
+            page_str_w = page_str.size * font_size * 0.55
+            # Texte du terme
+            page.text(entry_text, at: {x, y - font_size})
+            # Numéros de page alignés à droite
+            page.fill_color(@theme.index_page_number_color)
+            page.text(page_str, at: {x + entry_w - page_str_w, y - font_size})
+            page.fill_color(@theme.base_font_color)
+          else
+            page.text(entry_text, at: {x, y - font_size})
+          end
+          y -= line_h
+        when :secondary
+          # Sous-terme (indenté)
+          page.font("Helvetica", size: font_size - 0.5)
+          page.fill_color(@theme.base_font_color)
+          indent = 10.0
+          entry_text = text
+          page.text(entry_text, at: {x + indent, y - (font_size - 0.5)})
+          unless pages.empty?
+            page_str = pages.map(&.to_s).join(", ")
+            page_str_w = page_str.size * (font_size - 0.5) * 0.55
+            page.fill_color(@theme.index_page_number_color)
+            page.text(page_str, at: {x + entry_w - page_str_w, y - (font_size - 0.5)})
+            page.fill_color(@theme.base_font_color)
+          end
+          y -= line_h * 0.9
+        end
+      end
+    end
+
     # Table des matières
     # =========================================================================
-
     # Rend la table des matières sur la page réservée (index 0-based).
     # La TOC est rendue après le contenu principal pour avoir les numéros de page corrects.
     private def render_toc(page_index : Int32) : Nil

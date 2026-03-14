@@ -207,4 +207,73 @@ describe AsciidoctorPDF::Converter do
     ADOC
     assert_pdf_generated(input, "complete_document")
   end
+
+  # =========================================================================
+  # Génération de l'index
+  # =========================================================================
+
+  it "should collect index terms and generate index page" do
+    # Le thème doit avoir index_enabled = true pour déclencher le rendu
+    theme = AsciidoctorPDF::Theme.new
+    theme.index_enabled = true
+
+    input = <<-ADOC
+    = Document avec Index
+    :index:
+
+    == Chapitre 1
+
+    Texte sur Crystal((Crystal)) et sur les langages de programmation((langage de programmation)).
+
+    == Chapitre 2
+
+    Plus d informations sur Crystal((Crystal)) et sur Ruby((Ruby)).
+    ADOC
+
+    output_path = "#{OUTPUT_DIR}/index_test.pdf"
+    doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => output_path})
+    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    converter.convert(doc)
+
+    File.exists?(output_path).should be_true
+    File.size(output_path).should be > 0
+    File.delete(output_path)
+  end
+
+  it "should not generate index page when index_enabled is false" do
+    theme = AsciidoctorPDF::Theme.new
+    theme.index_enabled = false
+
+    input = "Texte avec Crystal((Crystal)) indexé."
+    output_path = "#{OUTPUT_DIR}/no_index_test.pdf"
+    doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => output_path})
+    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    converter.convert(doc)
+
+    File.exists?(output_path).should be_true
+    File.size(output_path).should be > 0
+    File.delete(output_path)
+  end
+
+  it "should generate index with multiple columns" do
+    theme = AsciidoctorPDF::Theme.new
+    theme.index_enabled = true
+    theme.index_columns = 3
+
+    input = <<-ADOC
+    = Index multi-colonnes
+
+    Termes : Alpha((Alpha)), Beta((Beta)), Crystal((Crystal)), Delta((Delta)),
+    Epsilon((Epsilon)), Gamma((Gamma)), Lambda((Lambda)), Omega((Omega)).
+    ADOC
+
+    output_path = "#{OUTPUT_DIR}/index_multicolumn.pdf"
+    doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => output_path})
+    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    converter.convert(doc)
+
+    File.exists?(output_path).should be_true
+    File.size(output_path).should be > 0
+    File.delete(output_path)
+  end
 end
