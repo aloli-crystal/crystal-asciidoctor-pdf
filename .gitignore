@@ -1,0 +1,17 @@
+# Binaires compilés (le source Crystal dans bin/ est versionné)
+bin/asciidoctor-pdf
+
+# Artefacts de compilation Crystal
+.crystal/
+.shards/
+
+# Répertoire lib (dépendances installées par shards)
+lib/
+
+# Répertoire de sortie des tests
+spec/output/
+
+# Fichiers temporaires
+*.tmp
+*.bak
+*~

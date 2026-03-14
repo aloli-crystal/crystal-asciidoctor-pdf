@@ -92,7 +92,10 @@ module AsciidoctorPDF
     property table_border_color : String = "dddddd"
     property table_border_width : Float64 = 0.5
     property table_header_background_color : String = "e8e8e8"
+    property table_header_font_color : String = "333333"
     property table_header_font_style : String = "bold"
+    property table_row_alt_background_color : String? = "f9f9f9"
+    property table_footer_background_color : String = "eeeeee"
     property table_cell_padding : Float64 = 4.0
     property table_margin_top : Float64 = 8.0
     property table_margin_bottom : Float64 = 8.0
@@ -135,6 +138,7 @@ module AsciidoctorPDF
     property footer_right : String = "{page_number}"
 
     # --- Couleurs de syntax highlighting ---
+    property code_highlight_enabled : Bool = true
     property code_highlight_keyword_color : String = "0000ff"
     property code_highlight_string_color : String = "008000"
     property code_highlight_comment_color : String = "808080"

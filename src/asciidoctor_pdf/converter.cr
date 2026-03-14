@@ -14,6 +14,9 @@ module AsciidoctorPDF
     # Entrée d'index
     record IndexEntry, term : String, page_number : Int32
 
+    # Note de bas de page
+    record FootnoteEntry, index : Int32, text : String, page_number : Int32
+
     # --- État interne ---
     @doc : PDF::Document
     @theme : Theme
@@ -25,6 +28,9 @@ module AsciidoctorPDF
     @document_title : String = ""
     @index_entries : Array(IndexEntry) = [] of IndexEntry
     @toc_entries : Array({String, Int32, Int32}) = [] of {String, Int32, Int32}  # {titre, niveau, page}
+    @anchor_positions : Hash(String, Float64) = {} of String => Float64  # {id => y_position}
+    @footnotes : Array(FootnoteEntry) = [] of FootnoteEntry  # notes de bas de page
+    @footnotes_by_page : Hash(Int32, Array(FootnoteEntry)) = {} of Int32 => Array(FootnoteEntry)
     @output_path : String = "output.pdf"
 
     # Dimensions de la page (A4 par défaut)
@@ -75,11 +81,11 @@ module AsciidoctorPDF
       when "preamble"       then convert_preamble(node)
       when "toc"            then ""  # géré dans convert_document
       when "floating_title" then convert_floating_title(node)
-      when "inline_anchor"  then ""
+      when "inline_anchor"  then convert_inline_anchor(node)
       when "inline_break"   then ""
       when "inline_button"  then ""
       when "inline_callout" then ""
-      when "inline_footnote" then ""
+      when "inline_footnote" then convert_inline_footnote(node)
       when "inline_image"   then ""
       when "inline_indexterm" then convert_inline_indexterm(node)
       when "inline_kbd"     then ""
@@ -111,16 +117,21 @@ module AsciidoctorPDF
         render_title_page(node)
       end
 
-      # Table des matières (placeholder, sera remplie après le rendu)
-      toc_page_number = -1
+      # Table des matières (page réservée, sera remplie après le rendu du contenu)
+      toc_page_index = -1
       if @theme.toc_enabled && node.attr?("toc")
-        toc_page_number = @page_number + 1
+        toc_page_index = @page_number  # index 0-based de la page TOC
         new_page
       end
 
       # Contenu principal
       node.blocks.each do |block|
         convert(block)
+      end
+
+      # Rendre la table des matières sur la page réservée
+      if toc_page_index >= 0
+        render_toc(toc_page_index)
       end
 
       # Rendre les en-têtes et pieds de page sur toutes les pages
@@ -192,28 +203,24 @@ module AsciidoctorPDF
       return "" unless node.is_a?(Asciidoctor::Block)
 
       ensure_page
-      text = node.content || ""
-      text = strip_inline_markup(text)
-      return "" if text.empty?
+      html = node.content || ""
+      return "" if html.empty?
 
       font_size = @theme.base_font_size
       line_height = @theme.base_line_height
       line_h = font_size * line_height
 
-      page = @current_page.not_nil!
-      page.font("Helvetica", size: font_size)
-      page.fill_color(@theme.base_font_color)
-
-      # Découper le texte en lignes
-      lines = wrap_text(text, @content_width, font_size)
+      # Découper le HTML en lignes de texte brut pour le calcul de la hauteur
+      plain = strip_inline_markup(html)
+      lines = wrap_text(plain, @content_width, font_size)
       total_h = lines.size * line_h + @theme.prose_margin_bottom
 
       check_page_break(total_h)
 
-      lines.each do |line|
-        page.text(line, at: {@margin, @current_y - font_size})
-        @current_y -= line_h
-      end
+      page = @current_page.not_nil!
+
+      # Rendre chaque ligne avec le markup inline
+      render_inline_lines(page, html, @margin, @content_width, font_size, line_h)
       @current_y -= @theme.prose_margin_bottom
       ""
     end
@@ -236,10 +243,12 @@ module AsciidoctorPDF
       ensure_page
 
       source = node.source
+      language = node.attr("language") || ""
       lines = source.split("\n")
       font_size = @theme.code_font_size
       line_h = font_size * 1.4
       padding = @theme.code_padding
+      highlight = @theme.code_highlight_enabled && !language.empty?
 
       total_h = lines.size * line_h + (2 * padding) + @theme.code_margin_top + @theme.code_margin_bottom
       check_page_break(total_h)
@@ -259,13 +268,32 @@ module AsciidoctorPDF
       page.rectangle(@margin, @current_y - block_h, @content_width, block_h)
       page.stroke
 
-      # Texte du code
-      page.font("Courier", size: font_size)
-      page.fill_color(@theme.code_font_color)
+      # Indicateur de langage (coin supérieur droit)
+      unless language.empty?
+        page.font("Helvetica", size: font_size * 0.75)
+        page.fill_color("888888")
+        lang_x = @margin + @content_width - language.size * font_size * 0.45 - padding
+        page.text(language, at: {lang_x, @current_y - font_size * 0.75})
+      end
 
+      # Texte du code avec coloration syntaxique optionnelle
       y = @current_y - padding - font_size
       lines.each do |line|
-        page.text(line, at: {@margin + padding, y})
+        if highlight
+          tokens = SyntaxHighlighter.tokenize(line, language)
+          x = @margin + padding
+          tokens.each do |token|
+            page.font("Courier", size: font_size)
+            page.fill_color(token.color)
+            page.text(token.text, at: {x, y})
+            # Avancer x de la largeur approximative du token
+            x += token.text.size * font_size * 0.6
+          end
+        else
+          page.font("Courier", size: font_size)
+          page.fill_color(@theme.code_font_color)
+          page.text(line, at: {@margin + padding, y})
+        end
         y -= line_h
       end
 
@@ -419,54 +447,121 @@ module AsciidoctorPDF
       col_count = node.columns.size
       return "" if col_count == 0
 
-      col_width = @content_width / col_count
+      # Calculer les largeurs de colonnes proportionnelles (via colpcwidth)
+      col_widths = node.columns.map do |col|
+        pcw = col.attr("colpcwidth")
+        pcw ? (pcw.to_f / 100.0 * @content_width) : (@content_width / col_count)
+      end
+
       font_size = @theme.base_font_size
-      cell_h = font_size + (2 * @theme.table_cell_padding)
+      padding = @theme.table_cell_padding
+      cell_h = font_size + (2 * padding)
 
       page = @current_page.not_nil!
+
+      # Titre du tableau (caption)
+      if (caption = node.title) && !caption.empty?
+        page.font("Helvetica", size: font_size - 1)
+        page.fill_color("888888")
+        page.text(caption, at: {@margin, @current_y - (font_size - 1)})
+        @current_y -= (font_size - 1) * 1.4
+      end
 
       # En-têtes
       if node.has_header_option
         node.rows.head.each do |row|
           x = @margin
-          row.each do |cell|
+          row.each_with_index do |cell, ci|
+            cw = col_widths[ci]? || (@content_width / col_count)
             page.fill_color(@theme.table_header_background_color)
-            page.rectangle(x, @current_y - cell_h, col_width, cell_h)
+            page.rectangle(x, @current_y - cell_h, cw, cell_h)
             page.fill
 
             page.stroke_color(@theme.table_border_color)
             page.line_width(@theme.table_border_width)
-            page.rectangle(x, @current_y - cell_h, col_width, cell_h)
+            page.rectangle(x, @current_y - cell_h, cw, cell_h)
             page.stroke
 
             page.font("Helvetica-Bold", size: font_size)
-            page.fill_color(@theme.base_font_color)
+            page.fill_color(@theme.table_header_font_color)
             text = strip_inline_markup(cell.text || "")
-            page.text(text, at: {x + @theme.table_cell_padding, @current_y - @theme.table_cell_padding - font_size})
-            x += col_width
+            halign = cell.attr("halign") || "left"
+            tx = case halign
+                 when "center" then x + (cw - text.size * font_size * 0.55) / 2
+                 when "right"  then x + cw - text.size * font_size * 0.55 - padding
+                 else               x + padding
+                 end
+            page.text(text, at: {tx, @current_y - padding - font_size})
+            x += cw
           end
           @current_y -= cell_h
         end
       end
 
-      # Corps du tableau
+      # Corps du tableau avec alternance de couleurs
+      row_idx = 0
       node.rows.body.each do |row|
         check_page_break(cell_h)
+        page = @current_page.not_nil!
         x = @margin
-        row.each do |cell|
-          page = @current_page.not_nil!
+        bg_color = (row_idx % 2 == 1) ? @theme.table_row_alt_background_color : nil
+
+        row.each_with_index do |cell, ci|
+          cw = col_widths[ci]? || (@content_width / col_count)
+
+          # Fond alterné
+          if bg_color
+            page.fill_color(bg_color)
+            page.rectangle(x, @current_y - cell_h, cw, cell_h)
+            page.fill
+          end
+
           page.stroke_color(@theme.table_border_color)
           page.line_width(@theme.table_border_width)
-          page.rectangle(x, @current_y - cell_h, col_width, cell_h)
+          page.rectangle(x, @current_y - cell_h, cw, cell_h)
           page.stroke
 
           page.font("Helvetica", size: font_size)
           page.fill_color(@theme.base_font_color)
           text = strip_inline_markup(cell.text || "")
-          page.text(text, at: {x + @theme.table_cell_padding, @current_y - @theme.table_cell_padding - font_size})
-          x += col_width
+          halign = cell.attr("halign") || "left"
+          tx = case halign
+               when "center" then x + (cw - text.size * font_size * 0.55) / 2
+               when "right"  then x + cw - text.size * font_size * 0.55 - padding
+               else               x + padding
+               end
+          page.text(text, at: {tx, @current_y - padding - font_size})
+          x += cw
         end
         @current_y -= cell_h
+        row_idx += 1
+      end
+
+      # Pied de tableau
+      unless node.rows.foot.empty?
+        node.rows.foot.each do |row|
+          check_page_break(cell_h)
+          page = @current_page.not_nil!
+          x = @margin
+          row.each_with_index do |cell, ci|
+            cw = col_widths[ci]? || (@content_width / col_count)
+            page.fill_color(@theme.table_footer_background_color)
+            page.rectangle(x, @current_y - cell_h, cw, cell_h)
+            page.fill
+
+            page.stroke_color(@theme.table_border_color)
+            page.line_width(@theme.table_border_width)
+            page.rectangle(x, @current_y - cell_h, cw, cell_h)
+            page.stroke
+
+            page.font("Helvetica-Bold", size: font_size)
+            page.fill_color(@theme.base_font_color)
+            text = strip_inline_markup(cell.text || "")
+            page.text(text, at: {x + padding, @current_y - padding - font_size})
+            x += cw
+          end
+          @current_y -= cell_h
+        end
       end
 
       @current_y -= @theme.table_margin_bottom
@@ -484,22 +579,67 @@ module AsciidoctorPDF
       return "" if target.empty?
 
       ensure_page
-      # Rendu d'un placeholder si l'image n'est pas trouvée
-      page = @current_page.not_nil!
       alt = node.attr("alt") || target
-      font_size = @theme.base_font_size
+      width_attr = node.attr("width")
+      height_attr = node.attr("height")
 
+      image_path = resolve_image_path(node, target)
+
+      if image_path && File.exists?(image_path)
+        begin
+          img = PDF::Images::Image.load(image_path)
+
+          max_w = @content_width
+          display_w = width_attr ? [width_attr.to_f, max_w].min : [img.width.to_f, max_w].min
+          ratio = display_w / img.width.to_f
+          display_h = height_attr ? height_attr.to_f : img.height.to_f * ratio
+
+          check_page_break(display_h + 8.0)
+          page = @current_page.not_nil!
+
+          align = node.attr("align") || "left"
+          x = case align
+              when "center" then @margin + (@content_width - display_w) / 2
+              when "right"  then @margin + @content_width - display_w
+              else               @margin
+              end
+
+          page.image(img, at: {x, @current_y}, width: display_w)
+          @current_y -= display_h + 8.0
+        rescue
+          render_image_placeholder(alt)
+        end
+      else
+        render_image_placeholder(alt)
+      end
+      ""
+    end
+
+    private def resolve_image_path(node : Asciidoctor::Block, target : String) : String?
+      return nil if target.empty?
+      return target if File.exists?(target)
+      if (docdir = node.document.attr("docdir"))
+        candidate = File.join(docdir, target)
+        return candidate if File.exists?(candidate)
+        candidate2 = File.join(docdir, "images", target)
+        return candidate2 if File.exists?(candidate2)
+      end
+      nil
+    end
+
+    private def render_image_placeholder(alt : String) : Nil
+      ensure_page
+      page = @current_page.not_nil!
+      block_h = 40.0
       @current_y -= 8.0
       page.stroke_color("cccccc")
       page.line_width(0.5)
-      page.rectangle(@margin, @current_y - 40.0, @content_width, 40.0)
+      page.rectangle(@margin, @current_y - block_h, @content_width, block_h)
       page.stroke
-
-      page.font("Helvetica", size: font_size - 1)
+      page.font("Helvetica", size: @theme.base_font_size - 1)
       page.fill_color("888888")
       page.text("[Image: #{alt}]", at: {@margin + 8.0, @current_y - 24.0})
-      @current_y -= 48.0
-      ""
+      @current_y -= block_h + 8.0
     end
 
     # =========================================================================
@@ -587,6 +727,104 @@ module AsciidoctorPDF
       ""
     end
 
+    # Gestion des notes de bas de page
+    # Les notes sont collectées pendant le rendu, puis affichées en bas de chaque page.
+    def convert_inline_footnote(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Inline)
+      index_str = node.attr("index")
+      index = index_str ? index_str.to_i : (@footnotes.size + 1)
+      text = node.text || ""
+      return "" if text.empty? && node.type == :xref
+
+      # Enregistrer la note
+      entry = FootnoteEntry.new(index, text, @page_number)
+      @footnotes << entry
+      (@footnotes_by_page[@page_number] ||= [] of FootnoteEntry) << entry
+
+      # Afficher le numéro de note en exposant dans le texte courant
+      ensure_page
+      page = @current_page.not_nil!
+      font_size = @theme.base_font_size * 0.7
+      page.font("Helvetica", size: font_size)
+      page.fill_color("0645ad")
+      page.text("[#{index}]", at: {@margin, @current_y - @theme.base_font_size})
+      page.fill_color(@theme.base_font_color)
+      ""
+    end
+
+    # Rend les notes de bas de page pour une page donnée.
+    # Appelé après le rendu de chaque page.
+    private def render_page_footnotes(page : PDF::Page, page_num : Int32) : Nil
+      notes = @footnotes_by_page[page_num]?
+      return unless notes && !notes.empty?
+
+      font_size = @theme.base_font_size * 0.8
+      line_h = font_size * 1.3
+      separator_y = @margin + @theme.footer_height + notes.size * line_h + 8.0
+
+      # Ligne de séparation
+      page.stroke_color("cccccc")
+      page.line_width(0.5)
+      page.line({@margin, separator_y}, {@margin + @content_width / 3, separator_y})
+      page.stroke
+
+      y = separator_y - 4.0
+      notes.each do |note|
+        page.font("Helvetica", size: font_size)
+        page.fill_color(@theme.base_font_color)
+        page.text("[#{note.index}] #{note.text}", at: {@margin, y - font_size})
+        y -= line_h
+      end
+    end
+
+    # Gestion des liens et références internes (XRefs)
+    # Les liens sont rendus en couleur bleue soulignée dans le PDF.
+    # Pour les références internes, le texte de la référence est affiché entre crochets.
+    def convert_inline_anchor(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Inline)
+      case node.type
+      when :xref
+        # Référence interne : afficher le texte ou l'id entre crochets
+        reftext = node.text || node.attr("refid") || node.target || ""
+        ensure_page
+        page = @current_page.not_nil!
+        font_size = @theme.base_font_size
+        page.font("Helvetica", size: font_size)
+        page.fill_color("0645ad")
+        page.text("[» #{reftext}]", at: {@margin, @current_y - font_size})
+        page.fill_color(@theme.base_font_color)
+        @current_y -= font_size * @theme.base_line_height
+      when :link
+        # Lien externe : afficher le texte du lien en bleu
+        link_text = node.text || node.target || ""
+        target = node.target || ""
+        ensure_page
+        page = @current_page.not_nil!
+        font_size = @theme.base_font_size
+        page.font("Helvetica", size: font_size)
+        page.fill_color("0645ad")
+        display = link_text.empty? ? target : link_text
+        page.text(display, at: {@margin, @current_y - font_size})
+        page.fill_color(@theme.base_font_color)
+        @current_y -= font_size * @theme.base_line_height
+      when :ref
+        # Ancre de destination : enregistrer la position pour les XRefs
+        @anchor_positions[node.id || ""] = @current_y if node.id
+      when :bibref
+        # Référence bibliographique
+        id = node.id || ""
+        reftext = node.reftext || id
+        ensure_page
+        page = @current_page.not_nil!
+        font_size = @theme.base_font_size
+        page.font("Helvetica", size: font_size)
+        page.fill_color(@theme.base_font_color)
+        page.text("[#{reftext}]", at: {@margin, @current_y - font_size})
+        @current_y -= font_size * @theme.base_line_height
+      end
+      ""
+    end
+
     # =========================================================================
     # Helpers de rendu
     # =========================================================================
@@ -631,6 +869,66 @@ module AsciidoctorPDF
         @current_y -= font_size + 4.0
       end
       ""
+    end
+
+    # =========================================================================
+    # Table des matières
+    # =========================================================================
+
+    # Rend la table des matières sur la page réservée (index 0-based).
+    # La TOC est rendue après le contenu principal pour avoir les numéros de page corrects.
+    private def render_toc(page_index : Int32) : Nil
+      return if @toc_entries.empty?
+      return if page_index < 0 || page_index >= @doc.pages.size
+
+      page = @doc.pages[page_index]
+      y = @page_height - @margin
+      font_size = @theme.toc_font_size
+      line_h = font_size * 1.4
+      dot_color = @theme.toc_dot_leader_color
+      text_color = @theme.base_font_color
+
+      # Titre de la TOC
+      page.font("Helvetica-Bold", size: font_size + 4.0)
+      page.fill_color(@theme.heading_font_color)
+      page.text(@theme.toc_title, at: {@margin, y - (font_size + 4.0)})
+      y -= (font_size + 4.0) * 1.6
+
+      # Entrées de la TOC
+      @toc_entries.each do |entry|
+        title, level, page_num = entry
+        indent = (level - 1) * 12.0
+        entry_x = @margin + indent
+        entry_w = @content_width - indent
+
+        # Texte du titre
+        page.font(level <= 1 ? "Helvetica-Bold" : "Helvetica", size: font_size)
+        page.fill_color(text_color)
+        page.text(title, at: {entry_x, y - font_size})
+
+        # Numéro de page (aligné à droite)
+        page_str = page_num.to_s
+        page_num_w = page_str.size * font_size * 0.6
+        page.fill_color(text_color)
+        page.text(page_str, at: {@margin + @content_width - page_num_w, y - font_size})
+
+        # Pointillés entre le titre et le numéro de page
+        title_w = title.size * font_size * 0.55
+        dot_x_start = entry_x + title_w + 4.0
+        dot_x_end = @margin + @content_width - page_num_w - 4.0
+        if dot_x_end > dot_x_start
+          page.fill_color(dot_color)
+          dot_spacing = font_size * 0.5
+          dot_x = dot_x_start
+          while dot_x < dot_x_end
+            page.text(".", at: {dot_x, y - font_size})
+            dot_x += dot_spacing
+          end
+        end
+
+        y -= line_h
+        break if y < @margin  # Ne pas dépasser la page
+      end
     end
 
     # =========================================================================
@@ -688,6 +986,9 @@ module AsciidoctorPDF
         page_idx = meta.number - 1
         next if page_idx < 0 || page_idx >= @doc.pages.size
         page = @doc.pages[page_idx]
+
+        # Notes de bas de page
+        render_page_footnotes(page, meta.number)
 
         if @theme.footer_enabled
           render_page_footer(page, meta)
@@ -792,6 +1093,89 @@ module AsciidoctorPDF
     # =========================================================================
     # Utilitaires de texte
     # =========================================================================
+
+    # Rend le contenu HTML inline ligne par ligne sur la page PDF courante.
+    # Gère le retour à la ligne automatique et le rendu des segments stylisés.
+    private def render_inline_lines(
+      page : PDF::Page,
+      html : String,
+      x : Float64,
+      width : Float64,
+      font_size : Float64,
+      line_h : Float64
+    ) : Nil
+      segments = InlineRenderer.parse(html)
+      char_w = font_size * 0.55
+      max_chars = [1, (width / char_w).to_i].max
+
+      # Regrouper les segments en lignes
+      current_line_segs = [] of InlineSegment
+      current_line_len = 0
+
+      segments.each do |seg|
+        words = seg.text.split(" ")
+        words.each_with_index do |word, idx|
+          word_len = word.size
+          space = idx > 0 || !current_line_segs.empty? ? 1 : 0
+
+          if current_line_len + space + word_len > max_chars && !current_line_segs.empty?
+            # Flush la ligne courante
+            render_segment_line(page, current_line_segs, x, @current_y - font_size, font_size)
+            @current_y -= line_h
+            current_line_segs = [] of InlineSegment
+            current_line_len = 0
+            space = 0
+          end
+
+          prefix = space > 0 ? " " : ""
+          current_line_segs << InlineSegment.new(
+            text: prefix + word,
+            bold: seg.bold,
+            italic: seg.italic,
+            mono: seg.mono,
+            color: seg.color,
+            link: seg.link
+          )
+          current_line_len += space + word_len
+        end
+      end
+
+      # Flush la dernière ligne
+      unless current_line_segs.empty?
+        render_segment_line(page, current_line_segs, x, @current_y - font_size, font_size)
+        @current_y -= line_h
+      end
+    end
+
+    # Rend une ligne de segments inline sur la page PDF.
+    private def render_segment_line(
+      page : PDF::Page,
+      segments : Array(InlineSegment),
+      x : Float64,
+      y : Float64,
+      font_size : Float64
+    ) : Nil
+      current_x = x
+      segments.each do |seg|
+        next if seg.text.empty?
+        font_name = if seg.mono
+          "Courier"
+        elsif seg.bold && seg.italic
+          "Helvetica-BoldOblique"
+        elsif seg.bold
+          "Helvetica-Bold"
+        elsif seg.italic
+          "Helvetica-Oblique"
+        else
+          "Helvetica"
+        end
+        page.font(font_name, size: font_size)
+        page.fill_color(seg.color || @theme.base_font_color)
+        page.text(seg.text, at: {current_x, y})
+        char_w = font_size * (seg.mono ? 0.6 : 0.55)
+        current_x += seg.text.size * char_w
+      end
+    end
 
     # Supprime le markup inline HTML généré par asciidoctor
     private def strip_inline_markup(text : String) : String
