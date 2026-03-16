@@ -1,5 +1,10 @@
 = Changelog
 
+== 0.1.1 (2026-03-16)
+
+- Renommage du binaire CLI de `asciidoctor-pdf` à `crystal-asciidoctor-pdf`.
+- Modification du comportement de sortie par défaut : `mon_document.adoc` produit désormais `mon_document.adoc.pdf`.
+
 == 0.1.0 (2026-03-13)
 
 - Version initiale

@@ -27,12 +27,14 @@ AsciidoctorPDF::Converter.new.convert(doc)
 
 == Ligne de commande
 
-Ce shard fournit également un exécutable `asciidoctor-pdf` :
+Ce shard fournit également un exécutable `crystal-asciidoctor-pdf` :
 
 [source,bash]
 ----
-asciidoctor-pdf mon_document.adoc
+crystal-asciidoctor-pdf mon_document.adoc
 ----
+
+Par défaut, la commande `crystal-asciidoctor-pdf mon_document.adoc` générera un fichier nommé `mon_document.adoc.pdf`.
 
 == Développement
 
