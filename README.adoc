@@ -2,6 +2,77 @@
 
 Un convertisseur AsciiDoc vers PDF pour Crystal, basé sur `crystal-asciidoctor` pour le parsing et `crystal-pdf` pour la génération du PDF.
 
+== Versions
+
+[cols="2,2,2"]
+|===
+| | Version | Date
+
+| *Gem Ruby asciidoctor-pdf (source du portage)*
+| 2.3.24
+| 2025-11-15
+
+| *Gem Ruby asciidoctor (parser, via crystal-asciidoctor)*
+| 2.0.26
+| 2025-10-24
+
+| *Shard Crystal crystal-asciidoctor-pdf*
+| 0.1.0
+| 2026-04-02
+|===
+
+NOTE: Ce shard est un portage de la gem Ruby asciidoctor-pdf **2.3.24** et repose sur crystal-asciidoctor, lui-même porté depuis asciidoctor **2.0.26**.
+Vérifier les versions sur RubyGems : https://rubygems.org/gems/asciidoctor-pdf/versions[asciidoctor-pdf] | https://rubygems.org/gems/asciidoctor/versions[asciidoctor].
+
+== Fonctionnalités
+
+=== Conversion AsciiDoc
+
+* Paragraphes, sections (niveaux 1-6), listes (ordonnées, non ordonnées, description)
+* Tableaux avec en-têtes, pieds de page et alternance de couleurs
+* Blocs de code avec coloration syntaxique (Crystal, Ruby, Python, JavaScript, TypeScript, Go, Java, C, C++, Bash, SQL)
+* Admonitions (NOTE, TIP, WARNING, CAUTION, IMPORTANT)
+* Citations, vers, sidebars, exemples
+* Images (JPEG, PNG avec transparence)
+* Page de titre, en-têtes et pieds de page configurables
+* Table des matières (TOC)
+* Index alphabétique multi-colonnes
+* Notes de bas de page
+
+=== Fonctionnalités PDF
+
+* **Bookmarks** : les sections du document génèrent automatiquement une arborescence de signets dans le panneau de navigation PDF
+* **Liens cliquables** : les URLs dans le document produisent des annotations PDF cliquables
+* **Métadonnées** : titre, auteur et producteur renseignés dans les propriétés du PDF
+* **Mesures de texte exactes** : utilisation des métriques de police Type1/TrueType (pas d'approximation)
+
+=== Polices personnalisées
+
+Le converter supporte les polices TrueType/OpenType via le système de thèmes.
+Si des chemins de polices sont définis dans le thème, elles sont automatiquement chargées, embarquées et sous-ensemblées dans le PDF.
+
+[source,yaml]
+----
+# Exemple de thème avec polices TTF
+base_font_path: "fonts/OpenSans-Regular.ttf"
+base_font_bold_path: "fonts/OpenSans-Bold.ttf"
+base_font_italic_path: "fonts/OpenSans-Italic.ttf"
+mono_font_path: "fonts/JetBrainsMono-Regular.ttf"
+----
+
+Sans polices TTF, les polices standard PDF (Helvetica, Courier) sont utilisées.
+
+=== Thèmes
+
+Le rendu PDF est entièrement personnalisable via un fichier YAML (~60 propriétés) :
+taille et couleur des polices, marges, couleurs des admonitions, style des tableaux, en-têtes/pieds de page, etc.
+
+[source,crystal]
+----
+theme = AsciidoctorPDF::ThemeLoader.load("mon-theme.yml")
+converter = AsciidoctorPDF::Converter.new("pdf", theme)
+----
+
 == Installation
 
 . Ajoutez cette dépendance à votre fichier `shard.yml` :
@@ -10,7 +81,7 @@ Un convertisseur AsciiDoc vers PDF pour Crystal, basé sur `crystal-asciidoctor`
 ----
 dependencies:
   crystal-asciidoctor-pdf:
-    github: aloli/crystal-asciidoctor-pdf
+    github: aloli-crystal/crystal-asciidoctor-pdf
 ----
 . Exécutez `shards install`
 
@@ -20,8 +91,23 @@ dependencies:
 ----
 require "crystal-asciidoctor-pdf"
 
-input = "== Mon Document\n\nCeci est un test."
-doc = Asciidoctor.load(input)
+input = <<-ADOC
+= Mon Document
+Auteur
+
+== Introduction
+
+Un paragraphe avec *gras* et _italique_.
+
+== Code
+
+[source,crystal]
+\----
+puts "Bonjour !"
+\----
+ADOC
+
+doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => "document.pdf"})
 AsciidoctorPDF::Converter.new.convert(doc)
 ----
 
@@ -34,16 +120,27 @@ Ce shard fournit également un exécutable `crystal-asciidoctor-pdf` :
 crystal-asciidoctor-pdf mon_document.adoc
 ----
 
-Par défaut, la commande `crystal-asciidoctor-pdf mon_document.adoc` générera un fichier nommé `mon_document.adoc.pdf`.
+Par défaut, la commande génère un fichier `mon_document.pdf`.
 
 == Développement
 
-Pour contribuer, clonez le dépôt et exécutez `shards install`.
-Les tests peuvent être lancés avec `crystal spec`.
+Pour contribuer, clonez les trois dépôts au même niveau :
+
+[source,bash]
+----
+git clone https://github.com/aloli-crystal/crystal-asciidoctor.git
+git clone https://github.com/aloli-crystal/crystal-pdf.git
+git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
+cd crystal-asciidoctor-pdf
+shards install
+crystal spec
+----
+
+Les dépendances locales (`path: ../crystal-asciidoctor` et `path: ../crystal-pdf`) sont utilisées pour le développement.
 
 == Contribuer
 
-. Forkez le projet ( https://github.com/aloli/crystal-asciidoctor-pdf/fork )
+. Forkez le projet ( https://github.com/aloli-crystal/crystal-asciidoctor-pdf/fork )
 . Créez votre branche de fonctionnalité (`git checkout -b ma-nouvelle-fonctionnalite`)
 . Commitez vos changements (`git commit -am 'Ajouter une nouvelle fonctionnalité'`)
 . Poussez vers la branche (`git push origin ma-nouvelle-fonctionnalite`)

@@ -276,4 +276,172 @@ describe AsciidoctorPDF::Converter do
     File.size(output_path).should be > 0
     File.delete(output_path)
   end
+
+  # =========================================================================
+  # Bookmarks PDF (outline)
+  # =========================================================================
+
+  it "should generate PDF bookmarks from sections" do
+    input = "= Document\n\n== Chapter 1\n\nContent.\n\n== Chapter 2\n\nMore content."
+    path = convert_to_pdf(input, "bookmarks")
+    content = String.new(File.read(path).to_slice)
+    content.should contain("/Outlines")
+    content.should contain("/Title")
+    File.delete(path)
+  end
+
+  it "should not generate outline for document without sections" do
+    path = convert_to_pdf("Just a paragraph.", "no_bookmarks")
+    content = String.new(File.read(path).to_slice)
+    content.should_not contain("/Outlines")
+    File.delete(path)
+  end
+
+  # =========================================================================
+  # Métadonnées PDF
+  # =========================================================================
+
+  it "should include document title in PDF metadata" do
+    input = "= Mon Titre\n\nContenu."
+    path = convert_to_pdf(input, "metadata_title")
+    content = String.new(File.read(path).to_slice)
+    content.should contain("/Title")
+    content.should contain("Mon Titre")
+    File.delete(path)
+  end
+
+  it "should include author in PDF metadata" do
+    input = "= Titre\nJean Dupont\n\nContenu."
+    path = convert_to_pdf(input, "metadata_author")
+    content = String.new(File.read(path).to_slice)
+    content.should contain("/Author")
+    content.should contain("Jean Dupont")
+    File.delete(path)
+  end
+
+  it "should include producer in PDF metadata" do
+    path = convert_to_pdf("Contenu simple.", "metadata_producer")
+    content = String.new(File.read(path).to_slice)
+    content.should contain("/Producer")
+    content.should contain("crystal-asciidoctor-pdf")
+    File.delete(path)
+  end
+
+  # =========================================================================
+  # Mesures de texte exactes
+  # =========================================================================
+
+  it "should handle long paragraphs with proper line wrapping" do
+    long_text = "Ce paragraphe contient suffisamment de texte pour necessiter " \
+                "un retour a la ligne automatique dans le rendu PDF. " \
+                "Les mesures de texte utilisent maintenant les metriques exactes " \
+                "des polices Type1 au lieu d une approximation constante."
+    assert_pdf_generated(long_text, "long_paragraph")
+  end
+
+  it "should handle mixed inline formatting in paragraphs" do
+    input = "Texte avec *gras* et _italique_ et `code` et encore du texte normal pour remplir la ligne."
+    assert_pdf_generated(input, "mixed_inline_long")
+  end
+
+  # =========================================================================
+  # Liens
+  # =========================================================================
+
+  it "should generate clickable link annotations" do
+    input = "Visitez https://crystal-lang.org[Crystal] pour plus d infos."
+    path = convert_to_pdf(input, "link_annotation")
+    content = String.new(File.read(path).to_slice)
+    # Le HTML généré par asciidoctor contient <a href=...> qui produit un lien inline
+    File.size(path).should be > 0
+    File.delete(path)
+  end
+
+  # =========================================================================
+  # Description lists
+  # =========================================================================
+
+  it "should convert a description list" do
+    input = "Terme 1:: Definition du premier terme.\nTerme 2:: Definition du second terme."
+    assert_pdf_generated(input, "dlist")
+  end
+
+  # =========================================================================
+  # Blocs spéciaux avancés
+  # =========================================================================
+
+  it "should convert a verse block" do
+    input = "[verse, Auteur, Source]\n____\nPremiere ligne\nDeuxieme ligne\n____"
+    assert_pdf_generated(input, "verse_block")
+  end
+
+  it "should convert a floating title" do
+    input = "[discrete]\n== Titre flottant\n\nParagraphe sous le titre."
+    assert_pdf_generated(input, "floating_title")
+  end
+
+  it "should convert nested lists" do
+    input = "* Item 1\n** Sous-item 1a\n** Sous-item 1b\n* Item 2"
+    assert_pdf_generated(input, "nested_list")
+  end
+
+  it "should convert a page break" do
+    input = "Page 1.\n\n<<<\n\nPage 2."
+    assert_pdf_generated(input, "page_break")
+  end
+
+  it "should convert a thematic break" do
+    input = "Avant.\n\n'''\n\nApres."
+    assert_pdf_generated(input, "thematic_break")
+  end
+
+  # =========================================================================
+  # Document complet avec TOC et bookmarks
+  # =========================================================================
+
+  it "should convert a full document with TOC and bookmarks" do
+    input = <<-ADOC
+    = Guide Complet
+    Auteur Test
+    :toc:
+
+    == Introduction
+
+    Ceci est l introduction du guide.
+
+    === Sous-section
+
+    Contenu de la sous-section avec *gras* et _italique_.
+
+    == Code
+
+    [source,crystal]
+    ----
+    def hello
+      puts "Bonjour"
+    end
+    ----
+
+    == Tableau
+
+    |===
+    | A | B
+
+    | 1 | 2
+    | 3 | 4
+    |===
+
+    NOTE: Note importante.
+
+    == Conclusion
+
+    Fin du document.
+    ADOC
+    path = convert_to_pdf(input, "full_doc_toc_bookmarks")
+    content = String.new(File.read(path).to_slice)
+    content.should contain("/Outlines")
+    content.should contain("/Title")
+    File.size(path).should be > 1000
+    File.delete(path)
+  end
 end

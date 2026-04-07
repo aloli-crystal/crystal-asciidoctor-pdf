@@ -5,11 +5,11 @@ shards:
     version: 1.6.4
 
   crystal-asciidoctor:
-    git: https://github.com/aloli/crystal-asciidoctor.git
+    path: ../crystal-asciidoctor
     version: 0.1.0+git.commit.792a7f7fbacb69304c75cac5bd20bb8f88ef3961
 
   crystal-pdf:
-    git: https://github.com/aloli/crystal-pdf.git
+    path: ../crystal-pdf
     version: 0.1.0+git.commit.3a74807f2bd3b3f23c635b80f359afcf5fb42b2f
 
   matrix:

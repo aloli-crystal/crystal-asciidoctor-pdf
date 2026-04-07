@@ -17,6 +17,27 @@ module AsciidoctorPDF
     # Note de bas de page
     record FootnoteEntry, index : Int32, text : String, page_number : Int32
 
+    # --- Polices ---
+    # Les polices sont résolues au démarrage : si le thème définit des chemins TTF,
+    # elles sont chargées ; sinon les polices Type1 standard sont utilisées.
+    # Ceci permet de mesurer le texte et de rendre avec les mêmes polices.
+    @font_body : PDF::Fonts::Base?
+    @font_body_bold : PDF::Fonts::Base?
+    @font_body_italic : PDF::Fonts::Base?
+    @font_body_bold_italic : PDF::Fonts::Base?
+    @font_mono : PDF::Fonts::Base?
+    @font_mono_bold : PDF::Fonts::Base?
+    @font_heading : PDF::Fonts::Base?
+
+    # Noms de polices utilisés dans les appels page.font()
+    @fn_body : String = "Helvetica"
+    @fn_body_bold : String = "Helvetica-Bold"
+    @fn_body_italic : String = "Helvetica-Oblique"
+    @fn_body_bold_italic : String = "Helvetica-BoldOblique"
+    @fn_mono : String = "Courier"
+    @fn_mono_bold : String = "Courier-Bold"
+    @fn_heading : String = "Helvetica-Bold"
+
     # --- État interne ---
     @doc : PDF::Document
     @theme : Theme
@@ -50,6 +71,9 @@ module AsciidoctorPDF
       )
       @margin = @theme.page_margin
       @content_width = @page_width - (2 * @margin)
+
+      # Charger les polices TTF si définies dans le thème
+      load_theme_fonts
     end
 
     # Point d'entrée principal : convertit le document et écrit le PDF
@@ -112,6 +136,12 @@ module AsciidoctorPDF
       @document_title = node.doctitle || ""
       @output_path = determine_output_path(node)
 
+      # Métadonnées PDF
+      @doc.title = @document_title unless @document_title.empty?
+      @doc.author = node.attr("author") if node.attr?("author")
+      @doc.subject = node.attr("subject") if node.attr?("subject")
+      @doc.producer = "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"
+
       # Page de titre
       if @theme.title_page_enabled && !@document_title.empty?
         render_title_page(node)
@@ -138,6 +168,9 @@ module AsciidoctorPDF
       if @theme.index_enabled && !@index_entries.empty?
         render_index
       end
+      # Générer les bookmarks PDF (outline) à partir des entrées TOC
+      generate_pdf_outline
+
       # Rendre les en-têtes et pieds de page sur toutes les pages
       render_headers_footers
       # Écrire le PDF
@@ -175,7 +208,7 @@ module AsciidoctorPDF
       font_size = @theme.heading_font_size(level)
       page = @current_page.not_nil!
 
-      page.font("Helvetica-Bold", size: font_size)
+      set_font(page, @fn_heading, font_size)
       page.fill_color(@theme.heading_font_color)
 
       text_y = @current_y - font_size
@@ -273,9 +306,9 @@ module AsciidoctorPDF
 
       # Indicateur de langage (coin supérieur droit)
       unless language.empty?
-        page.font("Helvetica", size: font_size * 0.75)
+        set_font(page, @fn_body, font_size * 0.75)
         page.fill_color("888888")
-        lang_x = @margin + @content_width - language.size * font_size * 0.45 - padding
+        lang_x = @margin + @content_width - text_width(language, @fn_body, font_size * 0.75) - padding
         page.text(language, at: {lang_x, @current_y - font_size * 0.75})
       end
 
@@ -286,14 +319,13 @@ module AsciidoctorPDF
           tokens = SyntaxHighlighter.tokenize(line, language)
           x = @margin + padding
           tokens.each do |token|
-            page.font("Courier", size: font_size)
+            set_font(page, @fn_mono, font_size)
             page.fill_color(token.color)
             page.text(token.text, at: {x, y})
-            # Avancer x de la largeur approximative du token
-            x += token.text.size * font_size * 0.6
+            x += text_width(token.text, @fn_mono, font_size)
           end
         else
-          page.font("Courier", size: font_size)
+          set_font(page, @fn_mono, font_size)
           page.fill_color(@theme.code_font_color)
           page.text(line, at: {@margin + padding, y})
         end
@@ -345,12 +377,12 @@ module AsciidoctorPDF
       page.fill
 
       # Label (NOTE, TIP, etc.)
-      page.font("Helvetica-Bold", size: font_size - 1)
+      set_font(page, @fn_body_bold, font_size - 1)
       page.fill_color(border_color)
       page.text(name.upcase, at: {@margin + @theme.admonition_border_width + 4, @current_y - padding - font_size})
 
       # Texte de l'admonition
-      page.font("Helvetica", size: font_size)
+      set_font(page, @fn_body, font_size)
       page.fill_color(@theme.base_font_color)
 
       y = @current_y - padding - font_size
@@ -385,7 +417,7 @@ module AsciidoctorPDF
         ensure_page
         page = @current_page.not_nil!
         term = strip_inline_markup(item.text || "")
-        page.font("Helvetica-Bold", size: @theme.base_font_size)
+        set_font(page, @fn_body_bold, @theme.base_font_size)
         page.fill_color(@theme.base_font_color)
         page.text(term, at: {@margin, @current_y - @theme.base_font_size})
         @current_y -= @theme.base_font_size * @theme.base_line_height
@@ -416,7 +448,7 @@ module AsciidoctorPDF
         x_marker = @margin + indent
         x_text = x_marker + @theme.list_indent
 
-        page.font("Helvetica", size: font_size)
+        set_font(page, @fn_body, font_size)
         page.fill_color(@theme.list_marker_color)
         page.text(marker, at: {x_marker, @current_y - font_size})
 
@@ -464,7 +496,7 @@ module AsciidoctorPDF
 
       # Titre du tableau (caption)
       if (caption = node.title) && !caption.empty?
-        page.font("Helvetica", size: font_size - 1)
+        set_font(page, @fn_body, font_size - 1)
         page.fill_color("888888")
         page.text(caption, at: {@margin, @current_y - (font_size - 1)})
         @current_y -= (font_size - 1) * 1.4
@@ -485,13 +517,14 @@ module AsciidoctorPDF
             page.rectangle(x, @current_y - cell_h, cw, cell_h)
             page.stroke
 
-            page.font("Helvetica-Bold", size: font_size)
+            set_font(page, @fn_body_bold, font_size)
             page.fill_color(@theme.table_header_font_color)
             text = strip_inline_markup(cell.text || "")
             halign = cell.attr("halign") || "left"
+            tw = text_width(text, @fn_body_bold, font_size)
             tx = case halign
-                 when "center" then x + (cw - text.size * font_size * 0.55) / 2
-                 when "right"  then x + cw - text.size * font_size * 0.55 - padding
+                 when "center" then x + (cw - tw) / 2
+                 when "right"  then x + cw - tw - padding
                  else               x + padding
                  end
             page.text(text, at: {tx, @current_y - padding - font_size})
@@ -524,13 +557,14 @@ module AsciidoctorPDF
           page.rectangle(x, @current_y - cell_h, cw, cell_h)
           page.stroke
 
-          page.font("Helvetica", size: font_size)
+          set_font(page, @fn_body, font_size)
           page.fill_color(@theme.base_font_color)
           text = strip_inline_markup(cell.text || "")
           halign = cell.attr("halign") || "left"
+          tw = text_width(text, @fn_body, font_size)
           tx = case halign
-               when "center" then x + (cw - text.size * font_size * 0.55) / 2
-               when "right"  then x + cw - text.size * font_size * 0.55 - padding
+               when "center" then x + (cw - tw) / 2
+               when "right"  then x + cw - tw - padding
                else               x + padding
                end
           page.text(text, at: {tx, @current_y - padding - font_size})
@@ -557,7 +591,7 @@ module AsciidoctorPDF
             page.rectangle(x, @current_y - cell_h, cw, cell_h)
             page.stroke
 
-            page.font("Helvetica-Bold", size: font_size)
+            set_font(page, @fn_body_bold, font_size)
             page.fill_color(@theme.base_font_color)
             text = strip_inline_markup(cell.text || "")
             page.text(text, at: {x + padding, @current_y - padding - font_size})
@@ -639,7 +673,7 @@ module AsciidoctorPDF
       page.line_width(0.5)
       page.rectangle(@margin, @current_y - block_h, @content_width, block_h)
       page.stroke
-      page.font("Helvetica", size: @theme.base_font_size - 1)
+      set_font(page, @fn_body, @theme.base_font_size - 1)
       page.fill_color("888888")
       page.text("[Image: #{alt}]", at: {@margin + 8.0, @current_y - 24.0})
       @current_y -= block_h + 8.0
@@ -715,7 +749,7 @@ module AsciidoctorPDF
       title = node.title || ""
       font_size = @theme.heading_font_size(level)
       page = @current_page.not_nil!
-      page.font("Helvetica-Bold", size: font_size)
+      set_font(page, @fn_body_bold, font_size)
       page.fill_color(@theme.heading_font_color)
       check_page_break(font_size + 8.0)
       page.text(title, at: {@margin, @current_y - font_size})
@@ -748,7 +782,7 @@ module AsciidoctorPDF
       ensure_page
       page = @current_page.not_nil!
       font_size = @theme.base_font_size * 0.7
-      page.font("Helvetica", size: font_size)
+      set_font(page, @fn_body, font_size)
       page.fill_color("0645ad")
       page.text("[#{index}]", at: {@margin, @current_y - @theme.base_font_size})
       page.fill_color(@theme.base_font_color)
@@ -773,7 +807,7 @@ module AsciidoctorPDF
 
       y = separator_y - 4.0
       notes.each do |note|
-        page.font("Helvetica", size: font_size)
+        set_font(page, @fn_body, font_size)
         page.fill_color(@theme.base_font_color)
         page.text("[#{note.index}] #{note.text}", at: {@margin, y - font_size})
         y -= line_h
@@ -792,22 +826,30 @@ module AsciidoctorPDF
         ensure_page
         page = @current_page.not_nil!
         font_size = @theme.base_font_size
-        page.font("Helvetica", size: font_size)
+        set_font(page, @fn_body, font_size)
         page.fill_color("0645ad")
         page.text("[» #{reftext}]", at: {@margin, @current_y - font_size})
         page.fill_color(@theme.base_font_color)
         @current_y -= font_size * @theme.base_line_height
       when :link
-        # Lien externe : afficher le texte du lien en bleu
+        # Lien externe : afficher le texte du lien en bleu avec annotation cliquable
         link_text = node.text || node.target || ""
         target = node.target || ""
         ensure_page
         page = @current_page.not_nil!
         font_size = @theme.base_font_size
-        page.font("Helvetica", size: font_size)
+        set_font(page, @fn_body, font_size)
         page.fill_color("0645ad")
         display = link_text.empty? ? target : link_text
-        page.text(display, at: {@margin, @current_y - font_size})
+        text_y = @current_y - font_size
+        page.text(display, at: {@margin, text_y})
+
+        # Annotation lien URI cliquable
+        unless target.empty?
+          tw = text_width(display, @fn_body, font_size)
+          page.link_uri(rect: {@margin, text_y - 2, @margin + tw, text_y + font_size}, uri: target)
+        end
+
         page.fill_color(@theme.base_font_color)
         @current_y -= font_size * @theme.base_line_height
       when :ref
@@ -820,7 +862,7 @@ module AsciidoctorPDF
         ensure_page
         page = @current_page.not_nil!
         font_size = @theme.base_font_size
-        page.font("Helvetica", size: font_size)
+        set_font(page, @fn_body, font_size)
         page.fill_color(@theme.base_font_color)
         page.text("[#{reftext}]", at: {@margin, @current_y - font_size})
         @current_y -= font_size * @theme.base_line_height
@@ -853,7 +895,7 @@ module AsciidoctorPDF
       page.fill
 
       # Texte en italique
-      page.font("Helvetica-Oblique", size: font_size)
+      set_font(page, @fn_body_italic, font_size)
       page.fill_color(@theme.base_font_color)
 
       y = @current_y - font_size
@@ -866,7 +908,7 @@ module AsciidoctorPDF
 
       # Attribution
       if (attribution = node.attr("attribution"))
-        page.font("Helvetica", size: font_size - 1)
+        set_font(page, @fn_body, font_size - 1)
         page.fill_color("555555")
         page.text("— #{attribution}", at: {@margin + indent, @current_y - font_size})
         @current_y -= font_size + 4.0
@@ -895,7 +937,7 @@ module AsciidoctorPDF
 
       # Titre de l'index
       title_font_size = font_size + 6.0
-      page.font("Helvetica-Bold", size: title_font_size)
+      set_font(page, @fn_body_bold, title_font_size)
       page.fill_color(@theme.heading_font_color)
       page.text(@theme.index_title, at: {@margin, @page_height - @margin - title_font_size})
       y_start = @page_height - @margin - title_font_size * 2.0
@@ -965,18 +1007,18 @@ module AsciidoctorPDF
         case type
         when :letter
           # En-tête de lettre (ex. : "A")
-          page.font("Helvetica-Bold", size: font_size + 1.0)
+          set_font(page, @fn_body_bold, font_size + 1.0)
           page.fill_color(@theme.heading_font_color)
           page.text(text, at: {x, y - (font_size + 1.0)})
           y -= (font_size + 1.0) * 1.8
         when :primary
           # Terme principal
-          page.font("Helvetica", size: font_size)
+          set_font(page, @fn_body, font_size)
           page.fill_color(@theme.base_font_color)
           entry_text = text
           unless pages.empty?
             page_str = pages.map(&.to_s).join(", ")
-            page_str_w = page_str.size * font_size * 0.55
+            page_str_w = text_width(page_str, @fn_body, font_size)
             # Texte du terme
             page.text(entry_text, at: {x, y - font_size})
             # Numéros de page alignés à droite
@@ -989,14 +1031,14 @@ module AsciidoctorPDF
           y -= line_h
         when :secondary
           # Sous-terme (indenté)
-          page.font("Helvetica", size: font_size - 0.5)
+          set_font(page, @fn_body, font_size - 0.5)
           page.fill_color(@theme.base_font_color)
           indent = 10.0
           entry_text = text
           page.text(entry_text, at: {x + indent, y - (font_size - 0.5)})
           unless pages.empty?
             page_str = pages.map(&.to_s).join(", ")
-            page_str_w = page_str.size * (font_size - 0.5) * 0.55
+            page_str_w = text_width(page_str, @fn_body, font_size - 0.5)
             page.fill_color(@theme.index_page_number_color)
             page.text(page_str, at: {x + entry_w - page_str_w, y - (font_size - 0.5)})
             page.fill_color(@theme.base_font_color)
@@ -1022,7 +1064,7 @@ module AsciidoctorPDF
       text_color = @theme.base_font_color
 
       # Titre de la TOC
-      page.font("Helvetica-Bold", size: font_size + 4.0)
+      set_font(page, @fn_body_bold, font_size + 4.0)
       page.fill_color(@theme.heading_font_color)
       page.text(@theme.toc_title, at: {@margin, y - (font_size + 4.0)})
       y -= (font_size + 4.0) * 1.6
@@ -1035,18 +1077,19 @@ module AsciidoctorPDF
         entry_w = @content_width - indent
 
         # Texte du titre
-        page.font(level <= 1 ? "Helvetica-Bold" : "Helvetica", size: font_size)
+        set_font(page, level <= 1 ? @fn_body_bold : @fn_body, font_size)
         page.fill_color(text_color)
         page.text(title, at: {entry_x, y - font_size})
 
         # Numéro de page (aligné à droite)
         page_str = page_num.to_s
-        page_num_w = page_str.size * font_size * 0.6
+        toc_font_name = level <= 1 ? @fn_body_bold : @fn_body
+        page_num_w = text_width(page_str, toc_font_name, font_size)
         page.fill_color(text_color)
         page.text(page_str, at: {@margin + @content_width - page_num_w, y - font_size})
 
         # Pointillés entre le titre et le numéro de page
-        title_w = title.size * font_size * 0.55
+        title_w = text_width(title, toc_font_name, font_size)
         dot_x_start = entry_x + title_w + 4.0
         dot_x_end = @margin + @content_width - page_num_w - 4.0
         if dot_x_end > dot_x_start
@@ -1075,28 +1118,28 @@ module AsciidoctorPDF
 
       # Titre principal
       title = doc.doctitle || ""
-      page.font("Helvetica-Bold", size: @theme.title_font_size)
+      set_font(page, @fn_body_bold, @theme.title_font_size)
       page.fill_color(@theme.title_font_color)
       title_y = @page_height * 0.55
       page.text(title, at: {@margin, title_y})
 
       # Sous-titre
       if (subtitle = doc.attr("subtitle"))
-        page.font("Helvetica", size: @theme.subtitle_font_size)
+        set_font(page, @fn_body, @theme.subtitle_font_size)
         page.fill_color(@theme.subtitle_font_color)
         page.text(subtitle, at: {@margin, title_y - @theme.title_font_size - 10.0})
       end
 
       # Auteur
       if (author = doc.attr("author"))
-        page.font("Helvetica", size: @theme.author_font_size)
+        set_font(page, @fn_body, @theme.author_font_size)
         page.fill_color(@theme.author_font_color)
         page.text(author, at: {@margin, @page_height * 0.35})
       end
 
       # Date
       if (revdate = doc.attr("revdate"))
-        page.font("Helvetica", size: @theme.base_font_size)
+        set_font(page, @fn_body, @theme.base_font_size)
         page.fill_color("888888")
         page.text(revdate, at: {@margin, @page_height * 0.35 - @theme.author_font_size - 8.0})
       end
@@ -1141,7 +1184,7 @@ module AsciidoctorPDF
       page.line({@margin, y + @theme.footer_height}, {@margin + @content_width, y + @theme.footer_height})
       page.stroke
 
-      page.font("Helvetica", size: font_size)
+      set_font(page, @fn_body, font_size)
       page.fill_color(@theme.footer_font_color)
 
       left = resolve_page_vars(@theme.footer_left, meta)
@@ -1162,7 +1205,7 @@ module AsciidoctorPDF
       page.line({@margin, y - @theme.header_height}, {@margin + @content_width, y - @theme.header_height})
       page.stroke
 
-      page.font("Helvetica", size: font_size)
+      set_font(page, @fn_body, font_size)
       page.fill_color(@theme.header_font_color)
 
       left = resolve_page_vars(@theme.header_left, meta)
@@ -1206,6 +1249,32 @@ module AsciidoctorPDF
     end
 
     # =========================================================================
+    # Bookmarks PDF (outline)
+    # =========================================================================
+
+    # Génère le document outline (bookmarks) à partir des entrées TOC collectées.
+    # Chaque section de niveau 1-2 devient un bookmark dans le panneau de navigation.
+    private def generate_pdf_outline : Nil
+      return if @toc_entries.empty?
+
+      @doc.outline.define do |o|
+        @toc_entries.each do |entry|
+          title, level, page_num = entry
+          page_idx = page_num - 1
+          next if page_idx < 0 || page_idx >= @doc.pages.size
+
+          page_ref = @doc.pages[page_idx].page_reference
+          dest = PDF::Destination.fit(page_ref)
+
+          # Niveaux 1 = sections principales, reste = items plats
+          # (une arborescence complète nécessiterait de tracker les niveaux,
+          #  on simplifie pour l'instant)
+          o.item(title, dest: dest)
+        end
+      end
+    end
+
+    # =========================================================================
     # Écriture du PDF
     # =========================================================================
 
@@ -1238,29 +1307,30 @@ module AsciidoctorPDF
       line_h : Float64
     ) : Nil
       segments = InlineRenderer.parse(html)
-      char_w = font_size * 0.55
-      max_chars = [1, (width / char_w).to_i].max
 
-      # Regrouper les segments en lignes
+      # Regrouper les segments en lignes avec mesure exacte
       current_line_segs = [] of InlineSegment
-      current_line_len = 0
+      current_line_width = 0.0
 
       segments.each do |seg|
+        font_name = resolve_inline_font(seg)
+        font = @doc.font(font_name)
+        space_w = font.string_width(" ", font_size)
+
         words = seg.text.split(" ")
         words.each_with_index do |word, idx|
-          word_len = word.size
-          space = idx > 0 || !current_line_segs.empty? ? 1 : 0
+          word_w = font.string_width(word, font_size)
+          sep_w = (idx > 0 || !current_line_segs.empty?) ? space_w : 0.0
 
-          if current_line_len + space + word_len > max_chars && !current_line_segs.empty?
-            # Flush la ligne courante
+          if current_line_width + sep_w + word_w > width && !current_line_segs.empty?
             render_segment_line(page, current_line_segs, x, @current_y - font_size, font_size)
             @current_y -= line_h
             current_line_segs = [] of InlineSegment
-            current_line_len = 0
-            space = 0
+            current_line_width = 0.0
+            sep_w = 0.0
           end
 
-          prefix = space > 0 ? " " : ""
+          prefix = sep_w > 0 ? " " : ""
           current_line_segs << InlineSegment.new(
             text: prefix + word,
             bold: seg.bold,
@@ -1269,11 +1339,10 @@ module AsciidoctorPDF
             color: seg.color,
             link: seg.link
           )
-          current_line_len += space + word_len
+          current_line_width += sep_w + word_w
         end
       end
 
-      # Flush la dernière ligne
       unless current_line_segs.empty?
         render_segment_line(page, current_line_segs, x, @current_y - font_size, font_size)
         @current_y -= line_h
@@ -1281,6 +1350,7 @@ module AsciidoctorPDF
     end
 
     # Rend une ligne de segments inline sur la page PDF.
+    # Utilise les métriques exactes des polices pour l'avancement horizontal.
     private def render_segment_line(
       page : PDF::Page,
       segments : Array(InlineSegment),
@@ -1291,22 +1361,38 @@ module AsciidoctorPDF
       current_x = x
       segments.each do |seg|
         next if seg.text.empty?
-        font_name = if seg.mono
-          "Courier"
-        elsif seg.bold && seg.italic
-          "Helvetica-BoldOblique"
-        elsif seg.bold
-          "Helvetica-Bold"
-        elsif seg.italic
-          "Helvetica-Oblique"
-        else
-          "Helvetica"
-        end
-        page.font(font_name, size: font_size)
+        font_name = resolve_inline_font(seg)
+        font = get_font(font_name)
+        set_font(page, font_name, font_size)
         page.fill_color(seg.color || @theme.base_font_color)
         page.text(seg.text, at: {current_x, y})
-        char_w = font_size * (seg.mono ? 0.6 : 0.55)
-        current_x += seg.text.size * char_w
+
+        # Ajouter une annotation lien si le segment contient un lien
+        if (link = seg.link) && !link.empty?
+          seg_w = font.string_width(seg.text, font_size)
+          page.link_uri(
+            rect: {current_x, y - 2, current_x + seg_w, y + font_size},
+            uri: link
+          )
+        end
+
+        current_x += font.string_width(seg.text, font_size)
+      end
+    end
+
+    # Résout le nom de la police à partir des attributs d'un segment inline.
+    # Utilise les polices TTF du thème si disponibles.
+    private def resolve_inline_font(seg : InlineSegment) : String
+      if seg.mono
+        @fn_mono
+      elsif seg.bold && seg.italic
+        @fn_body_bold_italic
+      elsif seg.bold
+        @fn_body_bold
+      elsif seg.italic
+        @fn_body_italic
+      else
+        @fn_body
       end
     end
 
@@ -1326,23 +1412,110 @@ module AsciidoctorPDF
         .strip
     end
 
-    # Découpe un texte en lignes selon la largeur disponible (approximatif)
-    private def wrap_text(text : String, width : Float64, font_size : Float64) : Array(String)
-      char_width = font_size * 0.55  # approximation pour Helvetica
-      max_chars = [1, (width / char_width).to_i].max
+    # Charge les polices TTF définies dans le thème.
+    # Si aucun chemin n'est défini, les polices Type1 standard sont utilisées.
+    private def load_theme_fonts : Nil
+      if (path = @theme.base_font_path) && File.exists?(path)
+        ttf = @doc.load_font(path)
+        @font_body = ttf
+        @fn_body = ttf.name
+      end
+      if (path = @theme.base_font_bold_path) && File.exists?(path)
+        ttf = @doc.load_font(path)
+        @font_body_bold = ttf
+        @fn_body_bold = ttf.name
+        @fn_heading = ttf.name
+      end
+      if (path = @theme.base_font_italic_path) && File.exists?(path)
+        ttf = @doc.load_font(path)
+        @font_body_italic = ttf
+        @fn_body_italic = ttf.name
+      end
+      if (path = @theme.base_font_bold_italic_path) && File.exists?(path)
+        ttf = @doc.load_font(path)
+        @font_body_bold_italic = ttf
+        @fn_body_bold_italic = ttf.name
+      end
+      if (path = @theme.mono_font_path) && File.exists?(path)
+        ttf = @doc.load_font(path)
+        @font_mono = ttf
+        @fn_mono = ttf.name
+      end
+      if (path = @theme.mono_font_bold_path) && File.exists?(path)
+        ttf = @doc.load_font(path)
+        @font_mono_bold = ttf
+        @fn_mono_bold = ttf.name
+      end
+    end
+
+    # Applique une police sur la page courante, en utilisant l'objet TTF si disponible.
+    # Ceci est nécessaire car page.font(String) ne fonctionne que pour les Type1,
+    # alors que page.font(TrueTypeFont) est requis pour les polices TTF.
+    private def set_font(page : PDF::Page, font_name : String, size : Float64) : Nil
+      ttf = case font_name
+            when @fn_body           then @font_body
+            when @fn_body_bold      then @font_body_bold
+            when @fn_body_italic    then @font_body_italic
+            when @fn_body_bold_italic then @font_body_bold_italic
+            when @fn_mono           then @font_mono
+            when @fn_mono_bold      then @font_mono_bold
+            when @fn_heading        then @font_body_bold
+            else nil
+            end
+
+      if ttf && ttf.is_a?(PDF::Fonts::TrueTypeFont)
+        page.font(ttf, size: size)
+      else
+        page.font(font_name, size: size)
+      end
+    end
+
+    # Retourne l'objet police pour la mesure de texte.
+    # Utilise les polices TTF chargées si disponibles, sinon les Type1.
+    private def get_font(font_name : String) : PDF::Fonts::Base
+      # Vérifier d'abord les polices TTF chargées
+      case font_name
+      when @fn_body           then @font_body || @doc.font("Helvetica")
+      when @fn_body_bold      then @font_body_bold || @doc.font("Helvetica-Bold")
+      when @fn_body_italic    then @font_body_italic || @doc.font("Helvetica-Oblique")
+      when @fn_body_bold_italic then @font_body_bold_italic || @doc.font("Helvetica-BoldOblique")
+      when @fn_mono           then @font_mono || @doc.font("Courier")
+      when @fn_mono_bold      then @font_mono_bold || @doc.font("Courier-Bold")
+      when @fn_heading        then @font_body_bold || @doc.font("Helvetica-Bold")
+      else                         @doc.font(font_name)
+      end
+    end
+
+    # Mesure la largeur d'un texte en points en utilisant les métriques
+    # exactes des polices (Type1 ou TrueType).
+    private def text_width(text : String, font_name : String, font_size : Float64) : Float64
+      get_font(font_name).string_width(text, font_size)
+    end
+
+    # Découpe un texte en lignes selon la largeur disponible.
+    # Utilise les métriques de police exactes pour le calcul.
+    private def wrap_text(text : String, width : Float64, font_size : Float64, font_name : String? = nil) : Array(String)
+      font = get_font(font_name || @fn_body)
+      space_w = font.string_width(" ", font_size)
       lines = [] of String
 
       text.split("\n").each do |paragraph|
         words = paragraph.split(" ")
         current_line = ""
+        current_width = 0.0
 
         words.each do |word|
-          test = current_line.empty? ? word : "#{current_line} #{word}"
-          if test.size <= max_chars
-            current_line = test
+          word_w = font.string_width(word, font_size)
+          sep_w = current_line.empty? ? 0.0 : space_w
+
+          if current_width + sep_w + word_w <= width
+            current_line = current_line.empty? ? word : "#{current_line} #{word}"
+            current_width += sep_w + word_w
           else
             lines << current_line unless current_line.empty?
-            current_line = word.size > max_chars ? word[0, max_chars] : word
+            # Si le mot seul est trop long, on le met quand même
+            current_line = word
+            current_width = word_w
           end
         end
         lines << current_line unless current_line.empty?
