@@ -12,19 +12,18 @@ authors:
 
 license: MIT
 
-# Dépendances locales pour le développement.
-# Pour la publication, remettre :
+# Pour le développement local, remplacer par :
 #   crystal-asciidoctor:
-#     github: aloli-crystal/crystal-asciidoctor
-#     branch: developpement
+#     path: ../crystal-asciidoctor
 #   crystal-pdf:
-#     github: aloli-crystal/crystal-pdf
-#     branch: developpement
+#     path: ../crystal-pdf
 dependencies:
   crystal-asciidoctor:
-    path: ../crystal-asciidoctor
+    github: aloli-crystal/crystal-asciidoctor
+    version: "~> 2.0"
   crystal-pdf:
-    path: ../crystal-pdf
+    github: aloli-crystal/crystal-pdf
+    version: "~> 0.1"
 
 development_dependencies:
   ameba:
