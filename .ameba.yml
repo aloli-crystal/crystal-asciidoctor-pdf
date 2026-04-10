@@ -1,0 +1,16 @@
+Naming/QueryBoolMethods:
+  Enabled: false
+  # Les properties booléennes du thème YAML utilisent property (pas property?)
+  # pour rester compatibles avec le format YAML de chargement des thèmes.
+
+Naming/BlockParameterName:
+  Enabled: false
+
+Style/NegatedConditionsInUnless:
+  Enabled: false
+
+Style/ParenthesesAroundCondition:
+  Enabled: false
+
+Style/UnlessElse:
+  Enabled: false
