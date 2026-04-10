@@ -17,8 +17,8 @@ Un convertisseur AsciiDoc vers PDF pour Crystal, basé sur `crystal-asciidoctor`
 | 2025-10-24
 
 | *Shard Crystal crystal-asciidoctor-pdf*
-| 0.1.0
-| 2026-04-02
+| 2.3.24
+| 2026-04-10
 |===
 
 NOTE: Ce shard est un portage de la gem Ruby asciidoctor-pdf **2.3.24** et repose sur crystal-asciidoctor, lui-même porté depuis asciidoctor **2.0.26**.
@@ -113,14 +113,54 @@ AsciidoctorPDF::Converter.new.convert(doc)
 
 == Ligne de commande
 
-Ce shard fournit également un exécutable `crystal-asciidoctor-pdf` :
+Ce shard fournit également un exécutable `crystal-asciidoctor-pdf`.
+
+=== Construire le binaire
+
+[source,bash]
+----
+git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
+cd crystal-asciidoctor-pdf
+shards build --release
+----
+
+Le binaire est généré dans `bin/crystal-asciidoctor-pdf`. Vous pouvez le copier dans votre PATH :
+
+[source,bash]
+----
+sudo cp bin/crystal-asciidoctor-pdf /usr/local/bin/
+----
+
+=== Utilisation
 
 [source,bash]
 ----
 crystal-asciidoctor-pdf mon_document.adoc
 ----
 
-Par défaut, la commande génère un fichier `mon_document.pdf`.
+Par défaut, la commande génère un fichier `mon_document.adoc.pdf`.
+
+Options disponibles :
+
+[cols="1,3"]
+|===
+| Option | Description
+
+| `-o FILE`, `--out-file FILE`
+| Fichier PDF de sortie (par défaut : `<fichier>.adoc.pdf`)
+
+| `-T FILE`, `--theme FILE`
+| Fichier de thème YAML personnalisé
+
+| `-a ATTR`, `--attribute ATTR`
+| Attribut AsciiDoc au format `nom=valeur`
+
+| `-v`, `--version`
+| Afficher la version
+
+| `-h`, `--help`
+| Afficher l'aide
+|===
 
 == Développement
 
