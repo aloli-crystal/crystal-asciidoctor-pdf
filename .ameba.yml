@@ -14,3 +14,17 @@ Style/ParenthesesAroundCondition:
 
 Style/UnlessElse:
   Enabled: false
+
+Lint/NotNil:
+  Enabled: false
+
+Lint/UselessAssign:
+  Enabled: false
+
+Lint/Formatting:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+  # Le converter AsciiDoc→PDF a une complexité cyclomatique élevée
+  # par nature (dispatch sur de nombreux types de blocs).
