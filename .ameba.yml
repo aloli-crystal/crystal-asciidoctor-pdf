@@ -28,3 +28,9 @@ Metrics/CyclomaticComplexity:
   Enabled: false
   # Le converter AsciiDoc→PDF a une complexité cyclomatique élevée
   # par nature (dispatch sur de nombreux types de blocs).
+
+Lint/UnusedArgument:
+  Enabled: false
+
+Performance/ChainedCallWithNoBang:
+  Enabled: false
