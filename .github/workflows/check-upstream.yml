@@ -1,0 +1,65 @@
+name: Check upstream asciidoctor-pdf gem
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # Every Monday at 08:00 UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get current tracked version
+        id: current
+        run: |
+          version=$(grep -oP 'UPSTREAM_VERSION\s*=\s*"\K[^"]+' src/asciidoctor_pdf/asciidoctor_pdf.cr)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Current tracked version: $version"
+
+      - name: Get latest upstream version
+        id: upstream
+        run: |
+          response=$(curl -s https://rubygems.org/api/v1/gems/asciidoctor-pdf.json)
+          version=$(echo "$response" | jq -r '.version')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Latest upstream version: $version"
+
+      - name: Create issue if new version detected
+        if: steps.current.outputs.version != steps.upstream.outputs.version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT_VERSION: ${{ steps.current.outputs.version }}
+          UPSTREAM_VERSION: ${{ steps.upstream.outputs.version }}
+        run: |
+          existing=$(gh issue list --label upstream --search "Upstream asciidoctor-pdf gem updated to ${UPSTREAM_VERSION}" --state open --json number --jq 'length')
+          if [ "$existing" -gt 0 ]; then
+            echo "Issue already exists for version ${UPSTREAM_VERSION}, skipping."
+            exit 0
+          fi
+
+          body=$(cat <<EOF
+          A new version of the upstream **asciidoctor-pdf** Ruby gem has been released.
+
+          | | Version |
+          |---|---|
+          | **Current tracked** | \`${CURRENT_VERSION}\` |
+          | **New upstream** | \`${UPSTREAM_VERSION}\` |
+
+          ### Links
+
+          - [Changelog](https://github.com/asciidoctor/asciidoctor-pdf/blob/main/CHANGELOG.adoc)
+          - [Compare commits ${CURRENT_VERSION}...${UPSTREAM_VERSION}](https://github.com/asciidoctor/asciidoctor-pdf/compare/v${CURRENT_VERSION}...v${UPSTREAM_VERSION})
+          - [RubyGems page](https://rubygems.org/gems/asciidoctor-pdf)
+          EOF
+          )
+
+          gh issue create \
+            --title "Upstream asciidoctor-pdf gem updated to ${UPSTREAM_VERSION}" \
+            --body "$body" \
+            --label "upstream"

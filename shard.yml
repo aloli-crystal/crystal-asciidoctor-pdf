@@ -35,4 +35,4 @@ targets:
   crystal-asciidoctor-pdf:
     main: bin/crystal-asciidoctor-pdf
 
-crystal: ">= 1.0.0"
+crystal: ">= 1.19.0"
