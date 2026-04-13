@@ -1,4 +1,8 @@
 module AsciidoctorPDF
+  # Répertoire data/fonts/ contenant les polices TTF embarquées (DejaVu Sans).
+  # Résolu à la compilation par rapport au fichier source.
+  FONTS_DIR = File.join(File.dirname(File.dirname(__DIR__)), "data", "fonts")
+
   # Thème PDF : définit toutes les propriétés visuelles du document PDF généré.
   # Équivalent du système de thèmes YAML d'asciidoctor-pdf Ruby.
   class Theme
@@ -8,17 +12,18 @@ module AsciidoctorPDF
     property page_margin : Float64 = 36.0  # 0.5 inch en points
 
     # --- Polices ---
-    property base_font_family : String = "Helvetica"
+    property base_font_family : String = "DejaVu Sans"
     property base_font_size : Float64 = 10.5
     property base_line_height : Float64 = 1.5
     property base_font_color : String = "333333"
 
-    # Polices TrueType optionnelles (nil = utiliser les polices Type1 intégrées)
-    property base_font_path : String? = nil
-    property base_font_bold_path : String? = nil
-    property base_font_italic_path : String? = nil
+    # Polices TrueType — par défaut DejaVu Sans (Unicode complet).
+    # Mettre à nil pour revenir aux polices Type1 intégrées (pas d'Unicode étendu).
+    property base_font_path : String? = File.join(FONTS_DIR, "DejaVuSans.ttf")
+    property base_font_bold_path : String? = File.join(FONTS_DIR, "DejaVuSans-Bold.ttf")
+    property base_font_italic_path : String? = File.join(FONTS_DIR, "DejaVuSans-Oblique.ttf")
     property base_font_bold_italic_path : String? = nil
-    property mono_font_path : String? = nil
+    property mono_font_path : String? = File.join(FONTS_DIR, "DejaVuSansMono.ttf")
     property mono_font_bold_path : String? = nil
 
     # --- Titres ---

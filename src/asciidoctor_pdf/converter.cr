@@ -152,6 +152,9 @@ module AsciidoctorPDF
       if @theme.toc_enabled && node.attr?("toc")
         toc_page_index = @page_number  # index 0-based de la page TOC
         new_page
+        # Créer une nouvelle page pour le contenu afin d'éviter que le corps
+        # ne se superpose à la TOC (qui sera rendue en post-traitement)
+        new_page
       end
 
       # Contenu principal
@@ -1061,31 +1064,41 @@ module AsciidoctorPDF
       page = @doc.pages[page_index]
       y = @page_height - @margin
       font_size = @theme.toc_font_size
-      line_h = font_size * 1.4
+      # Espacement entre les entrées : au moins 1.5x la taille de police
+      line_h = font_size * 1.8
       dot_color = @theme.toc_dot_leader_color
       text_color = @theme.base_font_color
 
       # Titre de la TOC
-      set_font(page, @fn_body_bold, font_size + 4.0)
+      toc_title_size = font_size + 6.0
+      set_font(page, @fn_body_bold, toc_title_size)
       page.fill_color(@theme.heading_font_color)
-      page.text(@theme.toc_title, at: {@margin, y - (font_size + 4.0)})
-      y -= (font_size + 4.0) * 1.6
+      page.text(@theme.toc_title, at: {@margin, y - toc_title_size})
+      y -= toc_title_size * 2.0
 
       # Entrées de la TOC
       @toc_entries.each do |entry|
         title, level, page_num = entry
-        indent = (level - 1) * 12.0
+        # Indentation : niveau 1 = 0, niveau 2 = 20pt, niveau 3 = 40pt, etc.
+        indent = (level - 1) * 20.0
         entry_x = @margin + indent
         entry_w = @content_width - indent
 
+        # Vérifier qu'il reste de la place sur la page
+        if y - line_h < @margin
+          # La TOC déborde sur une seule page — on s'arrête ici.
+          # (Un support multi-page de la TOC pourrait être ajouté ultérieurement.)
+          break
+        end
+
         # Texte du titre
-        set_font(page, level <= 1 ? @fn_body_bold : @fn_body, font_size)
+        toc_font_name = level <= 1 ? @fn_body_bold : @fn_body
+        set_font(page, toc_font_name, font_size)
         page.fill_color(text_color)
         page.text(title, at: {entry_x, y - font_size})
 
         # Numéro de page (aligné à droite)
         page_str = page_num.to_s
-        toc_font_name = level <= 1 ? @fn_body_bold : @fn_body
         page_num_w = text_width(page_str, toc_font_name, font_size)
         page.fill_color(text_color)
         page.text(page_str, at: {@margin + @content_width - page_num_w, y - font_size})
@@ -1105,7 +1118,6 @@ module AsciidoctorPDF
         end
 
         y -= line_h
-        break if y < @margin  # Ne pas dépasser la page
       end
     end
 
@@ -1316,7 +1328,7 @@ module AsciidoctorPDF
 
       segments.each do |seg|
         font_name = resolve_inline_font(seg)
-        font = @doc.font(font_name)
+        font = get_font(font_name)
         space_w = font.string_width(" ", font_size)
 
         words = seg.text.split(" ")
