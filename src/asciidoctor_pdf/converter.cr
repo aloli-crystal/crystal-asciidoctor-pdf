@@ -192,7 +192,9 @@ module AsciidoctorPDF
       return "" unless node.is_a?(Asciidoctor::Section)
 
       level = node.level
-      title = node.title || ""
+      raw_title = node.title || ""
+      # Strip HTML tags from the title (e.g., <code>Crystal</code> → Crystal)
+      title = raw_title.gsub(/<[^>]+>/, "")
       @current_section_title = title
 
       # Enregistrer pour la table des matières

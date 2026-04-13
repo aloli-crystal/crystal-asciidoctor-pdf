@@ -56,9 +56,9 @@ module AsciidoctorPDF
         page.fill_color(seg.color || base_color)
         page.text(seg.text, at: {current_x, y})
 
-        # Avancer X de la largeur approximative du texte
-        char_w = base_font_size * 0.55
-        current_x += seg.text.size * char_w
+        # Use proper font metrics for text width advancement
+        font = PDF::Fonts::Type1.new(font_name)
+        current_x += font.string_width(seg.text, base_font_size)
       end
       current_x
     end

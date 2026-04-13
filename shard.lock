@@ -9,7 +9,7 @@ shards:
     version: 2.0.26
 
   crystal-pdf:
-    git: https://github.com/aloli-crystal/crystal-pdf.git
+    path: ../crystal-pdf
     version: 0.1.0
 
   crystal-rouge:

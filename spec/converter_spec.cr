@@ -444,4 +444,52 @@ describe AsciidoctorPDF::Converter do
     File.size(path).should be > 1000
     File.delete(path)
   end
+
+  # =========================================================================
+  # UTF-8 / French text encoding
+  # =========================================================================
+
+  it "should correctly generate PDF with French accented characters" do
+    input = <<-ADOC
+    = Spécifications
+    Philippe Nénert
+
+    == Présentation
+
+    Voici un tiret \u2014 et des accents : é è ê ë à â ù û ç ô î.
+
+    * Puce avec accents éàü
+    * Deuxième puce
+    ADOC
+
+    path = convert_to_pdf(input, "french_utf8")
+    File.exists?(path).should be_true
+    File.size(path).should be > 0
+
+    # Read the PDF bytes and ensure no garbled UTF-8 sequences remain.
+    # The raw UTF-8 bytes for "é" are 0xC3 0xA9. In a properly encoded
+    # PDF (WinAnsi), "é" should be the single byte 0xE9.
+    # If we find 0xC3 0xA9 adjacent in text streams, encoding is broken.
+    bytes = File.read(path).to_slice
+    # The PDF should contain WinAnsi-encoded 0xE9 (é)
+    found_winansi_e_acute = bytes.includes?(0xE9_u8)
+    found_winansi_e_acute.should be_true
+    File.delete(path)
+  end
+
+  it "should handle em dashes and smart quotes in PDF" do
+    input = "Un texte \u2014 avec un tiret cadratin et des \u201Cguillemets\u201D."
+    path = convert_to_pdf(input, "emdash_smartquotes")
+    File.exists?(path).should be_true
+    File.size(path).should be > 0
+    File.delete(path)
+  end
+
+  it "should strip HTML tags from section titles" do
+    input = "= Guide\n\n== Using `Crystal` for the web\n\nContent here."
+    path = convert_to_pdf(input, "section_code_title")
+    File.exists?(path).should be_true
+    File.size(path).should be > 0
+    File.delete(path)
+  end
 end
