@@ -218,7 +218,10 @@ module AsciidoctorPDF
       # Rendu du titre de section
       font_size = @theme.heading_font_size(level)
 
-      check_page_break(font_size + @theme.heading_margin_bottom(level) + 5)
+      # Ensure heading is not orphaned: require room for the heading plus at
+      # least 4 lines of body text below it (using base font size * line height).
+      min_content_below = @theme.base_font_size * @theme.base_line_height * 4
+      check_page_break(font_size + @theme.heading_margin_bottom(level) + min_content_below)
 
       # Acquérir la page après check_page_break (qui peut créer une nouvelle page)
       page = @current_page.not_nil!
@@ -296,55 +299,128 @@ module AsciidoctorPDF
       line_h = font_size * 1.4
       padding = @theme.code_padding
       highlight = @theme.code_highlight_enabled && !language.empty?
+      bottom_limit = @margin + 20.0
 
       total_h = lines.size * line_h + (2 * padding) + @theme.code_margin_top + @theme.code_margin_bottom
-      check_page_break(total_h)
 
+      # If the whole block fits on the current page, use the simple path
+      if @current_y - total_h >= bottom_limit
+        render_code_block_simple(lines, language, font_size, line_h, padding, highlight)
+      else
+        # Split the code block across pages
+        render_code_block_paginated(lines, language, font_size, line_h, padding, highlight, bottom_limit)
+      end
+
+      ""
+    end
+
+    # Render a code block that fits entirely on the current page.
+    private def render_code_block_simple(lines : Array(String), language : String, font_size : Float64, line_h : Float64, padding : Float64, highlight : Bool) : Nil
+      check_page_break(lines.size * line_h + (2 * padding) + @theme.code_margin_top + @theme.code_margin_bottom)
       page = @current_page.not_nil!
       @current_y -= @theme.code_margin_top
 
-      # Fond du bloc de code
       block_h = lines.size * line_h + (2 * padding)
-      page.fill_color(@theme.code_background_color)
-      page.rectangle(@margin, @current_y - block_h, @content_width, block_h)
-      page.fill
+      draw_code_block_background(page, @current_y, block_h)
+      draw_code_language_label(page, language, font_size, padding)
 
-      # Bordure
-      page.stroke_color(@theme.code_border_color)
-      page.line_width(@theme.code_border_width)
-      page.rectangle(@margin, @current_y - block_h, @content_width, block_h)
-      page.stroke
-
-      # Indicateur de langage (coin supérieur droit)
-      unless language.empty?
-        set_font(page, @fn_body, font_size * 0.75)
-        page.fill_color("888888")
-        lang_x = @margin + @content_width - text_width(language, @fn_body, font_size * 0.75) - padding
-        page.text(language, at: {lang_x, @current_y - font_size * 0.75})
-      end
-
-      # Texte du code avec coloration syntaxique optionnelle
       y = @current_y - padding - font_size
       lines.each do |line|
-        if highlight
-          tokens = SyntaxHighlighter.tokenize(line, language)
-          x = @margin + padding
-          tokens.each do |token|
-            set_font(page, @fn_mono, font_size)
-            page.fill_color(token.color)
-            page.text(token.text, at: {x, y})
-            x += text_width(token.text, @fn_mono, font_size)
-          end
-        else
-          set_font(page, @fn_mono, font_size)
-          page.fill_color(@theme.code_font_color)
-          page.text(line, at: {@margin + padding, y})
-        end
+        render_code_line(page, line, y, font_size, padding, highlight, language)
         y -= line_h
       end
 
       @current_y -= block_h + @theme.code_margin_bottom
-      ""
+    end
+
+    # Render a code block that may span multiple pages.
+    private def render_code_block_paginated(lines : Array(String), language : String, font_size : Float64, line_h : Float64, padding : Float64, highlight : Bool, bottom_limit : Float64) : Nil
+      # Start a new page if the current page can't even fit a few lines
+      min_first_chunk = padding + font_size + 3 * line_h + padding + @theme.code_margin_top
+      check_page_break(min_first_chunk)
+
+      page = @current_page.not_nil!
+      @current_y -= @theme.code_margin_top
+
+      line_idx = 0
+      first_chunk = true
+
+      while line_idx < lines.size
+        page = @current_page.not_nil!
+
+        # Calculate how many lines fit on the current page
+        available_h = @current_y - bottom_limit - (2 * padding)
+        max_lines = (available_h / line_h).to_i
+        max_lines = 1 if max_lines < 1
+
+        chunk_lines = lines[line_idx, [max_lines, lines.size - line_idx].min]
+        chunk_block_h = chunk_lines.size * line_h + (2 * padding)
+
+        # Draw background & border for this chunk
+        draw_code_block_background(page, @current_y, chunk_block_h)
+
+        # Language label only on the first chunk
+        if first_chunk
+          draw_code_language_label(page, language, font_size, padding)
+          first_chunk = false
+        end
+
+        # Render lines
+        y = @current_y - padding - font_size
+        chunk_lines.each do |line|
+          render_code_line(page, line, y, font_size, padding, highlight, language)
+          y -= line_h
+        end
+
+        line_idx += chunk_lines.size
+        @current_y -= chunk_block_h
+
+        # If there are more lines, move to a new page
+        if line_idx < lines.size
+          new_page
+        end
+      end
+
+      @current_y -= @theme.code_margin_bottom
+    end
+
+    # Draw code block background rectangle and border.
+    private def draw_code_block_background(page : PDF::Page, top_y : Float64, block_h : Float64) : Nil
+      page.fill_color(@theme.code_background_color)
+      page.rectangle(@margin, top_y - block_h, @content_width, block_h)
+      page.fill
+
+      page.stroke_color(@theme.code_border_color)
+      page.line_width(@theme.code_border_width)
+      page.rectangle(@margin, top_y - block_h, @content_width, block_h)
+      page.stroke
+    end
+
+    # Draw the language indicator label in the top-right corner.
+    private def draw_code_language_label(page : PDF::Page, language : String, font_size : Float64, padding : Float64) : Nil
+      return if language.empty?
+      set_font(page, @fn_body, font_size * 0.75)
+      page.fill_color("888888")
+      lang_x = @margin + @content_width - text_width(language, @fn_body, font_size * 0.75) - padding
+      page.text(language, at: {lang_x, @current_y - font_size * 0.75})
+    end
+
+    # Render a single line of code text.
+    private def render_code_line(page : PDF::Page, line : String, y : Float64, font_size : Float64, padding : Float64, highlight : Bool, language : String) : Nil
+      if highlight
+        tokens = SyntaxHighlighter.tokenize(line, language)
+        x = @margin + padding
+        tokens.each do |token|
+          set_font(page, @fn_mono, font_size)
+          page.fill_color(token.color)
+          page.text(token.text, at: {x, y})
+          x += text_width(token.text, @fn_mono, font_size)
+        end
+      else
+        set_font(page, @fn_mono, font_size)
+        page.fill_color(@theme.code_font_color)
+        page.text(line, at: {@margin + padding, y})
+      end
     end
 
     # =========================================================================
