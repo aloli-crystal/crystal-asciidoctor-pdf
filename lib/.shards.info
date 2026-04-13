@@ -2,8 +2,8 @@
 version: 1.0
 shards:
   crystal-asciidoctor:
-    path: ../crystal-asciidoctor
-    version: 0.1.0+git.commit.792a7f7fbacb69304c75cac5bd20bb8f88ef3961
+    git: https://github.com/aloli-crystal/crystal-asciidoctor.git
+    version: 2.0.26
   matrix:
     git: https://github.com/exilor/matrix.git
     version: 0.1.0+git.commit.db74e62dcc0b65e548bf1a8eda65657310f57152
@@ -17,8 +17,11 @@ shards:
     git: https://github.com/stumpycr/stumpy_png.git
     version: 5.0.1
   crystal-pdf:
-    path: ../crystal-pdf
-    version: 0.1.0+git.commit.3a74807f2bd3b3f23c635b80f359afcf5fb42b2f
+    git: https://github.com/aloli-crystal/crystal-pdf.git
+    version: 0.1.0
   ameba:
     git: https://github.com/crystal-ameba/ameba.git
     version: 1.6.4
+  crystal-rouge:
+    git: https://github.com/aloli-crystal/crystal-rouge.git
+    version: 4.7.0

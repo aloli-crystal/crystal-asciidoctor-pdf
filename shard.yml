@@ -24,6 +24,9 @@ dependencies:
   crystal-pdf:
     github: aloli-crystal/crystal-pdf
     version: "~> 0.1"
+  crystal-rouge:
+    github: aloli-crystal/crystal-rouge
+    version: "~> 4.7"
 
 development_dependencies:
   ameba:

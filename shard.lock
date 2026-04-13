@@ -12,6 +12,10 @@ shards:
     git: https://github.com/aloli-crystal/crystal-pdf.git
     version: 0.1.0
 
+  crystal-rouge:
+    git: https://github.com/aloli-crystal/crystal-rouge.git
+    version: 4.7.0
+
   matrix:
     git: https://github.com/exilor/matrix.git
     version: 0.1.0+git.commit.db74e62dcc0b65e548bf1a8eda65657310f57152
