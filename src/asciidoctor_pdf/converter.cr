@@ -197,7 +197,13 @@ module AsciidoctorPDF
       level = node.level
       raw_title = node.title || ""
       # Strip HTML tags from the title (e.g., <code>Crystal</code> → Crystal)
-      title = raw_title.gsub(/<[^>]+>/, "")
+      title = decode_html_entities(raw_title.gsub(/<[^>]+>/, ""))
+
+      # Prepend section number when :sectnums: is enabled
+      if node.numbered
+        title = "#{node.sectnum} #{title}"
+      end
+
       @current_section_title = title
 
       # Enregistrer pour la table des matières
@@ -1078,7 +1084,8 @@ module AsciidoctorPDF
 
       # Entrées de la TOC
       @toc_entries.each do |entry|
-        title, level, page_num = entry
+        raw_title, level, page_num = entry
+        title = decode_html_entities(raw_title)
         # Indentation : niveau 1 = 0, niveau 2 = 20pt, niveau 3 = 40pt, etc.
         indent = (level - 1) * 20.0
         entry_x = @margin + indent
@@ -1130,18 +1137,26 @@ module AsciidoctorPDF
       page = @current_page.not_nil!
       center_x = @page_width / 2
 
-      # Titre principal
+      # Titre principal — wrap long titles to fit within the page width
       title = doc.doctitle || ""
-      set_font(page, @fn_body_bold, @theme.title_font_size)
+      title_font_size = @theme.title_font_size
+      set_font(page, @fn_body_bold, title_font_size)
       page.fill_color(@theme.title_font_color)
       title_y = @page_height * 0.55
-      page.text(title, at: {@margin, title_y})
+
+      # Wrap the title into multiple lines if it exceeds the content width
+      title_lines = wrap_text(title, @content_width, title_font_size, @fn_body_bold)
+      title_line_height = title_font_size * 1.3
+      title_lines.each_with_index do |line, i|
+        page.text(line, at: {@margin, title_y - (i * title_line_height)})
+      end
+      title_total_height = title_lines.size * title_line_height
 
       # Sous-titre
       if (subtitle = doc.attr("subtitle"))
         set_font(page, @fn_body, @theme.subtitle_font_size)
         page.fill_color(@theme.subtitle_font_color)
-        page.text(subtitle, at: {@margin, title_y - @theme.title_font_size - 10.0})
+        page.text(subtitle, at: {@margin, title_y - title_total_height - 10.0})
       end
 
       # Auteur
@@ -1161,7 +1176,8 @@ module AsciidoctorPDF
       # Ligne de séparation
       page.stroke_color("cccccc")
       page.line_width(1.0)
-      page.line({@margin, title_y - @theme.title_font_size - 30.0}, {@margin + @content_width, title_y - @theme.title_font_size - 30.0})
+      sep_y = title_y - title_total_height - 30.0
+      page.line({@margin, sep_y}, {@margin + @content_width, sep_y})
       page.stroke
     end
 
@@ -1410,20 +1426,28 @@ module AsciidoctorPDF
       end
     end
 
-    # Supprime le markup inline HTML généré par asciidoctor
-    private def strip_inline_markup(text : String) : String
+    # Décode les entités HTML courantes en leurs caractères Unicode.
+    # Couvre les entités nommées et numériques les plus fréquentes.
+    private def decode_html_entities(text : String) : String
       text
-        .gsub(/<[^>]+>/, "")
-        .gsub(/&amp;/, "&")
+        .gsub(/&#8217;/, "\u2019")  # right single quotation mark
+        .gsub(/&#8216;/, "\u2018")  # left single quotation mark
+        .gsub(/&#8220;/, "\u201C")  # left double quotation mark
+        .gsub(/&#8221;/, "\u201D")  # right double quotation mark
+        .gsub(/&#8212;/, "\u2014")  # em dash
+        .gsub(/&#8211;/, "\u2013")  # en dash
+        .gsub(/&#8230;/, "\u2026")  # ellipsis
+        .gsub(/&#39;/, "'")         # apostrophe
+        .gsub(/&quot;/, "\"")
         .gsub(/&lt;/, "<")
         .gsub(/&gt;/, ">")
-        .gsub(/&quot;/, "\"")
-        .gsub(/&#8220;/, "\u201C")
-        .gsub(/&#8221;/, "\u201D")
-        .gsub(/&#8216;/, "\u2018")
-        .gsub(/&#8217;/, "\u2019")
-        .gsub(/&#8230;/, "\u2026")
-        .strip
+        .gsub(/&amp;/, "&")
+    end
+
+    # Supprime le markup inline HTML généré par asciidoctor
+    private def strip_inline_markup(text : String) : String
+      decoded = text.gsub(/<[^>]+>/, "")
+      decode_html_entities(decoded).strip
     end
 
     # Charge les polices TTF définies dans le thème.
