@@ -1,0 +1,479 @@
+= AsciiDoc — Document de référence complet
+Philippe Nénert <philippe@aloli.fr>
+v1.0, 2026-04-13
+:lang: fr
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: rouge
+:tip-caption: Astuce
+:note-caption: Note
+:warning-caption: Attention
+:important-caption: Important
+:caution-caption: Prudence
+:appendix-caption: Annexe
+:table-caption: Tableau
+:figure-caption: Figure
+:listing-caption: Listing
+:example-caption: Exemple
+
+== Formatage du texte
+
+Ceci est un paragraphe normal avec du texte **en gras**, du texte _en italique_, du texte `monospace`, du texte *_gras italique_*, du texte ^exposant^ et du texte ~indice~.
+
+Texte [.line-through]#barré# et texte [.underline]#souligné#.
+
+Un paragraphe avec une note de bas de page.footnote:[Ceci est une note de bas de page.]
+
+=== Caractères spéciaux et Unicode
+
+Tiret cadratin — et tiret demi-cadratin –
+
+Apostrophe typographique : l'œuvre, c'est-à-dire
+
+Guillemets « français » et "anglais"
+
+Symboles : © ® ™ § ¶ † ‡ ° ± × ÷ ≠ ≤ ≥ ≈ ∞ √ ∑ ∏ ∫ ∂ Δ Ω π
+
+Monnaies : € £ ¥ ¢
+
+Flèches : → ← ↑ ↓ ↔ ⇒ ⇐
+
+Coches : ✓ ✗
+
+Puces : • ◦ ▪
+
+Arborescence de fichiers :
+....
+monorepo/
+├── src/
+│   ├── main.cr
+│   ├── config/
+│   │   └── settings.cr
+│   └── models/
+│       ├── user.cr
+│       └── project.cr
+├── spec/
+│   └── main_spec.cr
+└── shard.yml
+....
+
+== Listes
+
+=== Liste non ordonnée
+
+* Premier élément
+* Deuxième élément avec sous-liste
+** Sous-élément A
+** Sous-élément B
+*** Sous-sous-élément
+* Troisième élément
+
+=== Liste ordonnée
+
+. Première étape
+. Deuxième étape
+.. Sous-étape a
+.. Sous-étape b
+. Troisième étape
+
+=== Liste de description
+
+CPU:: Processeur central de l'ordinateur
+RAM:: Mémoire vive à accès aléatoire
+SSD:: Disque à état solide, rapide et silencieux
+
+=== Liste de vérification
+
+* [x] Tâche terminée
+* [x] Autre tâche terminée
+* [ ] Tâche en cours
+* [ ] Tâche future
+
+== Admonitions
+
+NOTE: Ceci est une note informative pour attirer l'attention du lecteur.
+
+TIP: Voici une astuce utile pour gagner du temps dans votre travail quotidien.
+
+WARNING: Attention, cette opération est irréversible et peut entraîner une perte de données.
+
+CAUTION: Procédez avec prudence. Vérifiez vos sauvegardes avant de continuer.
+
+IMPORTANT: Ce point est crucial pour le bon fonctionnement du système.
+
+== Tableaux
+
+=== Tableau simple
+
+[cols="1,2,1", options="header"]
+|===
+| Nom | Description | Version
+
+| Crystal
+| Langage de programmation compilé
+| 1.19.1
+
+| Marten
+| Framework web inspiré de Django
+| 0.6.3
+
+| PostgreSQL
+| Base de données relationnelle
+| 16.2
+
+| Kemal
+| Framework web minimaliste
+| 1.5.0
+|===
+
+=== Tableau avec alignement
+
+[cols="<2,^1,>1", options="header"]
+|===
+| Fonctionnalité | Statut | Priorité
+
+| Authentification SAML
+| ✓ Fait
+| Haute
+
+| Export PDF
+| ✓ Fait
+| Haute
+
+| Gantt interactif
+| En cours
+| Moyenne
+
+| Dashboard analytics
+| Planifié
+| Basse
+|===
+
+=== Tableau avec cellules larges
+
+[cols="1,3"]
+|===
+| Paramètre | Description détaillée
+
+| `max_connections`
+| Nombre maximum de connexions simultanées autorisées par le serveur de base de données. Cette valeur doit être ajustée en fonction de la charge attendue et de la mémoire disponible sur le serveur.
+
+| `shared_buffers`
+| Quantité de mémoire utilisée par PostgreSQL pour le cache des données. Recommandation : 25% de la RAM totale du serveur, avec un maximum de 8 Go pour la plupart des configurations.
+|===
+
+== Blocs de code
+
+=== Crystal
+
+[source,crystal]
+----
+require "kemal"
+
+class UserHandler < HTTP::Handler
+  def call(context)
+    if context.request.path == "/api/users"
+      users = User.all
+      context.response.content_type = "application/json"
+      context.response.print users.to_json
+    else
+      call_next(context)
+    end
+  end
+end
+
+# Démarrage du serveur
+Kemal.config.port = 3000
+Kemal.run
+----
+
+=== SQL
+
+[source,sql]
+----
+-- Création de la table des utilisateurs
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'lecteur',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Requête avec jointures
+SELECT u.email, p.name AS project_name, COUNT(t.id) AS task_count
+FROM users u
+JOIN team_members tm ON u.id = tm.user_id
+JOIN projects p ON tm.project_id = p.id
+LEFT JOIN tasks t ON p.id = t.project_id
+GROUP BY u.email, p.name
+ORDER BY task_count DESC
+LIMIT 10;
+----
+
+=== JavaScript
+
+[source,javascript]
+----
+// Composant HTMX avec gestion des événements
+document.addEventListener('htmx:afterSwap', (event) => {
+  const target = event.detail.target;
+  if (target.classList.contains('task-list')) {
+    updateProgressBar();
+    showNotification('Liste mise à jour');
+  }
+});
+
+async function fetchDashboardData() {
+  const response = await fetch('/api/dashboard');
+  const data = await response.json();
+  return {
+    progress: data.progress,
+    alerts: data.alerts.filter(a => a.severity === 'high'),
+    tasks: data.tasks.sort((a, b) => b.priority - a.priority)
+  };
+}
+----
+
+=== YAML (configuration)
+
+[source,yaml]
+----
+# Configuration du projet SYMASEC
+database:
+  host: localhost
+  port: 5432
+  name: symasec_${CLIENT}
+  pool_size: 25
+
+authentication:
+  provider: saml
+  session_timeout: 3600
+  saml:
+    idp_sso_url: https://login.microsoftonline.com/tenant/saml2
+    sp_entity_id: https://symasec.example.com
+    assertion_consumer_url: https://symasec.example.com/saml/callback
+----
+
+=== Bash
+
+[source,bash]
+----
+#!/bin/bash
+# Script de déploiement SYMASEC
+
+set -euo pipefail
+
+echo "🚀 Déploiement de SYMASEC v${VERSION}"
+
+# Build de l'application
+crystal build src/app.cr --release -o bin/symasec
+echo "✅ Build terminé"
+
+# Migration de la base de données
+./bin/symasec migrate
+echo "✅ Migrations appliquées"
+
+# Redémarrage du service
+sudo systemctl restart symasec
+echo "✅ Service redémarré"
+
+echo "🎉 Déploiement terminé avec succès"
+----
+
+== Citations et vers
+
+=== Citation avec attribution
+
+[quote, Linus Torvalds, 2000]
+____
+Talk is cheap. Show me the code.
+____
+
+=== Vers
+
+[verse, Victor Hugo, Les Contemplations]
+____
+Demain, dès l'aube, à l'heure où blanchit la campagne,
+Je partirai. Vois-tu, je sais que tu m'attends.
+J'irai par la forêt, j'irai par la montagne.
+Je ne puis demeurer loin de toi plus longtemps.
+____
+
+== Images et figures
+
+NOTE: Les images ci-dessous sont des références. Dans un document réel, les fichiers image seraient présents.
+
+// image::architecture.png[Architecture SYMASEC, width=600]
+
+== Liens et références croisées
+
+=== Liens externes
+
+* Site officiel de Crystal : https://crystal-lang.org
+* Documentation Marten : https://martenframework.com/docs/
+* Dépôt GitHub : https://github.com/aloli-crystal
+
+=== Références internes
+
+Voir la section <<Tableaux>> pour les exemples de tableaux.
+
+Voir la section <<Blocs de code>> pour les exemples de code source.
+
+== Blocs spéciaux
+
+=== Exemple
+
+[example]
+====
+Ceci est un bloc d'exemple qui peut contenir du texte formaté, des listes, etc.
+
+* Point 1
+* Point 2
+====
+
+=== Sidebar
+
+[sidebar]
+****
+*À propos de ce document*
+
+Ce document sert de référence exhaustive pour valider le rendu PDF et EPUB produit par l'écosystème Crystal AsciiDoc (crystal-asciidoctor-pdf, crystal-asciidoctor-epub3).
+****
+
+=== Bloc littéral
+
+....
+Ceci est un bloc littéral.
+L'espacement et les    retours à la ligne
+    sont préservés exactement
+        comme écrits.
+....
+
+=== Bloc ouvert (open block)
+
+--
+Ceci est un bloc ouvert.
+Il peut contenir n'importe quel contenu AsciiDoc.
+
+* Même des listes
+* Et du texte **formaté**
+--
+
+== Sauts et séparations
+
+Texte avant la ligne horizontale.
+
+'''
+
+Texte après la ligne horizontale.
+
+<<<
+
+Ce texte commence sur une nouvelle page (saut de page).
+
+== Formules mathématiques
+
+=== Notation inline
+
+La formule d'Einstein : stem:[E = mc^2]
+
+L'intégrale de Gauss : stem:[\int_{-\infty}^{+\infty} e^{-x^2} dx = \sqrt{\pi}]
+
+=== Bloc mathématique
+
+[stem]
+++++
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+++++
+
+[stem]
+++++
+f(x) = \frac{1}{\sigma\sqrt{2\pi}} e^{-\frac{(x-\mu)^2}{2\sigma^2}}
+++++
+
+== Diagrammes
+
+=== PlantUML (via Kroki)
+
+[plantuml, format=svg]
+----
+@startuml
+actor Utilisateur
+participant "Navigateur" as Browser
+participant "Serveur Marten" as Server
+participant "PostgreSQL" as DB
+
+Utilisateur -> Browser : Connexion
+Browser -> Server : POST /login
+Server -> DB : SELECT * FROM users
+DB --> Server : User record
+Server --> Browser : Session cookie
+Browser --> Utilisateur : Dashboard
+@enduml
+----
+
+=== Mermaid (via Kroki)
+
+[mermaid, format=svg]
+----
+graph TD
+    A[Document AsciiDoc] --> B{Convertisseur}
+    B -->|PDF| C[crystal-asciidoctor-pdf]
+    B -->|EPUB| D[crystal-asciidoctor-epub3]
+    B -->|HTML| E[crystal-asciidoctor]
+    B -->|Reveal.js| F[crystal-asciidoctor-revealjs]
+    C --> G[📄 Document PDF]
+    D --> H[📱 E-book EPUB]
+    E --> I[🌐 Site web]
+    F --> J[📊 Présentation]
+----
+
+== Inline spéciaux
+
+=== Raccourcis clavier
+
+Appuyez sur kbd:[Ctrl+C] pour copier et kbd:[Ctrl+V] pour coller.
+
+Sur macOS, utilisez kbd:[Cmd+S] pour sauvegarder.
+
+=== Boutons
+
+Cliquez sur btn:[OK] pour valider ou btn:[Annuler] pour revenir.
+
+=== Menus
+
+Sélectionnez menu:Fichier[Enregistrer sous...] pour sauvegarder une copie.
+
+=== Termes d'index
+
+Voici un terme important ((ISO 27001)) qui sera indexé.
+
+La ((certification)) est un processus continu.
+
+[appendix]
+== Glossaire
+
+AsciiDoc:: Format de documentation textuel léger et puissant
+Crystal:: Langage de programmation compilé, typé statiquement, syntaxe inspirée de Ruby
+EPUB:: Format de livre électronique standard (Electronic Publication)
+ISO 27001:: Norme internationale de gestion de la sécurité de l'information
+PDF:: Format de document portable (Portable Document Format)
+SAML:: Security Assertion Markup Language, protocole d'authentification SSO
+STEM:: Science, Technology, Engineering, Mathematics — formules mathématiques
+
+[appendix]
+== Historique des modifications
+
+[cols="1,1,3"]
+|===
+| Date | Version | Description
+
+| 2026-04-13
+| 1.0
+| Création du document de référence exhaustif
+
+|===

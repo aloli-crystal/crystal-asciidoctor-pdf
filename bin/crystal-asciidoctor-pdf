@@ -5,6 +5,7 @@ require "option_parser"
 input_file = ""
 output_file = ""
 theme_file = ""
+sample_mode = false
 attributes = {} of String => String
 
 OptionParser.parse do |parser|
@@ -15,9 +16,24 @@ OptionParser.parse do |parser|
     parts = a.split("=", 2)
     attributes[parts[0]] = parts.size > 1 ? parts[1] : ""
   end
+  parser.on("--sample", "Generer le document de reference (reference.adoc + PDF)") { sample_mode = true }
   parser.on("-h", "--help", "Afficher l aide") { puts parser; exit 0 }
   parser.on("-v", "--version", "Afficher la version") { puts "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"; exit 0 }
   parser.unknown_args { |args| input_file = args.first? || "" }
+end
+
+if sample_mode
+  sample_src = File.join(__DIR__, "..", "data", "samples", "reference.adoc")
+  sample_dest = File.join(Dir.current, "reference.adoc")
+  sample_pdf = File.join(Dir.current, "reference.adoc.pdf")
+  File.write(sample_dest, File.read(sample_src))
+  theme = AsciidoctorPDF::Theme.new
+  options = {"docfile" => sample_dest, "outfile" => sample_pdf} of String => String
+  doc = Asciidoctor.load_file(sample_dest, options)
+  converter = AsciidoctorPDF::Converter.new("pdf", theme)
+  converter.convert(doc)
+  puts "Sample document generated: reference.adoc and reference.adoc.pdf"
+  exit 0
 end
 
 if input_file.empty?
