@@ -1,0 +1,4 @@
+.Français
+* xref:index.adoc[Présentation]
+* xref:installation.adoc[Installation]
+* xref:usage.adoc[Utilisation]

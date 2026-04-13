@@ -1,0 +1,41 @@
+= Crystal Asciidoctor PDF
+
+Convertisseur AsciiDoc vers PDF pour Crystal, base sur `crystal-asciidoctor` pour le parsing et `crystal-pdf` pour la generation du PDF. Porte de la gem Ruby https://github.com/asciidoctor/asciidoctor-pdf[asciidoctor-pdf] (v2.3.24).
+
+== Fonctionnalites
+
+=== Conversion AsciiDoc
+
+* Paragraphes, sections (niveaux 1-6), listes (ordonnees, non ordonnees, description)
+* Tableaux avec en-tetes, pieds de page et alternance de couleurs
+* Blocs de code avec coloration syntaxique
+* Admonitions (NOTE, TIP, WARNING, CAUTION, IMPORTANT)
+* Citations, vers, sidebars, exemples
+* Images (JPEG, PNG avec transparence)
+* Page de titre, en-tetes et pieds de page configurables
+* Table des matieres (TOC)
+* Index alphabetique multi-colonnes
+* Notes de bas de page
+
+=== Fonctionnalites PDF
+
+* *Signets* -- les sections generent automatiquement une arborescence de signets
+* *Liens cliquables* -- les URLs produisent des annotations PDF cliquables
+* *Metadonnees* -- titre, auteur et producteur renseignes dans les proprietes du PDF
+* *Mesures de texte exactes* -- utilisation des metriques de police Type1/TrueType
+
+=== Polices Personnalisees
+
+Support des polices TrueType/OpenType via le systeme de themes.
+
+=== Themes
+
+Rendu PDF entierement personnalisable via un fichier YAML (~60 proprietes).
+
+== Versions
+
+Porte depuis Ruby asciidoctor-pdf *2.3.24* (15/11/2025).
+
+== Licence
+
+MIT

@@ -1,0 +1,67 @@
+= Utilisation
+
+== API Bibliotheque
+
+[source,crystal]
+----
+require "crystal-asciidoctor-pdf"
+
+input = <<-ADOC
+= Mon Document
+Auteur
+
+== Introduction
+
+Un paragraphe avec *gras* et _italique_.
+
+== Code
+
+[source,crystal]
+\----
+puts "Bonjour !"
+\----
+ADOC
+
+doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => "document.pdf"})
+AsciidoctorPDF::Converter.new.convert(doc)
+----
+
+== Theme Personnalise
+
+[source,crystal]
+----
+theme = AsciidoctorPDF::ThemeLoader.load("mon-theme.yml")
+converter = AsciidoctorPDF::Converter.new("pdf", theme)
+----
+
+== Ligne de Commande
+
+[source,bash]
+----
+crystal-asciidoctor-pdf mon_document.adoc
+----
+
+=== Options
+
+[cols="1,3"]
+|===
+| Option | Description
+
+| `-o FILE`, `--out-file FILE`
+| Fichier PDF de sortie (par defaut : `<fichier>.adoc.pdf`)
+
+| `-T FILE`, `--theme FILE`
+| Fichier de theme YAML personnalise
+
+| `-a ATTR`, `--attribute ATTR`
+| Attribut AsciiDoc (`nom=valeur`)
+
+| `--sample`
+| Generer le document de reference
+
+| `-v`, `--version`
+| Afficher la version
+
+| `-h`, `--help`
+| Afficher l'aide
+|===

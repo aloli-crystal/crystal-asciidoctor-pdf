@@ -1,0 +1,28 @@
+= Installation
+
+== Prerequis
+
+* Crystal >= 1.19.0
+
+== En tant que Bibliotheque
+
+Ajoutez a votre `shard.yml` :
+
+[source,yaml]
+----
+dependencies:
+  crystal-asciidoctor-pdf:
+    github: aloli-crystal/crystal-asciidoctor-pdf
+----
+
+Executez `shards install`.
+
+== Binaire CLI
+
+[source,bash]
+----
+git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
+cd crystal-asciidoctor-pdf
+shards build --release
+sudo cp bin/crystal-asciidoctor-pdf /usr/local/bin/
+----

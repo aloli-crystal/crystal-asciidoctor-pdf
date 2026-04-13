@@ -1,0 +1,85 @@
+= Usage
+
+== Library API
+
+[source,crystal]
+----
+require "crystal-asciidoctor-pdf"
+
+input = <<-ADOC
+= My Document
+Author
+
+== Introduction
+
+A paragraph with *bold* and _italic_.
+
+== Code
+
+[source,crystal]
+\----
+puts "Hello!"
+\----
+ADOC
+
+doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => "document.pdf"})
+AsciidoctorPDF::Converter.new.convert(doc)
+----
+
+== Custom Theme
+
+[source,crystal]
+----
+theme = AsciidoctorPDF::ThemeLoader.load("my-theme.yml")
+converter = AsciidoctorPDF::Converter.new("pdf", theme)
+----
+
+=== Theme file example
+
+[source,yaml]
+----
+base_font_path: "fonts/OpenSans-Regular.ttf"
+base_font_bold_path: "fonts/OpenSans-Bold.ttf"
+base_font_italic_path: "fonts/OpenSans-Italic.ttf"
+mono_font_path: "fonts/JetBrainsMono-Regular.ttf"
+----
+
+== Command Line
+
+[source,bash]
+----
+crystal-asciidoctor-pdf document.adoc
+----
+
+=== Options
+
+[cols="1,3"]
+|===
+| Option | Description
+
+| `-o FILE`, `--out-file FILE`
+| Output PDF file (default: `<file>.adoc.pdf`)
+
+| `-T FILE`, `--theme FILE`
+| Custom YAML theme file
+
+| `-a ATTR`, `--attribute ATTR`
+| AsciiDoc attribute (`name=value`)
+
+| `--sample`
+| Generate reference document (`reference.adoc` + `reference.adoc.pdf`)
+
+| `-v`, `--version`
+| Show version
+
+| `-h`, `--help`
+| Show help
+|===
+
+== Reference Document
+
+[source,bash]
+----
+crystal-asciidoctor-pdf --sample
+# => reference.adoc + reference.adoc.pdf
+----
