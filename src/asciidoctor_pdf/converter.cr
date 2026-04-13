@@ -217,13 +217,13 @@ module AsciidoctorPDF
 
       # Rendu du titre de section
       font_size = @theme.heading_font_size(level)
-      page = @current_page.not_nil!
 
+      check_page_break(font_size + @theme.heading_margin_bottom(level) + 5)
+
+      # Acquérir la page après check_page_break (qui peut créer une nouvelle page)
+      page = @current_page.not_nil!
       set_font(page, @fn_heading, font_size)
       page.fill_color(@theme.heading_font_color)
-
-      text_y = @current_y - font_size
-      check_page_break(font_size + @theme.heading_margin_bottom(level) + 5)
 
       page.text(title, at: {@margin, @current_y - font_size})
       @current_y -= font_size + @theme.heading_margin_bottom(level)
@@ -759,10 +759,10 @@ module AsciidoctorPDF
       level = node.level
       title = node.title || ""
       font_size = @theme.heading_font_size(level)
+      check_page_break(font_size + 8.0)
       page = @current_page.not_nil!
       set_font(page, @fn_body_bold, font_size)
       page.fill_color(@theme.heading_font_color)
-      check_page_break(font_size + 8.0)
       page.text(title, at: {@margin, @current_y - font_size})
       @current_y -= font_size + 6.0
       ""
@@ -1260,7 +1260,7 @@ module AsciidoctorPDF
 
     private def new_page : Nil
       @page_number += 1
-      @current_page = @doc.page do |p|
+      @current_page = @doc.page(@page_width, @page_height) do |p|
         # Le bloc est requis, mais le contenu est ajouté de manière séquentielle.
       end
       @current_y = @page_height - @margin
