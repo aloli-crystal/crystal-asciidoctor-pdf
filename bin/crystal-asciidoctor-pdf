@@ -23,7 +23,12 @@ OptionParser.parse do |parser|
 end
 
 if sample_mode
-  sample_src = File.join(__DIR__, "..", "data", "samples", "reference.adoc")
+  # Le fichier de référence est dans crystal-asciidoctor (le shard cœur)
+  sample_src = File.join(__DIR__, "..", "lib", "crystal-asciidoctor", "data", "samples", "reference.adoc")
+  # Fallback : chercher dans le shard local
+  unless File.exists?(sample_src)
+    sample_src = File.join(__DIR__, "..", "data", "samples", "reference.adoc")
+  end
   sample_dest = File.join(Dir.current, "reference.adoc")
   sample_pdf = File.join(Dir.current, "reference.adoc.pdf")
   File.write(sample_dest, File.read(sample_src))
