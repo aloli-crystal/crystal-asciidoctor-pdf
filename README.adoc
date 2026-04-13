@@ -155,12 +155,27 @@ Options disponibles :
 | `-a ATTR`, `--attribute ATTR`
 | Attribut AsciiDoc au format `nom=valeur`
 
+| `--sample`
+| Générer le document de référence AsciiDoc (`reference.adoc` + `reference.adoc.pdf`)
+
 | `-v`, `--version`
 | Afficher la version
 
 | `-h`, `--help`
 | Afficher l'aide
 |===
+
+=== Document de référence
+
+L'option `--sample` génère un document AsciiDoc exhaustif et son PDF, couvrant tous les éléments AsciiDoc (formatage, listes, tableaux, code, admonitions, formules, diagrammes, etc.) :
+
+[source,bash]
+----
+crystal-asciidoctor-pdf --sample
+# → reference.adoc + reference.adoc.pdf
+----
+
+Ce document sert de test de conformité pour valider le rendu PDF.
 
 == Développement
 
