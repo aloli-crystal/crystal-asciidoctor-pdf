@@ -17,8 +17,8 @@ shards:
     git: https://github.com/stumpycr/stumpy_png.git
     version: 5.0.1
   crystal-pdf:
-    path: ../crystal-pdf
-    version: 0.1.0
+    git: https://github.com/aloli-crystal/crystal-pdf.git
+    version: 0.2.0
   ameba:
     git: https://github.com/crystal-ameba/ameba.git
     version: 1.6.4
