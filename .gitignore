@@ -8,6 +8,10 @@
 .crystal/
 .shards/
 
+# Binaires ELF produits par `shards build` (racine du repo)
+/crystal-asciidoctor-pdf-bin
+*.dwarf
+
 # Répertoire lib (dépendances installées par shards)
 lib/
 
