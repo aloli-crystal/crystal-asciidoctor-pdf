@@ -3,6 +3,13 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.2 — 2026-04-22
+
+* Fix French accents and apostrophes in the CLI output and help
+  messages (`PDF généré`, `thème`, `Générer le document de référence`,
+  `l'aide`, `Erreur : aucun fichier d'entrée spécifié`, etc.).
+* Tidy a couple of string concatenations into interpolations.
+
 == v2.3.24.1 — 2026-04-22
 
 * Project restructured to produce a proper native binary. The CLI source

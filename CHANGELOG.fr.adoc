@@ -1,11 +1,41 @@
-= Changelog
+= Journal des modifications
+:toc: left
+:toc-title: Versions
+:toclevels: 2
+
+== v2.3.24.2 — 2026-04-22
+
+* Correction des accents et apostrophes français dans les messages
+  du CLI et de l'aide (`PDF généré`, `thème`,
+  `Générer le document de référence`, `l'aide`,
+  `Erreur : aucun fichier d'entrée spécifié`, etc.).
+* Quelques concaténations de chaînes converties en interpolations.
+
+== v2.3.24.1 — 2026-04-22
+
+* Restructuration du projet pour produire un vrai binaire natif.
+  Le script source de la CLI est passé de `bin/crystal-asciidoctor-pdf`
+  à `src/cli.cr` ; `shards build --release crystal-asciidoctor-pdf`
+  produit désormais un binaire ELF/Mach-O dans `bin/crystal-asciidoctor-pdf`
+  sans écraser aucun fichier source, rendant l'outil directement
+  utilisable après `shards build`.
+* Mise à jour du `.gitignore` : suppression du contournement
+  `/crystal-asciidoctor-pdf-bin` et ignorage simple de `/bin/*`.
+* Ajout du linter *ameba* à la CI avec configuration `.ameba.yml`
+  partagée alignée sur l'écosystème Crystal.
+* Ajout du journal des modifications bilingue (CHANGELOG.adoc en
+  anglais, CHANGELOG.fr.adoc en français) ; suppression d'un
+  CHANGELOG.md résiduel.
+* Reformatage via `crystal tool format` de `inline_renderer.cr`,
+  `theme.cr`, `theme_loader.cr`.
 
 == 0.1.1 (2026-03-16)
 
-- Renommage du binaire CLI de `asciidoctor-pdf` à `crystal-asciidoctor-pdf`.
-- Modification du comportement de sortie par défaut : `mon_document.adoc` produit désormais `mon_document.adoc.pdf`.
+* Renommage du binaire CLI de `asciidoctor-pdf` à `crystal-asciidoctor-pdf`.
+* Modification du comportement de sortie par défaut : `mon_document.adoc`
+  produit désormais `mon_document.adoc.pdf`.
 
 == 0.1.0 (2026-03-13)
 
-- Version initiale
-- Conversion de base des paragraphes, sections, listes et tableaux.
+* Version initiale.
+* Conversion de base des paragraphes, sections, listes et tableaux.
