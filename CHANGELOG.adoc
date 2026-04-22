@@ -1,11 +1,32 @@
 = Changelog
+:toc: left
+:toc-title: Versions
+:toclevels: 2
+
+== v2.3.24.1 — 2026-04-22
+
+* Project restructured to produce a proper native binary. The CLI source
+  script moved from `bin/crystal-asciidoctor-pdf` to `src/cli.cr`;
+  running `shards build --release crystal-asciidoctor-pdf` now produces
+  an ELF/Mach-O binary at `bin/crystal-asciidoctor-pdf` without
+  overwriting any source file, making the tool directly usable after
+  `shards build`.
+* Tighten `.gitignore`: drop the `/crystal-asciidoctor-pdf-bin`
+  workaround and simply ignore `/bin/*`.
+* Add the *ameba* linter to the CI pipeline with the shared
+  `.ameba.yml` config aligned with the Crystal ecosystem.
+* Add a bilingual changelog (CHANGELOG.adoc in English,
+  CHANGELOG.fr.adoc in French); remove a leftover CHANGELOG.md.
+* Reformat `inline_renderer.cr`, `theme.cr`, `theme_loader.cr` via
+  `crystal tool format`.
 
 == 0.1.1 (2026-03-16)
 
-- Renommage du binaire CLI de `asciidoctor-pdf` à `crystal-asciidoctor-pdf`.
-- Modification du comportement de sortie par défaut : `mon_document.adoc` produit désormais `mon_document.adoc.pdf`.
+* CLI binary renamed from `asciidoctor-pdf` to `crystal-asciidoctor-pdf`.
+* Default output behaviour: `mon_document.adoc` now produces
+  `mon_document.adoc.pdf`.
 
 == 0.1.0 (2026-03-13)
 
-- Version initiale
-- Conversion de base des paragraphes, sections, listes et tableaux.
+* Initial release.
+* Basic conversion of paragraphs, sections, lists and tables.

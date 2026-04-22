@@ -45,7 +45,7 @@ module AsciidoctorPDF
       y : Float64,
       base_font_size : Float64,
       base_color : String,
-      theme : Theme
+      theme : Theme,
     ) : Float64
       current_x = x
       segments.each do |seg|

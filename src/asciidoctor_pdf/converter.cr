@@ -48,9 +48,9 @@ module AsciidoctorPDF
     @current_section_title : String = ""
     @document_title : String = ""
     @index_entries : Array(IndexEntry) = [] of IndexEntry
-    @toc_entries : Array({String, Int32, Int32}) = [] of {String, Int32, Int32}  # {titre, niveau, page}
-    @anchor_positions : Hash(String, Float64) = {} of String => Float64  # {id => y_position}
-    @footnotes : Array(FootnoteEntry) = [] of FootnoteEntry  # notes de bas de page
+    @toc_entries : Array({String, Int32, Int32}) = [] of {String, Int32, Int32} # {titre, niveau, page}
+    @anchor_positions : Hash(String, Float64) = {} of String => Float64         # {id => y_position}
+    @footnotes : Array(FootnoteEntry) = [] of FootnoteEntry                     # notes de bas de page
     @footnotes_by_page : Hash(Int32, Array(FootnoteEntry)) = {} of Int32 => Array(FootnoteEntry)
     @output_path : String = "output.pdf"
 
@@ -84,45 +84,45 @@ module AsciidoctorPDF
 
     def dispatch(node : Asciidoctor::AbstractNode, transform : String) : String
       case transform
-      when "document"       then convert_document(node)
-      when "section"        then convert_section(node)
-      when "paragraph"      then convert_paragraph(node)
-      when "listing"        then convert_listing(node)
-      when "literal"        then convert_literal(node)
-      when "admonition"     then convert_admonition(node)
-      when "ulist"          then convert_ulist(node)
-      when "olist"          then convert_olist(node)
-      when "dlist"          then convert_dlist(node)
-      when "table"          then convert_table(node)
-      when "image"          then convert_image(node)
-      when "page_break"     then convert_page_break(node)
-      when "thematic_break" then convert_thematic_break(node)
-      when "quote"          then convert_quote(node)
-      when "verse"          then convert_verse(node)
-      when "sidebar"        then convert_sidebar(node)
-      when "example"        then convert_example(node)
-      when "open"           then convert_open(node)
-      when "preamble"       then convert_preamble(node)
-      when "toc"            then ""  # géré dans convert_document
-      when "floating_title" then convert_floating_title(node)
-      when "inline_anchor"  then convert_inline_anchor(node)
-      when "inline_break"   then ""
-      when "inline_button"  then ""
-      when "inline_callout" then ""
-      when "inline_footnote" then convert_inline_footnote(node)
-      when "inline_image"   then ""
+      when "document"         then convert_document(node)
+      when "section"          then convert_section(node)
+      when "paragraph"        then convert_paragraph(node)
+      when "listing"          then convert_listing(node)
+      when "literal"          then convert_literal(node)
+      when "admonition"       then convert_admonition(node)
+      when "ulist"            then convert_ulist(node)
+      when "olist"            then convert_olist(node)
+      when "dlist"            then convert_dlist(node)
+      when "table"            then convert_table(node)
+      when "image"            then convert_image(node)
+      when "page_break"       then convert_page_break(node)
+      when "thematic_break"   then convert_thematic_break(node)
+      when "quote"            then convert_quote(node)
+      when "verse"            then convert_verse(node)
+      when "sidebar"          then convert_sidebar(node)
+      when "example"          then convert_example(node)
+      when "open"             then convert_open(node)
+      when "preamble"         then convert_preamble(node)
+      when "toc"              then "" # géré dans convert_document
+      when "floating_title"   then convert_floating_title(node)
+      when "inline_anchor"    then convert_inline_anchor(node)
+      when "inline_break"     then ""
+      when "inline_button"    then ""
+      when "inline_callout"   then ""
+      when "inline_footnote"  then convert_inline_footnote(node)
+      when "inline_image"     then ""
       when "inline_indexterm" then convert_inline_indexterm(node)
-      when "inline_kbd"     then ""
-      when "inline_menu"    then ""
-      when "inline_quoted"  then ""
-      when "pass"           then ""
-      when "stem"           then ""
-      when "audio"          then ""
-      when "video"          then ""
-      when "colist"         then ""
-      when "outline"        then ""
-      when "embedded"       then convert_embedded(node)
-      else                       ""
+      when "inline_kbd"       then ""
+      when "inline_menu"      then ""
+      when "inline_quoted"    then ""
+      when "pass"             then ""
+      when "stem"             then ""
+      when "audio"            then ""
+      when "video"            then ""
+      when "colist"           then ""
+      when "outline"          then ""
+      when "embedded"         then convert_embedded(node)
+      else                         ""
       end
     end
 
@@ -150,7 +150,7 @@ module AsciidoctorPDF
       # Table des matières (page réservée, sera remplie après le rendu du contenu)
       toc_page_index = -1
       if @theme.toc_enabled && node.attr?("toc")
-        toc_page_index = @page_number  # index 0-based de la page TOC
+        toc_page_index = @page_number # index 0-based de la page TOC
         new_page
         # Créer une nouvelle page pour le contenu afin d'éviter que le corps
         # ne se superpose à la TOC (qui sera rendue en post-traitement)
@@ -1051,12 +1051,12 @@ module AsciidoctorPDF
       new_page
       page = @current_page.not_nil!
 
-      font_size  = @theme.index_font_size
-      line_h     = font_size * 1.5
-      col_count  = @theme.index_columns.clamp(1, 4)
-      col_width  = @content_width / col_count
-      col_gap    = 8.0
-      entry_w    = col_width - col_gap
+      font_size = @theme.index_font_size
+      line_h = font_size * 1.5
+      col_count = @theme.index_columns.clamp(1, 4)
+      col_width = @content_width / col_count
+      col_gap = 8.0
+      entry_w = col_width - col_gap
 
       # Titre de l'index
       title_font_size = font_size + 6.0
@@ -1075,7 +1075,7 @@ module AsciidoctorPDF
         next if term.empty?
         # Gestion des sous-termes (séparés par virgule : "terme principal, sous-terme")
         parts = term.split(",", 2).map(&.strip)
-        primary   = parts[0]
+        primary = parts[0]
         secondary = parts[1]?
         letter = primary[0..0].upcase
         grouped[letter] ||= {} of String => Array(Int32)
@@ -1098,7 +1098,7 @@ module AsciidoctorPDF
           pages = grouped[letter][key].sort.uniq
           if key.includes?("\t")
             parts = key.split("\t", 2)
-            lines << {:primary,   parts[0], [] of Int32}
+            lines << {:primary, parts[0], [] of Int32}
             lines << {:secondary, parts[1], pages}
           else
             lines << {:primary, key, pages}
@@ -1446,7 +1446,7 @@ module AsciidoctorPDF
       x : Float64,
       width : Float64,
       font_size : Float64,
-      line_h : Float64
+      line_h : Float64,
     ) : Nil
       segments = InlineRenderer.parse(html)
 
@@ -1498,7 +1498,7 @@ module AsciidoctorPDF
       segments : Array(InlineSegment),
       x : Float64,
       y : Float64,
-      font_size : Float64
+      font_size : Float64,
     ) : Nil
       current_x = x
       segments.each do |seg|
@@ -1542,14 +1542,14 @@ module AsciidoctorPDF
     # Couvre les entités nommées et numériques les plus fréquentes.
     private def decode_html_entities(text : String) : String
       text
-        .gsub(/&#8217;/, "\u2019")  # right single quotation mark
-        .gsub(/&#8216;/, "\u2018")  # left single quotation mark
-        .gsub(/&#8220;/, "\u201C")  # left double quotation mark
-        .gsub(/&#8221;/, "\u201D")  # right double quotation mark
-        .gsub(/&#8212;/, "\u2014")  # em dash
-        .gsub(/&#8211;/, "\u2013")  # en dash
-        .gsub(/&#8230;/, "\u2026")  # ellipsis
-        .gsub(/&#39;/, "'")         # apostrophe
+        .gsub(/&#8217;/, "\u2019") # right single quotation mark
+        .gsub(/&#8216;/, "\u2018") # left single quotation mark
+        .gsub(/&#8220;/, "\u201C") # left double quotation mark
+        .gsub(/&#8221;/, "\u201D") # right double quotation mark
+        .gsub(/&#8212;/, "\u2014") # em dash
+        .gsub(/&#8211;/, "\u2013") # en dash
+        .gsub(/&#8230;/, "\u2026") # ellipsis
+        .gsub(/&#39;/, "'")        # apostrophe
         .gsub(/&quot;/, "\"")
         .gsub(/&lt;/, "<")
         .gsub(/&gt;/, ">")
@@ -1603,14 +1603,14 @@ module AsciidoctorPDF
     # alors que page.font(TrueTypeFont) est requis pour les polices TTF.
     private def set_font(page : PDF::Page, font_name : String, size : Float64) : Nil
       ttf = case font_name
-            when @fn_body           then @font_body
-            when @fn_body_bold      then @font_body_bold
-            when @fn_body_italic    then @font_body_italic
+            when @fn_body             then @font_body
+            when @fn_body_bold        then @font_body_bold
+            when @fn_body_italic      then @font_body_italic
             when @fn_body_bold_italic then @font_body_bold_italic
-            when @fn_mono           then @font_mono
-            when @fn_mono_bold      then @font_mono_bold
-            when @fn_heading        then @font_body_bold
-            else nil
+            when @fn_mono             then @font_mono
+            when @fn_mono_bold        then @font_mono_bold
+            when @fn_heading          then @font_body_bold
+            else                           nil
             end
 
       if ttf && ttf.is_a?(PDF::Fonts::TrueTypeFont)
@@ -1625,14 +1625,14 @@ module AsciidoctorPDF
     private def get_font(font_name : String) : PDF::Fonts::Base
       # Vérifier d'abord les polices TTF chargées
       case font_name
-      when @fn_body           then @font_body || @doc.font("Helvetica")
-      when @fn_body_bold      then @font_body_bold || @doc.font("Helvetica-Bold")
-      when @fn_body_italic    then @font_body_italic || @doc.font("Helvetica-Oblique")
+      when @fn_body             then @font_body || @doc.font("Helvetica")
+      when @fn_body_bold        then @font_body_bold || @doc.font("Helvetica-Bold")
+      when @fn_body_italic      then @font_body_italic || @doc.font("Helvetica-Oblique")
       when @fn_body_bold_italic then @font_body_bold_italic || @doc.font("Helvetica-BoldOblique")
-      when @fn_mono           then @font_mono || @doc.font("Courier")
-      when @fn_mono_bold      then @font_mono_bold || @doc.font("Courier-Bold")
-      when @fn_heading        then @font_body_bold || @doc.font("Helvetica-Bold")
-      else                         @doc.font(font_name)
+      when @fn_mono             then @font_mono || @doc.font("Courier")
+      when @fn_mono_bold        then @font_mono_bold || @doc.font("Courier-Bold")
+      when @fn_heading          then @font_body_bold || @doc.font("Helvetica-Bold")
+      else                           @doc.font(font_name)
       end
     end
 

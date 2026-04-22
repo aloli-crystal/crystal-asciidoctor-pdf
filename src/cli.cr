@@ -1,5 +1,4 @@
-#!/usr/bin/env crystal
-require "../src/asciidoctor_pdf"
+require "./asciidoctor_pdf"
 require "option_parser"
 
 input_file = ""

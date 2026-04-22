@@ -9,7 +9,7 @@ module AsciidoctorPDF
     # --- Page ---
     property page_size : String = "A4"
     property page_layout : String = "portrait"
-    property page_margin : Float64 = 36.0  # 0.5 inch en points
+    property page_margin : Float64 = 36.0 # 0.5 inch en points
 
     # --- Polices ---
     property base_font_family : String = "DejaVu Sans"
