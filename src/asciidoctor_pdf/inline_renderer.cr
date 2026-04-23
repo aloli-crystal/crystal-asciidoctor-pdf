@@ -20,12 +20,13 @@ module AsciidoctorPDF
       segments = [] of InlineSegment
       return segments if html.empty?
 
-      # Normalise les retours à la ligne en espaces : en HTML un
-      # saut de ligne dans un paragraphe est de l'espace, mais la
-      # police utilisée pour le rendu inline affiche sinon un glyphe
-      # `.notdef` (tofu) à chaque `\n`. Mêmes remplacements pour les
-      # espaces insécables que les polices Type1 standard n'ont pas
-      # toujours en glyphe drawable.
+      # Normalise les retours à la ligne en espaces (en HTML, un `\n`
+      # dans un paragraphe est de l'espace, mais les polices l'affichent
+      # sinon en tofu). Les espaces insécables sont décodés vers le vrai
+      # caractère U+00A0 pour que `wrap_text` (qui ne casse que sur
+      # l'espace ASCII) conserve la propriété insécable ; ils seront
+      # remplacés par un espace ASCII juste avant chaque `page.text`
+      # pour éviter un tofu quand la police n'a pas de glyphe NBSP.
       text = html
         .gsub(/&amp;/, "&")
         .gsub(/&lt;/, "<")
@@ -36,9 +37,8 @@ module AsciidoctorPDF
         .gsub(/&#8216;/, "\u2018")
         .gsub(/&#8217;/, "\u2019")
         .gsub(/&#8230;/, "\u2026")
-        .gsub(/&#160;/, " ")
-        .gsub(/&nbsp;/, " ")
-        .gsub('\u00A0', " ")
+        .gsub(/&#160;/, "\u00A0")
+        .gsub(/&nbsp;/, "\u00A0")
         .gsub(/\s+/, " ")
 
       # Parcourir le HTML avec un état de style courant
@@ -81,8 +81,14 @@ module AsciidoctorPDF
             end
             current_x += flag_w
           else
-            page.text(value, at: {current_x, y})
-            current_x += font.string_width(value, base_font_size)
+            # Substitue U+00A0 par un espace ASCII au moment du dessin.
+            # Le NBSP a été préservé jusqu'ici pour que le wrap ne le
+            # casse pas (insécabilité conservée) ; l'emit PDF utilise
+            # un espace ordinaire pour éviter un tofu avec les polices
+            # qui n'ont pas de glyphe NBSP.
+            printable = value.gsub('\u00A0', ' ')
+            page.text(printable, at: {current_x, y})
+            current_x += font.string_width(printable, base_font_size)
           end
         end
       end

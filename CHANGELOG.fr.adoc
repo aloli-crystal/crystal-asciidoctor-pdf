@@ -3,6 +3,36 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.6 — 2026-04-23
+
+Préserver la propriété insécable de `&nbsp;` / `&#160;` lors du
+wrap.
+
+Le correctif de la v2.3.24.5 normalisait tout espace insécable en
+espace ASCII *avant* le wrap, ce qui éliminait les tofus mais
+supprimait aussi la propriété « ne pas couper » de la séquence —
+les utilisateurs qui font un usage intensif de `&nbsp;` pouvaient
+voir un saut de ligne précisément là où ils l'avaient écrit pour
+l'empêcher.
+
+Le pipeline devient :
+
+* Les entités HTML `&#160;` et `&nbsp;` sont décodées vers le
+  vrai caractère **U+00A0** (espace insécable). Un U+00A0 déjà
+  présent dans l'entrée est conservé tel quel.
+* `wrap_text` casse uniquement sur l'espace ASCII (la regex
+  `/\s/` ne matche pas U+00A0 en Crystal), donc une paire de
+  mots jointe par U+00A0 reste sur la même ligne.
+* Juste avant chaque `page.text` (dans `draw_text_run` du
+  converter et dans `InlineRenderer.render_line`), U+00A0 est
+  remplacé par un espace ASCII dans la chaîne dessinée — le
+  PDF est visuellement propre que la police active ait ou non
+  un glyphe NBSP drawable.
+
+Résultat : le rendu visuel est identique à la v2.3.24.5 (pas de
+tofu), mais les sauts de ligne respectent maintenant les espaces
+insécables de l'auteur.
+
 == v2.3.24.5 — 2026-04-23
 
 Extension du rendu des drapeaux + correctifs de glyphes d'espacement.

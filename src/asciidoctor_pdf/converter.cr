@@ -1724,8 +1724,16 @@ module AsciidoctorPDF
           end
           cursor += flag_w
         else
-          page.text(value, at: {cursor, y})
-          cursor += font.string_width(value, font_size)
+          # Substitue U+00A0 par un espace ASCII au moment du dessin.
+          # Le NBSP a été préservé jusqu'ici pour que `wrap_text` ne
+          # casse pas dessus (insécabilité conservée) ; l'emit PDF
+          # utilise un espace ordinaire pour éviter un tofu avec les
+          # polices qui n'ont pas de glyphe NBSP.
+          printable = value.gsub('\u00A0', ' ')
+          page.text(printable, at: {cursor, y})
+          # La mesure doit rester cohérente avec la largeur réelle du
+          # texte à l'écran : on mesure donc `printable`, pas `value`.
+          cursor += font.string_width(printable, font_size)
         end
       end
     end

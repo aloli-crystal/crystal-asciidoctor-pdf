@@ -3,6 +3,33 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.6 — 2026-04-23
+
+Preserve the non-break property of `&nbsp;` / `&#160;` in wrap.
+
+The v2.3.24.5 fix normalised every non-breaking space to an ASCII
+space *before* wrap, which eliminated the tofu glyphs but also
+dropped the "do not break" property of the sequence — users relying
+heavily on `&nbsp;` could see a line break exactly where they had
+written one to prevent it.
+
+Pipeline is now:
+
+* HTML entities `&#160;` and `&nbsp;` decode to the actual
+  character **U+00A0** (non-breaking space). A bare U+00A0 that
+  was already in the input is kept as-is.
+* `wrap_text` splits on ASCII space only (regex `/\s/` does not
+  match U+00A0 in Crystal), so a word pair joined by U+00A0 stays
+  on the same line.
+* Just before each `page.text` call (`draw_text_run` in the
+  converter and `InlineRenderer.render_line`), U+00A0 is replaced
+  by an ASCII space in the drawn string — the PDF is visually
+  clean regardless of whether the active font has a drawable
+  NBSP glyph.
+
+Net effect: the visual result is identical to v2.3.24.5 (no tofu)
+but line breaks now honour the author's non-breaking spaces.
+
 == v2.3.24.5 — 2026-04-23
 
 Broader flag rendering plus a handful of white-space glyph fixes.
