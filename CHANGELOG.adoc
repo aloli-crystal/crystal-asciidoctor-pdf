@@ -3,6 +3,35 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.7 — 2026-04-23
+
+Extend non-breaking-space handling to every renderer that was still
+emitting raw HTML entities or raw U+00A0 characters.
+
+* **Document title** (`@document_title`) is now decoded through
+  `decode_html_entities` once in `convert_document`, so consumers
+  (title page, running headers / footers, PDF `/Title` metadata,
+  index title, …) all see a plain-text title. An explicit
+  `{nbsp}` in the AsciiDoc title used to surface as the literal
+  string `&#160;` everywhere — most visibly on the cover page
+  and the footer.
+* **Header / footer templates**: `resolve_page_vars` now also
+  replaces any surviving U+00A0 with an ASCII space, so the
+  running header/footer (which doesn't go through `draw_text_run`)
+  no longer draws a tofu box for an NBSP.
+* **Cover page**: `render_title_page` now calls `draw_text_run`
+  for the title, subtitle, author and revdate rows instead of
+  `page.text` directly ; any NBSP carried from the source is
+  rendered as a visual space, and future inline flags in those
+  fields would work too.
+* **Floating titles, TOC entry titles, table captions**: same
+  switch to `draw_text_run` for consistency.
+
+Net effect: `{nbsp}` and `&nbsp;` in *any* author-facing text —
+including the document title and chrome — are now rendered as a
+visible space, while `wrap_text` continues to treat them as
+non-break separators.
+
 == v2.3.24.6 — 2026-04-23
 
 Preserve the non-break property of `&nbsp;` / `&#160;` in wrap.

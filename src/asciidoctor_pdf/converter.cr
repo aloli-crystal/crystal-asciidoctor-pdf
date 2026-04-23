@@ -135,7 +135,12 @@ module AsciidoctorPDF
     def convert_document(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Document)
 
-      @document_title = node.doctitle || ""
+      # Decode HTML entities in the document title once here so every
+      # downstream renderer (title page, headers, PDF metadata, index
+      # title, …) sees a plain-text title. NBSPs remain as U+00A0 so
+      # `wrap_text` preserves the non-break property ; they become
+      # ASCII spaces only just before each `page.text` call.
+      @document_title = decode_html_entities(node.doctitle || "")
       @output_path = determine_output_path(node)
 
       # Métadonnées PDF
@@ -607,7 +612,7 @@ module AsciidoctorPDF
       if (caption = node.title) && !caption.empty?
         set_font(page, @fn_body, font_size - 1)
         page.fill_color("888888")
-        page.text(caption, at: {@margin, @current_y - (font_size - 1)})
+        draw_text_run(page, caption, @margin, @current_y - (font_size - 1), @fn_body, font_size - 1)
         @current_y -= (font_size - 1) * 1.4
       end
 
@@ -897,7 +902,7 @@ module AsciidoctorPDF
       page = @current_page.not_nil!
       set_font(page, @fn_body_bold, font_size)
       page.fill_color(@theme.heading_font_color)
-      page.text(title, at: {@margin, @current_y - font_size})
+      draw_text_run(page, title, @margin, @current_y - font_size, @fn_body_bold, font_size)
       @current_y -= font_size + 6.0
       ""
     end
@@ -1236,7 +1241,7 @@ module AsciidoctorPDF
         toc_font_name = level <= 1 ? @fn_body_bold : @fn_body
         set_font(page, toc_font_name, font_size)
         page.fill_color(text_color)
-        page.text(title, at: {entry_x, y - font_size})
+        draw_text_run(page, title, entry_x, y - font_size, toc_font_name, font_size)
 
         # Numéro de page (aligné à droite)
         page_str = page_num.to_s
@@ -1271,8 +1276,10 @@ module AsciidoctorPDF
       page = @current_page.not_nil!
       center_x = @page_width / 2
 
-      # Titre principal — wrap long titles to fit within the page width
-      title = doc.doctitle || ""
+      # Titre principal — wrap long titles to fit within the page width.
+      # Use `@document_title` (already decoded) so HTML entities like
+      # `&#160;` don't leak through as literal text.
+      title = @document_title
       title_font_size = @theme.title_font_size
       set_font(page, @fn_body_bold, title_font_size)
       page.fill_color(@theme.title_font_color)
@@ -1282,7 +1289,7 @@ module AsciidoctorPDF
       title_lines = wrap_text(title, @content_width, title_font_size, @fn_body_bold)
       title_line_height = title_font_size * 1.3
       title_lines.each_with_index do |line, i|
-        page.text(line, at: {@margin, title_y - (i * title_line_height)})
+        draw_text_run(page, line, @margin, title_y - (i * title_line_height), @fn_body_bold, title_font_size)
       end
       title_total_height = title_lines.size * title_line_height
 
@@ -1290,21 +1297,21 @@ module AsciidoctorPDF
       if (subtitle = doc.attr("subtitle"))
         set_font(page, @fn_body, @theme.subtitle_font_size)
         page.fill_color(@theme.subtitle_font_color)
-        page.text(subtitle, at: {@margin, title_y - title_total_height - 10.0})
+        draw_text_run(page, decode_html_entities(subtitle), @margin, title_y - title_total_height - 10.0, @fn_body, @theme.subtitle_font_size)
       end
 
       # Auteur
       if (author = doc.attr("author"))
         set_font(page, @fn_body, @theme.author_font_size)
         page.fill_color(@theme.author_font_color)
-        page.text(author, at: {@margin, @page_height * 0.35})
+        draw_text_run(page, decode_html_entities(author), @margin, @page_height * 0.35, @fn_body, @theme.author_font_size)
       end
 
       # Date
       if (revdate = doc.attr("revdate"))
         set_font(page, @fn_body, @theme.base_font_size)
         page.fill_color("888888")
-        page.text(revdate, at: {@margin, @page_height * 0.35 - @theme.author_font_size - 8.0})
+        draw_text_run(page, decode_html_entities(revdate), @margin, @page_height * 0.35 - @theme.author_font_size - 8.0, @fn_body, @theme.base_font_size)
       end
 
       # Ligne de séparation
@@ -1386,6 +1393,10 @@ module AsciidoctorPDF
         .gsub("{page_number}", meta.number.to_s)
         .gsub("{section_title}", meta.section_title)
         .gsub("{document_title}", @document_title)
+        # Replace U+00A0 with ASCII space just before the string is
+        # handed to `page.text` in header/footer rendering (those
+        # paths don't go through `draw_text_run`).
+        .gsub('\u00A0', ' ')
     end
 
     # =========================================================================

@@ -3,6 +3,36 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.7 — 2026-04-23
+
+Étendre la gestion des espaces insécables à tous les renderers
+qui émettaient encore des entités HTML brutes ou des U+00A0 bruts.
+
+* **Titre du document** (`@document_title`) : maintenant décodé
+  via `decode_html_entities` une seule fois dans
+  `convert_document`, donc tous les consommateurs (page de
+  titre, en-tête/pied de page, métadonnées PDF `/Title`, titre
+  de l'index, etc.) voient un titre en texte brut. Un `{nbsp}`
+  dans le titre AsciiDoc apparaissait auparavant littéralement
+  comme `&#160;` partout — visible en particulier sur la page
+  de garde et dans le pied de page.
+* **Templates d'en-tête / pied de page** : `resolve_page_vars`
+  remplace aussi tout U+00A0 subsistant par un espace ASCII,
+  pour que l'en-tête/pied (qui ne passe pas par `draw_text_run`)
+  n'affiche plus un tofu à la place d'un NBSP.
+* **Page de titre** : `render_title_page` utilise désormais
+  `draw_text_run` pour le titre, le sous-titre, l'auteur et la
+  date au lieu d'appeler `page.text` directement ; tout NBSP
+  hérité du source est rendu en espace visuel, et d'éventuels
+  drapeaux inline dans ces champs fonctionneraient aussi.
+* **Titres flottants, entrées de TOC, captions de tableau** :
+  même bascule vers `draw_text_run` pour la cohérence.
+
+Résultat : `{nbsp}` et `&nbsp;` dans *tout* texte côté auteur —
+y compris le titre du document et la chrome — sont maintenant
+rendus comme un espace visible, tandis que `wrap_text` continue
+de les traiter comme séparateurs insécables.
+
 == v2.3.24.6 — 2026-04-23
 
 Préserver la propriété insécable de `&nbsp;` / `&#160;` lors du
