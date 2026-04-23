@@ -13,7 +13,7 @@ module AsciidoctorPDF
 
     # --- Polices ---
     property base_font_family : String = "DejaVu Sans"
-    property base_font_size : Float64 = 10.5
+    property base_font_size : Float64 = 10.0
     property base_line_height : Float64 = 1.5
     property base_font_color : String = "333333"
 

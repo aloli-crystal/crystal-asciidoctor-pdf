@@ -217,19 +217,30 @@ module AsciidoctorPDF
 
       # Rendu du titre de section
       font_size = @theme.heading_font_size(level)
+      heading_line_h = font_size * @theme.base_line_height
 
-      # Ensure heading is not orphaned: require room for the heading plus at
-      # least 4 lines of body text below it (using base font size * line height).
+      # Découper le titre en lignes si il dépasse la largeur de contenu.
+      # Sans ce wrapping, un titre long est rendu tronqué (le texte déborde
+      # la page et le dernier mot est coupé).
+      title_lines = wrap_text(title, @content_width, font_size, @fn_heading)
+      heading_block_h = font_size + (title_lines.size - 1) * heading_line_h
+
+      # Ensure heading is not orphaned: require room for the whole heading
+      # plus at least 4 lines of body text below it.
       min_content_below = @theme.base_font_size * @theme.base_line_height * 4
-      check_page_break(font_size + @theme.heading_margin_bottom(level) + min_content_below)
+      check_page_break(heading_block_h + @theme.heading_margin_bottom(level) + min_content_below)
 
       # Acquérir la page après check_page_break (qui peut créer une nouvelle page)
       page = @current_page.not_nil!
       set_font(page, @fn_heading, font_size)
       page.fill_color(@theme.heading_font_color)
 
-      page.text(title, at: {@margin, @current_y - font_size})
-      @current_y -= font_size + @theme.heading_margin_bottom(level)
+      y = @current_y - font_size
+      title_lines.each_with_index do |line, idx|
+        page.text(line, at: {@margin, y})
+        y -= heading_line_h unless idx == title_lines.size - 1
+      end
+      @current_y -= heading_block_h + @theme.heading_margin_bottom(level)
 
       # Ligne de séparation pour h1 et h2
       if level <= 2
@@ -446,8 +457,17 @@ module AsciidoctorPDF
       font_size = @theme.base_font_size
       line_h = font_size * @theme.base_line_height
       padding = @theme.admonition_padding
-      label_width = 60.0
-      content_w = @content_width - label_width - padding
+
+      # Espace réservé au label (NOTE, TIP, IMPORTANT, WARNING, CAUTION) :
+      # au minimum 60pt pour aligner les labels entre admonitions, plus si
+      # le texte du label mesuré est plus long (évite qu'il mange le début
+      # du texte de l'admonition).
+      label_text = name.upcase
+      label_size = font_size - 1
+      label_offset = @theme.admonition_border_width + 4.0
+      label_gap = 8.0
+      label_space = [60.0, label_offset + text_width(label_text, @fn_body_bold, label_size) + label_gap].max
+      content_w = @content_width - label_space - padding
 
       lines = wrap_text(text, content_w, font_size)
       block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
@@ -464,9 +484,9 @@ module AsciidoctorPDF
       page.fill
 
       # Label (NOTE, TIP, etc.)
-      set_font(page, @fn_body_bold, font_size - 1)
+      set_font(page, @fn_body_bold, label_size)
       page.fill_color(border_color)
-      page.text(name.upcase, at: {@margin + @theme.admonition_border_width + 4, @current_y - padding - font_size})
+      page.text(label_text, at: {@margin + label_offset, @current_y - padding - font_size})
 
       # Texte de l'admonition
       set_font(page, @fn_body, font_size)
@@ -474,7 +494,7 @@ module AsciidoctorPDF
 
       y = @current_y - padding - font_size
       lines.each do |line|
-        page.text(line, at: {@margin + label_width, y})
+        page.text(line, at: {@margin + label_space, y})
         y -= line_h
       end
 
@@ -1644,6 +1664,9 @@ module AsciidoctorPDF
 
     # Découpe un texte en lignes selon la largeur disponible.
     # Utilise les métriques de police exactes pour le calcul.
+    # Les mots qui dépassent seuls la largeur disponible (par exemple un
+    # nom propre long dans une colonne étroite) sont découpés caractère
+    # par caractère pour éviter que la cellule déborde visuellement.
     private def wrap_text(text : String, width : Float64, font_size : Float64, font_name : String? = nil) : Array(String)
       font = get_font(font_name || @fn_body)
       space_w = font.string_width(" ", font_size)
@@ -1661,9 +1684,16 @@ module AsciidoctorPDF
           if current_width + sep_w + word_w <= width
             current_line = current_line.empty? ? word : "#{current_line} #{word}"
             current_width += sep_w + word_w
+          elsif word_w > width
+            # Le mot ne tient pas seul : on le découpe en morceaux qui tiennent.
+            lines << current_line unless current_line.empty?
+            chunks = break_long_word(word, width, font, font_size)
+            # Les n-1 premiers morceaux occupent une ligne complète.
+            chunks[0..-2].each { |chunk| lines << chunk } if chunks.size > 1
+            current_line = chunks.last
+            current_width = font.string_width(current_line, font_size)
           else
             lines << current_line unless current_line.empty?
-            # Si le mot seul est trop long, on le met quand même
             current_line = word
             current_width = word_w
           end
@@ -1672,6 +1702,88 @@ module AsciidoctorPDF
       end
 
       lines.empty? ? [""] : lines
+    end
+
+    # Découpe un mot en morceaux dont chacun tient dans `width`.
+    # Utilisé par `wrap_text` quand un mot seul dépasse la largeur (par
+    # exemple dans des cellules de tableau très étroites).
+    #
+    # Priorité de césure, du plus lisible au plus brutal :
+    # 1. Trait d'union interne : `Pays-Bas` -> `Pays-` + `Bas`.
+    # 2. Majuscule interne (camelCase) : `RoyaumeUni` -> `Royaume` + `Uni`.
+    # 3. Caractère par caractère, en dernier recours.
+    #
+    # Les sous-parties peuvent elles-mêmes dépasser `width` : on les
+    # réinjecte récursivement dans l'algorithme pour les découper plus
+    # finement jusqu'à ce qu'elles tiennent.
+    private def break_long_word(word : String, width : Float64, font : PDF::Fonts::Base, font_size : Float64) : Array(String)
+      return [word] if font.string_width(word, font_size) <= width
+
+      # 1. Tirets internes : découpe en gardant le tiret sur le morceau de gauche.
+      if word.includes?('-') && word.index('-') != 0 && word.index('-') != word.size - 1
+        parts = split_keep_separator(word, '-')
+        return parts.flat_map { |p| break_long_word(p, width, font, font_size) } if parts.size > 1
+      end
+
+      # 2. Majuscules internes (casse mixte type `RoyaumeUni`, `GitHub`).
+      parts = split_on_internal_uppercase(word)
+      if parts.size > 1
+        return parts.flat_map { |p| break_long_word(p, width, font, font_size) }
+      end
+
+      # 3. Découpe caractère par caractère.
+      chunks = [] of String
+      buf = ""
+      word.each_char do |c|
+        candidate = buf + c
+        if !buf.empty? && font.string_width(candidate, font_size) > width
+          chunks << buf
+          buf = c.to_s
+        else
+          buf = candidate
+        end
+      end
+      chunks << buf unless buf.empty?
+      chunks
+    end
+
+    # Découpe `text` sur chaque occurrence de `sep`, en conservant `sep`
+    # à la fin du morceau qui le précède. Exemple :
+    # `split_keep_separator("Pays-Bas", '-')` -> `["Pays-", "Bas"]`.
+    private def split_keep_separator(text : String, sep : Char) : Array(String)
+      parts = [] of String
+      buf = String::Builder.new
+      text.each_char do |c|
+        buf << c
+        if c == sep
+          parts << buf.to_s
+          buf = String::Builder.new
+        end
+      end
+      tail = buf.to_s
+      parts << tail unless tail.empty?
+      parts
+    end
+
+    # Découpe `text` aux transitions minuscule -> majuscule (casse mixte
+    # interne, type `RoyaumeUni`). Renvoie un tableau singleton si le
+    # mot n'a pas de frontière interne exploitable.
+    private def split_on_internal_uppercase(text : String) : Array(String)
+      return [text] if text.size < 2
+      parts = [] of String
+      buf = String::Builder.new
+      prev : Char? = nil
+      text.each_char do |c|
+        if (p = prev) && p.lowercase? && c.uppercase?
+          parts << buf.to_s
+          buf = String::Builder.new
+        end
+        buf << c
+        prev = c
+      end
+      tail = buf.to_s
+      parts << tail unless tail.empty?
+      parts
     end
   end
 end

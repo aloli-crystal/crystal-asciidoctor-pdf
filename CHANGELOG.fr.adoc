@@ -3,6 +3,31 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.3 — 2026-04-23
+
+Corrections de mise en page et de typographie constatées sur des
+documents réels.
+
+* **Admonitions** (NOTE, TIP, IMPORTANT, WARNING, CAUTION) : un
+  espacement correct sépare désormais le label du texte.
+  Précédemment le label tenait dans une zone fixe de 60 pt quelle que
+  soit sa largeur réelle, ce qui faisait visuellement coller des
+  labels longs (`IMPORTANT`) au premier mot du message.
+* **Titres de section** : les titres longs sont désormais découpés
+  sur plusieurs lignes au lieu d'être rendus au-delà de la marge
+  droite (et tronqués). Utilise l'assistant existant `wrap_text`
+  avec la police des titres.
+* **Cellules de tableau** : les mots qui ne tiennent pas dans leur
+  colonne (typique pour les noms de pays dans des colonnes étroites
+  proportionnelles, ex. `Allemagne` ou `Pays-Bas`) sont désormais
+  découpés en sous-morceaux. Priorité de césure : tirets internes
+  (`Pays-` + `Bas`), frontières camelCase, puis en dernier recours
+  coupe caractère par caractère. Plus aucun débordement visuel dans
+  la colonne voisine.
+* **Taille de police du corps** : abaissée de 10.5 pt à 10 pt.
+  Essentiellement cosmétique — les tableaux denses tiennent mieux en
+  A4 sans changer la hiérarchie des titres.
+
 == v2.3.24.2 — 2026-04-22
 
 * Correction des accents et apostrophes français dans les messages

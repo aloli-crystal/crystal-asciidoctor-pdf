@@ -3,6 +3,29 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.3 — 2026-04-23
+
+Layout and typography fixes observed on real-world documents.
+
+* **Admonitions** (NOTE, TIP, IMPORTANT, WARNING, CAUTION): the label
+  now has a proper gap before the text. Previously the label fit in a
+  fixed 60 pt slot regardless of its rendered width, which made long
+  labels like `IMPORTANT` visually collide with the first word of
+  the message.
+* **Section titles**: long titles are now wrapped across multiple
+  lines instead of being rendered past the right margin (and
+  truncated). Uses the existing `wrap_text` helper with the heading
+  font.
+* **Table cells**: words that do not fit in their column (typical
+  for country names in narrow proportional columns, e.g. `Allemagne`
+  or `Pays-Bas`) are now broken into sub-chunks. Break priority:
+  internal hyphens (`Pays-` + `Bas`), camelCase boundaries, then a
+  per-character fallback. No visual overflow into the neighbouring
+  column any more.
+* **Default body font size**: lowered from 10.5 pt to 10 pt. Mostly
+  cosmetic — makes dense tables fit better on A4 without changing
+  the heading hierarchy.
+
 == v2.3.24.2 — 2026-04-22
 
 * Fix French accents and apostrophes in the CLI output and help
