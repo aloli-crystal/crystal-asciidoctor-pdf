@@ -3,6 +3,38 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.8 — 2026-04-23
+
+Suite de tests d'intégration bout-en-bout. Le pipeline adoc → PDF
+est désormais exercé via `spec/integration/*_spec.cr`, qui font
+circuler de petits extraits AsciiDoc à travers le vrai converter
+et inspectent le PDF produit via `PDF::Reader`.
+
+* 7 fichiers de specs couvrant : sanity, espaces insécables,
+  titres de section, tableaux, admonitions
+  (NOTE/TIP/IMPORTANT/WARNING/CAUTION + forme bloc), listes
+  (non ordonnée, ordonnée, définition), emphase inline
+  (gras/italique/monospace), drapeaux de pays (y compris la
+  régression BR qui bouclait), et métadonnées de titre du PDF.
+  **30 tests d'intégration, 46 tests unitaires, 76 au total —
+  tous verts.**
+* Nouveau helper `IntegrationHelper` dans
+  `spec/integration/spec_helper.cr` qui :
+  - convertit une chaîne AsciiDoc via le vrai
+    `AsciidoctorPDF::Converter`,
+  - extrait le texte lisible des flux de contenu PDF (supporte à
+    la fois les littéraux Type1 WinAnsi `(…)` et les chaînes hex
+    TrueType Identity-H `<…>`, scan tolérant octet par octet),
+  - lit le champ `/Info` `/Title` du PDF et décode le
+    UTF-16BE-avec-BOM si nécessaire,
+  - force les polices Type1 standard dans les runs de test pour
+    que le texte extrait soit lisible en ASCII (le pipeline de
+    police réel du converter est quand même testé — simplement
+    basculé sur un encodage extractible).
+* Pur Crystal, zéro dépendance sur un outil externe (pas de
+  `pdftotext`, `unzip`, …) — le runner CI n'a besoin de rien
+  d'autre que ce que `shards install` fournit.
+
 == v2.3.24.7 — 2026-04-23
 
 Étendre la gestion des espaces insécables à tous les renderers

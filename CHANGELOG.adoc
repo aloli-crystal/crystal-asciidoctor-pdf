@@ -3,6 +3,35 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.8 — 2026-04-23
+
+End-to-end integration test suite. The pipeline adoc → PDF is now
+exercised through `spec/integration/*_spec.cr`, which round-trip
+small AsciiDoc snippets through the real converter and inspect the
+produced PDF via `PDF::Reader`.
+
+* 7 spec files covering: sanity, NBSP handling, section headings,
+  tables, admonitions (NOTE/TIP/IMPORTANT/WARNING/CAUTION + block
+  form), lists (unordered, ordered, definition), inline emphasis
+  (bold/italic/mono), country flags (including the BR regression
+  that used to loop), and document title metadata. **30 integration
+  tests, 46 unit tests, 76 total — all green.**
+* New helper `IntegrationHelper` in `spec/integration/spec_helper.cr`
+  that:
+  - converts an inline AsciiDoc string through the real
+    `AsciidoctorPDF::Converter`,
+  - extracts readable text from PDF content streams (supports both
+    Type1 WinAnsi literal `(…)` strings and TrueType Identity-H
+    hex `<…>` strings, tolerant byte-level scan),
+  - reads the PDF `/Info` `/Title` field and decodes UTF-16BE-with-BOM
+    when needed,
+  - forces Type1 standard fonts in test runs so the extracted text
+    is ASCII-readable (the converter's real font pipeline is still
+    tested — it's just swapped to an extractable encoding).
+* Pure Crystal, zero external tool dependency (no `pdftotext`,
+  `unzip`, …) — the CI runner doesn't need anything beyond what
+  `shards install` provides.
+
 == v2.3.24.7 — 2026-04-23
 
 Extend non-breaking-space handling to every renderer that was still
