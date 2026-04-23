@@ -1,4 +1,6 @@
 require "crystal-pdf/src/pdf"
+require "crystal-flags/src/crystal_flags"
+require "./inline_flags"
 
 module AsciidoctorPDF
   # Segment de texte inline avec ses attributs de style
@@ -18,7 +20,12 @@ module AsciidoctorPDF
       segments = [] of InlineSegment
       return segments if html.empty?
 
-      # Décoder les entités HTML basiques
+      # Normalise les retours à la ligne en espaces : en HTML un
+      # saut de ligne dans un paragraphe est de l'espace, mais la
+      # police utilisée pour le rendu inline affiche sinon un glyphe
+      # `.notdef` (tofu) à chaque `\n`. Mêmes remplacements pour les
+      # espaces insécables que les polices Type1 standard n'ont pas
+      # toujours en glyphe drawable.
       text = html
         .gsub(/&amp;/, "&")
         .gsub(/&lt;/, "<")
@@ -30,6 +37,9 @@ module AsciidoctorPDF
         .gsub(/&#8217;/, "\u2019")
         .gsub(/&#8230;/, "\u2026")
         .gsub(/&#160;/, " ")
+        .gsub(/&nbsp;/, " ")
+        .gsub('\u00A0', " ")
+        .gsub(/\s+/, " ")
 
       # Parcourir le HTML avec un état de style courant
       parse_html(text, segments)
@@ -48,17 +58,33 @@ module AsciidoctorPDF
       theme : Theme,
     ) : Float64
       current_x = x
+      flag_w = InlineFlags.flag_width(base_font_size)
+      flag_h = InlineFlags.flag_height(base_font_size)
+
       segments.each do |seg|
         next if seg.text.empty?
 
         font_name = resolve_font(seg, theme)
         page.font(font_name, size: base_font_size)
         page.fill_color(seg.color || base_color)
-        page.text(seg.text, at: {current_x, y})
-
-        # Use proper font metrics for text width advancement
         font = PDF::Fonts::Type1.new(font_name)
-        current_x += font.string_width(seg.text, base_font_size)
+
+        # Split the segment into text and flag runs. Flag emojis are
+        # drawn as real colour SVGs; plain text keeps the segment's
+        # styling (bold/italic/mono/colour).
+        InlineFlags.segments(seg.text).each do |(kind, value)|
+          if kind == :flag
+            if (svg_data = CrystalFlags.svg(value))
+              page.svg(svg_data, at: {current_x, y + flag_h}, width: flag_w, height: flag_h)
+            else
+              page.text("[#{value}]", at: {current_x, y})
+            end
+            current_x += flag_w
+          else
+            page.text(value, at: {current_x, y})
+            current_x += font.string_width(value, base_font_size)
+          end
+        end
       end
       current_x
     end
@@ -128,7 +154,11 @@ module AsciidoctorPDF
             when "strong", "b" then bold_depth += 1
             when "em", "i"     then italic_depth += 1
             when "code", "tt"  then mono_depth += 1
-            when "br"          then buf += "\n"
+            when "br"          then buf += " " # hard line break: treat
+            # as a space for now. A real `<br>` would need the render
+            # pipeline to emit an explicit line split at this point;
+            # keeping a literal `\n` draws a tofu box because Type1
+            # fonts have no glyph for newline.
             when "span"
               # Extraire la couleur du style
               if (m = tag.match(/style\s*=\s*["']?[^"'>]*color\s*:\s*#?([0-9a-fA-F]{6})/))

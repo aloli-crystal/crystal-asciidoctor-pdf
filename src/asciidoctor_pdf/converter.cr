@@ -496,7 +496,7 @@ module AsciidoctorPDF
 
       y = @current_y - padding - font_size
       lines.each do |line|
-        page.text(line, at: {@margin + label_space, y})
+        draw_text_run(page, line, @margin + label_space, y, @fn_body, font_size)
         y -= line_h
       end
 
@@ -528,7 +528,7 @@ module AsciidoctorPDF
         term = strip_inline_markup(item.text || "")
         set_font(page, @fn_body_bold, @theme.base_font_size)
         page.fill_color(@theme.base_font_color)
-        page.text(term, at: {@margin, @current_y - @theme.base_font_size})
+        draw_text_run(page, term, @margin, @current_y - @theme.base_font_size, @fn_body_bold, @theme.base_font_size)
         @current_y -= @theme.base_font_size * @theme.base_line_height
 
         if item.blocks?
@@ -563,7 +563,7 @@ module AsciidoctorPDF
 
         page.fill_color(@theme.base_font_color)
         lines.each do |line|
-          page.text(line, at: {x_text, @current_y - font_size})
+          draw_text_run(page, line, x_text, @current_y - font_size, @fn_body, font_size)
           @current_y -= line_h
         end
         @current_y -= @theme.list_item_spacing
@@ -1576,6 +1576,19 @@ module AsciidoctorPDF
         .gsub(/&lt;/, "<")
         .gsub(/&gt;/, ">")
         .gsub(/&amp;/, "&")
+        # Non-breaking space: replace with a regular space. The Type1
+        # standard fonts used by the inline renderer don't always
+        # expose a drawable NBSP glyph, so a real U+00A0 character
+        # shows up as a tofu box in the PDF. Swapping it for an
+        # ordinary space keeps the layout visually correct at the
+        # cost of losing the non-break property.
+        .gsub(/&#160;/, " ")
+        .gsub(/&nbsp;/, " ")
+        .gsub('\u00A0', " ")
+        # Collapse newlines / whitespace runs introduced by the HTML
+        # paragraph formatting. A bare `\n` would otherwise end up
+        # in the drawn string and render as a tofu glyph.
+        .gsub(/\s+/, " ")
     end
 
     # Supprime le markup inline HTML généré par asciidoctor

@@ -3,6 +3,38 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.5 — 2026-04-23
+
+Extension du rendu des drapeaux + correctifs de glyphes d'espacement.
+
+* **Drapeaux dans les paragraphes, admonitions et listes** aussi —
+  plus seulement dans les tableaux. `draw_text_run` est désormais
+  appelé depuis `convert_paragraph` (via `InlineRenderer.render_line`),
+  `render_admonition`, `convert_dlist` et `render_list`. Toute paire
+  d'indicateurs régionaux dans le corps du texte est maintenant
+  rendue comme un vrai drapeau SVG en couleur.
+* **Correction des carrés tofu provenant de `<br>`** : le renderer
+  inline traduisait un `<br>` par un `\n` littéral dans le buffer
+  de rendu, qui s'affichait en tofu car les polices Type1 n'ont pas
+  de glyphe pour le retour à la ligne. Un espace normal est émis à
+  la place ; les hard line breaks sont donc traités comme des
+  séparateurs de mots. Une vraie mise en page multi-ligne pour
+  `<br>` est laissée pour une passe ultérieure.
+* **Correction des carrés tofu provenant des retours à la ligne
+  souples** : le HTML généré par AsciiDoctor préserve les sauts de
+  ligne du source dans les paragraphes. Le renderer inline et
+  `strip_inline_markup` réduisent maintenant toute séquence
+  d'espaces à un espace unique avant le dessin du texte.
+* **Correction des carrés tofu d'espaces insécables** : `&#160;`,
+  `&nbsp;` et U+00A0 brut sont désormais normalisés en espace
+  ordinaire (la propriété « non séparable » est perdue, compromis
+  acceptable étant donné que les polices Type1 standard n'exposent
+  pas toujours un glyphe drawable pour le NBSP).
+* **Mise à jour de dépendance** : `crystal-pdf` → utilise v0.3.3 via
+  `~> 0.3`, qui ajoute un cache d'instances `SVG::Parser` au niveau
+  du document pour que les drapeaux répétés dans un même document
+  ne soient parsés qu'une fois.
+
 == v2.3.24.4 — 2026-04-23
 
 Vrais drapeaux de pays dans les cellules de tableau, via un nouveau
