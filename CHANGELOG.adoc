@@ -3,6 +3,28 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.4 — 2026-04-23
+
+Real country flags in table cells, via a new SVG rendering pipeline.
+
+* **New dependency** `crystal-flags` (~> 0.1) — 271 ISO 3166-1 alpha-2
+  SVG flags from lipis/flag-icons embedded at compile time.
+* **Inline flag rendering in table cells**: pairs of Unicode regional
+  indicator characters (e.g. `🇫🇷`, `🇩🇪`) are detected in cell text
+  and drawn as actual colour SVG glyphs on top of the text layer, at
+  the baseline of the surrounding text. Previously those codepoints
+  rendered as tofu boxes (DejaVu Sans has no glyph for them) and
+  threw off the cell width calculation.
+* **Layout**: `text_width` and `wrap_text` now charge each flag as a
+  fixed width derived from the font size, so columns reserve the
+  correct amount of space instead of counting the `.notdef` width
+  from the text font.
+* **Dependency bump**: `crystal-pdf` → `~> 0.3` (uses the path-parser
+  loop fix and the closed-shape fill fix shipped in crystal-pdf
+  v0.3.1 and v0.3.2).
+* New helper module `AsciidoctorPDF::InlineFlags` with `segments`,
+  `flag_width` and `flag_height`.
+
 == v2.3.24.3 — 2026-04-23
 
 Layout and typography fixes observed on real-world documents.

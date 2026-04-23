@@ -1,5 +1,7 @@
 require "crystal-asciidoctor/src/crystal-asciidoctor"
 require "crystal-pdf/src/pdf"
+require "crystal-flags/src/crystal_flags"
+require "./inline_flags"
 
 module AsciidoctorPDF
   # Convertisseur AsciiDoc → PDF pour crystal-asciidoctor.
@@ -647,7 +649,7 @@ module AsciidoctorPDF
                    when "right"  then x + cw - tw - padding
                    else               x + padding
                    end
-              page.text(line, at: {tx, @current_y - padding - font_size - (li * line_h)})
+              draw_text_run(page, line, tx, @current_y - padding - font_size - (li * line_h), @fn_body_bold, font_size)
             end
             x += cw
           end
@@ -698,7 +700,7 @@ module AsciidoctorPDF
                  when "right"  then x + cw - tw - padding
                  else               x + padding
                  end
-            page.text(line, at: {tx, @current_y - padding - font_size - (li * line_h)})
+            draw_text_run(page, line, tx, @current_y - padding - font_size - (li * line_h), @fn_body, font_size)
           end
           x += cw
         end
@@ -1657,9 +1659,62 @@ module AsciidoctorPDF
     end
 
     # Mesure la largeur d'un texte en points en utilisant les métriques
-    # exactes des polices (Type1 ou TrueType).
+    # exactes des polices (Type1 ou TrueType). Les drapeaux emoji
+    # (paires de regional indicators, rendus comme SVG via
+    # crystal-flags) comptent pour une largeur fixe dérivée de la
+    # taille de police, pas comme les glyphes `.notdef` de la police
+    # texte.
     private def text_width(text : String, font_name : String, font_size : Float64) : Float64
-      get_font(font_name).string_width(text, font_size)
+      measure_width(text, get_font(font_name), font_size)
+    end
+
+    # Même mesure que `text_width` mais prend un objet `PDF::Fonts::Base`
+    # déjà résolu. Utilisé en interne par `wrap_text` et
+    # `break_long_word`.
+    private def measure_width(text : String, font : PDF::Fonts::Base, font_size : Float64) : Float64
+      total = 0.0
+      InlineFlags.segments(text).each do |(kind, value)|
+        total += if kind == :flag
+                   InlineFlags.flag_width(font_size)
+                 else
+                   font.string_width(value, font_size)
+                 end
+      end
+      total
+    end
+
+    # Dessine `text` à la position `(x, y)` sur `page`. Les drapeaux
+    # emoji sont rendus comme SVG (via `crystal-flags`) au lieu du
+    # tofu produit par une police texte standard qui n'a pas de
+    # glyphes pour ces codepoints. Le curseur X avance de la largeur
+    # exacte de chaque segment (texte ou drapeau) pour que les runs
+    # suivants soient positionnés correctement.
+    private def draw_text_run(page : PDF::Page, text : String, x : Float64, y : Float64, font_name : String, font_size : Float64) : Nil
+      font = get_font(font_name)
+      cursor = x
+      flag_w = InlineFlags.flag_width(font_size)
+      flag_h = InlineFlags.flag_height(font_size)
+
+      InlineFlags.segments(text).each do |(kind, value)|
+        if kind == :flag
+          if (svg_data = CrystalFlags.svg(value))
+            # `page.svg(at: {x, y})` treats `y` as the top of the SVG
+            # bounding box (the renderer flips y internally). To align
+            # the flag with the text's x-height, position the top of
+            # the flag at `y + flag_h` (so its bottom sits on the
+            # baseline, matching the visual height of a capital).
+            page.svg(svg_data, at: {cursor, y + flag_h}, width: flag_w, height: flag_h)
+          else
+            # Fallback : afficher le code ISO en texte quand le drapeau
+            # n'est pas disponible (ex : pays invalide ou absent du set).
+            page.text("[#{value}]", at: {cursor, y})
+          end
+          cursor += flag_w
+        else
+          page.text(value, at: {cursor, y})
+          cursor += font.string_width(value, font_size)
+        end
+      end
     end
 
     # Découpe un texte en lignes selon la largeur disponible.
@@ -1678,7 +1733,7 @@ module AsciidoctorPDF
         current_width = 0.0
 
         words.each do |word|
-          word_w = font.string_width(word, font_size)
+          word_w = measure_width(word, font, font_size)
           sep_w = current_line.empty? ? 0.0 : space_w
 
           if current_width + sep_w + word_w <= width
@@ -1691,7 +1746,7 @@ module AsciidoctorPDF
             # Les n-1 premiers morceaux occupent une ligne complète.
             chunks[0..-2].each { |chunk| lines << chunk } if chunks.size > 1
             current_line = chunks.last
-            current_width = font.string_width(current_line, font_size)
+            current_width = measure_width(current_line, font, font_size)
           else
             lines << current_line unless current_line.empty?
             current_line = word

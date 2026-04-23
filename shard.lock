@@ -8,9 +8,13 @@ shards:
     git: https://github.com/aloli-crystal/crystal-asciidoctor.git
     version: 2.0.26
 
+  crystal-flags:
+    git: https://github.com/aloli-crystal/crystal-flags.git
+    version: 0.1.0
+
   crystal-pdf:
     git: https://github.com/aloli-crystal/crystal-pdf.git
-    version: 0.2.0
+    version: 0.3.2
 
   crystal-rouge:
     git: https://github.com/aloli-crystal/crystal-rouge.git

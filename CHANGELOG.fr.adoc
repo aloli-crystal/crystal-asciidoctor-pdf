@@ -3,6 +3,32 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.4 — 2026-04-23
+
+Vrais drapeaux de pays dans les cellules de tableau, via un nouveau
+pipeline de rendu SVG.
+
+* **Nouvelle dépendance** `crystal-flags` (~> 0.1) — 271 drapeaux
+  SVG ISO 3166-1 alpha-2 issus de lipis/flag-icons, embarqués à la
+  compilation.
+* **Rendu inline des drapeaux dans les cellules de tableau** : les
+  paires d'indicateurs régionaux Unicode (p.ex. `🇫🇷`, `🇩🇪`) sont
+  détectées dans le texte des cellules et dessinées comme de vrais
+  glyphes SVG en couleur sur la ligne de base du texte. Auparavant
+  ces codepoints étaient rendus en tofu (DejaVu Sans ne contient
+  pas de glyphe pour eux) et faussaient le calcul de largeur de
+  colonne.
+* **Mise en page** : `text_width` et `wrap_text` comptent désormais
+  chaque drapeau comme une largeur fixe dérivée de la taille de
+  police, afin que les colonnes réservent l'espace correct plutôt
+  que la largeur du glyphe `.notdef` de la police texte.
+* **Mise à jour de dépendance** : `crystal-pdf` → `~> 0.3` (utilise
+  le correctif de boucle du path-parser et le correctif de
+  remplissage des formes fermées livrés dans crystal-pdf v0.3.1 et
+  v0.3.2).
+* Nouveau module `AsciidoctorPDF::InlineFlags` avec `segments`,
+  `flag_width` et `flag_height`.
+
 == v2.3.24.3 — 2026-04-23
 
 Corrections de mise en page et de typographie constatées sur des
