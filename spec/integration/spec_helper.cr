@@ -108,6 +108,58 @@ module IntegrationHelper
     buf.to_s
   end
 
+  # Counts the number of `/Subtype /Link` annotations in the raw PDF
+  # bytes. This is the cheapest, most font-agnostic way to assert that
+  # the TOC entries are clickable: every entry should produce one link
+  # annotation that targets a named destination.
+  #
+  # PDF content streams may contain arbitrary high (>= 0x80) bytes that
+  # break Crystal's UTF-8 regex engine, so we count via raw byte-window
+  # comparison instead of `String#scan`.
+  def self.link_annotation_count(pdf_path : String) : Int32
+    count_byte_pattern(pdf_path, "/Subtype /Link") +
+      count_byte_pattern(pdf_path, "/Subtype/Link")
+  end
+
+  # Returns the total number of `/XYZ` destinations appearing anywhere
+  # in the PDF. Each section emits exactly one named destination AND
+  # one outline (bookmark) entry — both of which use the `/XYZ` view
+  # type when targeting a precise position. So the raw count is
+  # `2 × number_of_sections` for the standard pipeline.
+  def self.xyz_destination_count(pdf_path : String) : Int32
+    count_byte_pattern(pdf_path, "/XYZ")
+  end
+
+  # Returns the number of byte-level occurrences of `pattern` in the
+  # raw bytes of `pdf_path`. Avoids regex (would crash on non-UTF-8
+  # bytes) and avoids loading the whole file as a `String`.
+  def self.count_byte_pattern(pdf_path : String, pattern : String) : Int32
+    bytes = File.read(pdf_path).to_slice
+    needle = pattern.to_slice
+    return 0 if needle.size == 0 || needle.size > bytes.size
+    count = 0
+    i = 0
+    last = bytes.size - needle.size
+    while i <= last
+      match = true
+      j = 0
+      while j < needle.size
+        if bytes[i + j] != needle[j]
+          match = false
+          break
+        end
+        j += 1
+      end
+      if match
+        count += 1
+        i += needle.size
+      else
+        i += 1
+      end
+    end
+    count
+  end
+
   # Tests that the PDF was generated and is non-empty.
   def self.produces_pdf?(adoc_source : String) : Bool
     path = convert(adoc_source)

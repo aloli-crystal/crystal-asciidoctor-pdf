@@ -50,9 +50,18 @@ module AsciidoctorPDF
     @current_section_title : String = ""
     @document_title : String = ""
     @index_entries : Array(IndexEntry) = [] of IndexEntry
-    @toc_entries : Array({String, Int32, Int32}) = [] of {String, Int32, Int32} # {titre, niveau, page}
-    @anchor_positions : Hash(String, Float64) = {} of String => Float64         # {id => y_position}
-    @footnotes : Array(FootnoteEntry) = [] of FootnoteEntry                     # notes de bas de page
+    # Entrées de la table des matières.
+    # Chaque entrée capture {titre, niveau, page (1-based), nom de destination
+    # PDF, coordonnée Y (PDF, repère bas-gauche) du haut du titre}. Le nom
+    # de destination est unique dans le document et permet à la TOC ainsi
+    # qu'à l'outline (bookmarks) de pointer précisément sur le début de la
+    # section, pas seulement sur la page.
+    @toc_entries : Array({String, Int32, Int32, String, Float64}) = [] of {String, Int32, Int32, String, Float64}
+    # Compteur pour générer des noms de destination uniques quand la
+    # section n'a pas d'id explicite côté AsciiDoc.
+    @dest_counter : Int32 = 0
+    @anchor_positions : Hash(String, Float64) = {} of String => Float64 # {id => y_position}
+    @footnotes : Array(FootnoteEntry) = [] of FootnoteEntry             # notes de bas de page
     @footnotes_by_page : Hash(Int32, Array(FootnoteEntry)) = {} of Int32 => Array(FootnoteEntry)
     @output_path : String = "output.pdf"
 
@@ -213,8 +222,14 @@ module AsciidoctorPDF
 
       @current_section_title = title
 
-      # Enregistrer pour la table des matières
-      @toc_entries << {title, level, @page_number}
+      # Forge un nom de destination PDF stable et unique pour cette
+      # section. Préfère l'id AsciiDoc (`[[anchor]]` ou auto-généré
+      # par le parseur) s'il existe, sinon retombe sur un compteur.
+      # Les noms PDF n'ont pas besoin d'être lisibles ; ils servent
+      # juste de clé pour l'`Annot.link_dest` de la TOC et pour
+      # l'outline.
+      @dest_counter += 1
+      dest_name = node.id || "_sect_#{@dest_counter}"
 
       ensure_page
 
@@ -237,8 +252,22 @@ module AsciidoctorPDF
       min_content_below = @theme.base_font_size * @theme.base_line_height * 4
       check_page_break(heading_block_h + @theme.heading_margin_bottom(level) + min_content_below)
 
-      # Acquérir la page après check_page_break (qui peut créer une nouvelle page)
+      # Acquérir la page après check_page_break (qui peut créer une nouvelle page).
+      # On enregistre l'entrée TOC ici (et non avant `check_page_break`) pour
+      # que le numéro de page reflète bien la page sur laquelle le titre
+      # va effectivement être dessiné — sinon une section qui déborde
+      # apparaîtrait dans la TOC avec le numéro de la page précédente.
       page = @current_page.not_nil!
+
+      # Crée une destination nommée pointant sur le haut du titre. La TOC
+      # et l'outline (bookmarks) y feront référence pour amener le lecteur
+      # exactement sur le titre — pas juste « quelque part » sur la page.
+      # Petit padding au-dessus pour ne pas coller le scroll au sommet.
+      top_y = @current_y + 4.0
+      @doc.add_dest(dest_name, PDF::Destination.xyz(page.page_reference, top: top_y))
+
+      @toc_entries << {title, level, @page_number, dest_name, top_y}
+
       set_font(page, @fn_heading, font_size)
       page.fill_color(@theme.heading_font_color)
 
@@ -1223,7 +1252,7 @@ module AsciidoctorPDF
 
       # Entrées de la TOC
       @toc_entries.each do |entry|
-        raw_title, level, page_num = entry
+        raw_title, level, page_num, dest_name, _top_y = entry
         title = decode_html_entities(raw_title)
         # Indentation : niveau 1 = 0, niveau 2 = 20pt, niveau 3 = 40pt, etc.
         indent = (level - 1) * 20.0
@@ -1248,6 +1277,18 @@ module AsciidoctorPDF
         page_num_w = text_width(page_str, toc_font_name, font_size)
         page.fill_color(text_color)
         page.text(page_str, at: {@margin + @content_width - page_num_w, y - font_size})
+
+        # Annotation Link : toute la ligne (titre + dots + numéro) est
+        # cliquable et navigue vers la destination nommée enregistrée
+        # par `convert_section`. Le rectangle est exprimé dans le
+        # repère PDF (origine en bas à gauche).
+        rect_top = y + 2.0
+        rect_bottom = y - font_size - 2.0
+        rect_right = @margin + @content_width
+        page.link_dest(
+          rect: {entry_x, rect_bottom, rect_right, rect_top},
+          dest: dest_name,
+        )
 
         # Pointillés entre le titre et le numéro de page
         title_w = text_width(title, toc_font_name, font_size)
@@ -1428,18 +1469,21 @@ module AsciidoctorPDF
     # =========================================================================
 
     # Génère le document outline (bookmarks) à partir des entrées TOC collectées.
-    # Chaque section de niveau 1-2 devient un bookmark dans le panneau de navigation.
+    # Chaque section devient un bookmark dans le panneau de navigation, et
+    # le clic amène le lecteur précisément au début du titre (et non au
+    # haut de la page entière), grâce à la coordonnée Y mémorisée par
+    # `convert_section`.
     private def generate_pdf_outline : Nil
       return if @toc_entries.empty?
 
       @doc.outline.define do |o|
         @toc_entries.each do |entry|
-          title, level, page_num = entry
+          title, _level, page_num, _dest_name, top_y = entry
           page_idx = page_num - 1
           next if page_idx < 0 || page_idx >= @doc.pages.size
 
           page_ref = @doc.pages[page_idx].page_reference
-          dest = PDF::Destination.fit(page_ref)
+          dest = PDF::Destination.xyz(page_ref, top: top_y)
 
           # Niveaux 1 = sections principales, reste = items plats
           # (une arborescence complète nécessiterait de tracker les niveaux,

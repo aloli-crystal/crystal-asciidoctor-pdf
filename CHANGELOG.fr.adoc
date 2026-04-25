@@ -3,6 +3,40 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.9 — 2026-04-25
+
+Entrées de TOC cliquables. Chaque ligne de la table des matières
+est désormais une annotation PDF de type Link qui amène le lecteur
+directement sur le titre de la section correspondante — fini de
+scroller à travers 80 pages pour trouver le chapitre 12. Le panneau
+d'outline PDF (signets dans la barre latérale du viewer) bénéficie
+de la même amélioration : un clic sur un signet positionne le
+lecteur sur le titre, plus seulement en haut de la page.
+
+* `convert_section` enregistre une destination nommée PDF pour
+  chaque section, indexée sur l'id AsciiDoc (auto-généré par le
+  parseur, ex. `_overview`, ou fourni via `[[ancre]]`). La
+  destination utilise `/XYZ` pour que le lecteur défile précisément
+  au sommet du titre.
+* `render_toc` émet une annotation `/Subtype /Link` par entrée
+  couvrant toute la ligne (titre + pointillés + numéro de page),
+  pointant vers la destination nommée. Pas de bordure visible —
+  l'annotation est invisible, seul le curseur change au survol.
+* `generate_pdf_outline` utilise désormais des destinations `/XYZ`
+  au lieu de `/Fit`, pour que la navigation par signets atterrisse
+  sur le titre — cohérent avec le comportement de la TOC interne.
+* Correctif bonus : les entrées de TOC étaient enregistrées *avant*
+  le `check_page_break` qui peut forcer une nouvelle page, ce qui
+  produisait des numéros de page off-by-one pour les sections qui
+  débordaient. L'entrée est désormais enregistrée après le saut de
+  page, donc la TOC affiche toujours la page sur laquelle le titre
+  est effectivement dessiné.
+* 4 nouveaux tests d'intégration dans
+  `spec/integration/toc_anchors_spec.cr` qui vérifient au niveau
+  octet la présence des annotations `/Subtype /Link` et des
+  destinations `/XYZ`. **34 tests d'intégration, 46 tests
+  unitaires, 80 au total — tous verts.**
+
 == v2.3.24.8 — 2026-04-23
 
 Suite de tests d'intégration bout-en-bout. Le pipeline adoc → PDF
