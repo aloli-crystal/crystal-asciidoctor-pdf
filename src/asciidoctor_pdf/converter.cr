@@ -1,6 +1,7 @@
 require "crystal-asciidoctor/src/crystal-asciidoctor"
 require "crystal-pdf/src/pdf"
 require "crystal-flags/src/crystal_flags"
+require "crystal-emojis-lite/src/crystal_emojis"
 require "./inline_flags"
 
 module AsciidoctorPDF
@@ -1813,13 +1814,69 @@ module AsciidoctorPDF
           # casse pas dessus (insécabilité conservée) ; l'emit PDF
           # utilise un espace ordinaire pour éviter un tofu avec les
           # polices qui n'ont pas de glyphe NBSP.
-          printable = safe_text(value.gsub('\u00A0', ' '))
-          page.text(printable, at: {cursor, y})
-          # La mesure doit rester cohérente avec la largeur réelle du
-          # texte à l'écran : on mesure donc `printable`, pas `value`.
-          cursor += font.string_width(printable, font_size)
+          softened = value.gsub('\u00A0', ' ')
+          # Coupe la chaîne autour de chaque emoji connu de
+          # crystal-emojis-lite : le texte plain est rendu via
+          # `page.text` (avec sanitize WinAnsi pour les caractères
+          # restant hors plage), les emojis comme glyphes SVG
+          # alignés sur la baseline (mêmes dimensions qu un
+          # drapeau pour rester cohérent visuellement).
+          emoji_w = flag_w
+          emoji_h = flag_h
+          text_with_emoji_segments(softened).each do |(kind2, value2)|
+            if kind2 == :emoji
+              if (svg_data = CrystalEmojis.svg(value2[0]))
+                page.svg(svg_data, at: {cursor, y + emoji_h}, width: emoji_w, height: emoji_h)
+                cursor += emoji_w
+              else
+                printable = safe_text(value2)
+                page.text(printable, at: {cursor, y})
+                cursor += font.string_width(printable, font_size)
+              end
+            else
+              printable = safe_text(value2)
+              page.text(printable, at: {cursor, y})
+              cursor += font.string_width(printable, font_size)
+            end
+          end
         end
       end
+    end
+
+    # Découpe un texte en lignes selon la largeur disponible.
+    # Utilise les métriques de police exactes pour le calcul.
+    # Les mots qui dépassent seuls la largeur disponible (par exemple un
+    # nom propre long dans une colonne étroite) sont découpés caractère
+    # Découpe `text` en alternance de segments :text et :emoji selon
+    # ce que `crystal-emojis-lite` reconnaît. Les emojis sont rendus
+    # comme glyphes SVG en couleur par `draw_text_run`, le reste
+    # part dans le pipeline texte standard.
+    #
+    # Format : Array de tuples `{Symbol, String}` où :
+    #   * `{:text,  "..."}` — texte sans emoji connu, à passer à `page.text`
+    #   * `{:emoji, "X"}`   — un seul codepoint emoji, à rendre en SVG
+    #
+    # Les emojis multi-codepoint (ZWJ, tons de peau, drapeaux) ne sont
+    # pas couverts par crystal-emojis-lite : ils retombent dans la
+    # branche `:text`, où le sanitize WinAnsi les remplacera par `?`.
+    # Pour les couvrir, l'utilisateur peut ajouter crystal-emojis-full
+    # à ses dépendances et fournir un patch dans cette méthode.
+    private def text_with_emoji_segments(text : String) : Array({Symbol, String})
+      result = [] of {Symbol, String}
+      buf = String::Builder.new
+      text.each_char do |char|
+        if CrystalEmojis.includes?(char)
+          unless buf.bytesize == 0
+            result << {:text, buf.to_s}
+            buf = String::Builder.new
+          end
+          result << {:emoji, char.to_s}
+        else
+          buf << char
+        end
+      end
+      result << {:text, buf.to_s} unless buf.bytesize == 0
+      result
     end
 
     # Découpe un texte en lignes selon la largeur disponible.

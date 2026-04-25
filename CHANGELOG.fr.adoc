@@ -3,6 +3,30 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.11 — 2026-04-26
+
+**Rendu des emojis en couleur** pour les ~208 emojis couverts par
+`crystal-emojis-lite`. Les glyphes comme ✅ ❌ ⚠ 🔴 🟢 🟡 🔵 💻 🔑 ⚙
+sont maintenant rendus comme SVG embarqués (Twemoji, en couleur)
+au lieu d'être substitués par `?`. Les emojis hors set lite
+retombent toujours sur `?` + warning (comportement v2.3.24.10) —
+pour une couverture complète, remplacer `crystal-emojis-lite` par
+`crystal-emojis-full` dans l'arbre de dépendances.
+
+* Nouvelle dépendance d'exécution :
+  https://github.com/aloli-crystal/crystal-emojis-lite[crystal-emojis-lite]
+  ~> 0.1.
+* Nouvel helper privé `Converter#text_with_emoji_segments(text)`
+  qui découpe une chaîne en alternance de segments `:text` et
+  `:emoji`, permettant à `draw_text_run` d'aiguiller chaque type
+  vers le bon pipeline (texte → `page.text` + sanitize WinAnsi ;
+  emoji → `page.svg` avec les mêmes dimensions que les drapeaux
+  de `crystal-flags`).
+* Mise à jour du test de non-régression du tofu silencieux : ✅
+  et ❌ ne se retrouvent plus comme `?` dans le flux texte WinAnsi ;
+  les caractères CJK et les emojis hors set lite y restent.
+* **94 tests, tous verts.**
+
 == v2.3.24.10 — 2026-04-26
 
 Met fin aux carrés tofu silencieux pour les caractères hors plage

@@ -3,6 +3,29 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.11 — 2026-04-26
+
+**Coloured emoji rendering** for the ~208 emojis covered by
+`crystal-emojis-lite`. Glyphs like ✅ ❌ ⚠ 🔴 🟢 🟡 🔵 💻 🔑 ⚙ are
+now rendered as embedded SVG (Twemoji, in colour) instead of being
+substituted with `?`. Emojis outside the lite set still fall back
+to `?` + warning (the v2.3.24.10 behaviour) — for full coverage,
+swap `crystal-emojis-lite` for `crystal-emojis-full` in the
+dependency tree.
+
+* New runtime dependency :
+  https://github.com/aloli-crystal/crystal-emojis-lite[crystal-emojis-lite]
+  ~> 0.1.
+* New private helper `Converter#text_with_emoji_segments(text)`
+  splits a string into alternating `:text` and `:emoji` segments,
+  letting `draw_text_run` route each kind to the right pipeline
+  (text → `page.text` + WinAnsi sanitize ; emoji → `page.svg`
+  with the same sizing as country flags from `crystal-flags`).
+* Updated regression test for the silent-tofu bug : ✅ and ❌
+  no longer end up as `?` in the WinAnsi text stream ; CJK
+  characters and emojis outside the lite set still do.
+* **94 tests, all green.**
+
 == v2.3.24.10 — 2026-04-26
 
 Stops the silent tofu boxes for characters outside the WinAnsi
