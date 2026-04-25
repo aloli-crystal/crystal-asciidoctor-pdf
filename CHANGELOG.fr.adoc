@@ -3,6 +3,38 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.10 — 2026-04-26
+
+Met fin aux carrés tofu silencieux pour les caractères hors plage
+WinAnsi. Les polices Type1 standard (Helvetica, Courier — défauts
+du converter) ne couvrent que ~220 codepoints (ASCII + Latin-1 +
+quelques extras Windows-1252). Tout le reste — emojis (✅ ❌ 🔴),
+dingbats (✓ ✗ ★), idéogrammes CJK, etc. — sortait jusqu'ici en
+rectangles vides sans aucun avertissement à l'auteur.
+
+Le correctif :
+
+* Nouveau module `AsciidoctorPDF::WinAnsi` avec les helpers
+  `representable?(char)` et `sanitize(text) { |char| … }`.
+* Nouvelle méthode `Converter#safe_text(text)` qui substitue tout
+  caractère hors WinAnsi par `?` et émet un avertissement dédupliqué
+  sur STDERR (« Avertissement : caractère « ✅ » (U+2705) absent
+  de WinAnsi, remplacé par « ? » dans le PDF. »). Un seul warning
+  par caractère et par conversion — pas de spam si un même emoji
+  apparaît N fois.
+* `draw_text_run` passe tout run de texte par `safe_text` avant
+  l'appel à `page.text`.
+* Nouveaux tests : 11 specs unitaires pour `WinAnsi`, 2 specs
+  d'intégration prouvant que les emojis ne plantent plus le
+  converter et que le texte purement WinAnsi reste intact.
+  **93 tests au total, tous verts.**
+
+C'est un correctif conservateur qui supprime le mode d'échec
+silencieux. L'étape suivante (prévue comme un shard à part) est
+`crystal-emojis`, qui rendra les vrais **emojis colorés** comme
+glyphes SVG embarqués (même pattern que `crystal-flags` pour les
+drapeaux).
+
 == v2.3.24.9 — 2026-04-25
 
 Entrées de TOC cliquables. Chaque ligne de la table des matières

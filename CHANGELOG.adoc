@@ -3,6 +3,35 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.10 — 2026-04-26
+
+Stops the silent tofu boxes for characters outside the WinAnsi
+encoding range. Type1 standard fonts (Helvetica, Courier — the
+defaults of this converter) only cover ~220 codepoints (ASCII +
+Latin-1 + a few Windows-1252 extras). Anything beyond — emojis
+(✅ ❌ 🔴), dingbats (✓ ✗ ★), CJK ideographs, etc. — used to
+render as empty rectangles with no warning to the author.
+
+The fix :
+
+* New `AsciidoctorPDF::WinAnsi` module with `representable?(char)`
+  and `sanitize(text) { |char| … }` helpers.
+* New `Converter#safe_text(text)` substitutes every non-WinAnsi
+  character with `?` and emits a deduplicated warning to STDERR
+  («  Avertissement : caractère « ✅ » (U+2705) absent de WinAnsi,
+  remplacé par « ? » dans le PDF. »). One warning per character
+  per conversion — no spam if the same emoji appears N times.
+* `draw_text_run` runs every text run through `safe_text` before
+  passing it to `page.text`.
+* New tests : 11 unit specs for `WinAnsi`, 2 integration specs
+  proving emojis no longer crash the converter and pure-WinAnsi
+  text is left untouched. **93 tests total, all green.**
+
+This is a conservative fix that removes the silent failure mode.
+The next step (planned as a separate shard) is `crystal-emojis`,
+which will render real **coloured emojis** as embedded SVG glyphs
+(same pattern as `crystal-flags` for country flags).
+
 == v2.3.24.9 — 2026-04-25
 
 Clickable TOC entries. Each line of the table of contents is now a

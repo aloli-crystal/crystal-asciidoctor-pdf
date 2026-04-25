@@ -3,12 +3,13 @@ require "crystal-pdf/src/pdf"
 
 require "./asciidoctor_pdf/theme"
 require "./asciidoctor_pdf/theme_loader"
+require "./asciidoctor_pdf/win_ansi"
 require "./asciidoctor_pdf/inline_renderer"
 require "./asciidoctor_pdf/syntax_highlighter"
 require "./asciidoctor_pdf/converter"
 
 module AsciidoctorPDF
-  VERSION = "2.3.24.9"
+  VERSION = "2.3.24.10"
 
   # Version de la gem Ruby asciidoctor-pdf utilisée comme base du portage.
   UPSTREAM_VERSION = "2.3.24"

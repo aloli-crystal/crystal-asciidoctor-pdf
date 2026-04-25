@@ -64,6 +64,10 @@ module AsciidoctorPDF
     @footnotes : Array(FootnoteEntry) = [] of FootnoteEntry             # notes de bas de page
     @footnotes_by_page : Hash(Int32, Array(FootnoteEntry)) = {} of Int32 => Array(FootnoteEntry)
     @output_path : String = "output.pdf"
+    # Caractères hors WinAnsi déjà signalés à l'utilisateur pendant
+    # cette conversion. On dédup pour ne pas spammer STDERR si un
+    # même emoji apparaît N fois dans le source.
+    @warned_chars : Set(Char) = Set(Char).new
 
     # Dimensions de la page (A4 par défaut)
     @page_width : Float64 = 595.28
@@ -1751,6 +1755,31 @@ module AsciidoctorPDF
       total
     end
 
+    # Sanitise `text` pour qu'il puisse être rendu par les polices
+    # Type1 standard (encodage WinAnsi). Tout caractère hors plage
+    # est remplacé par `?` et l'auteur est prévenu via STDERR — une
+    # seule fois par caractère et par conversion, pour ne pas
+    # spammer la sortie quand un même emoji apparaît N fois.
+    #
+    # Cette méthode protège contre le cas le plus pénible : un
+    # emoji ou dingbat dans le source AsciiDoc qui sortirait en
+    # tofu silencieux dans le PDF. Mieux vaut un `?` visible plus
+    # un warning lisible.
+    #
+    # NOTE : c'est une mesure conservatoire. Les emojis colorés
+    # (✅ ❌ 🔴 …) seront rendus correctement quand le shard
+    # `crystal-emojis` sera intégré (cf. roadmap).
+    def safe_text(text : String) : String
+      WinAnsi.sanitize(text) { |char| warn_unrenderable(char) }
+    end
+
+    private def warn_unrenderable(char : Char) : Nil
+      return if @warned_chars.includes?(char)
+      @warned_chars << char
+      hex = char.ord.to_s(16).upcase.rjust(4, '0')
+      STDERR.puts %(Avertissement : caractère « #{char} » (U+#{hex}) absent de WinAnsi, remplacé par « ? » dans le PDF.)
+    end
+
     # Dessine `text` à la position `(x, y)` sur `page`. Les drapeaux
     # emoji sont rendus comme SVG (via `crystal-flags`) au lieu du
     # tofu produit par une police texte standard qui n'a pas de
@@ -1784,7 +1813,7 @@ module AsciidoctorPDF
           # casse pas dessus (insécabilité conservée) ; l'emit PDF
           # utilise un espace ordinaire pour éviter un tofu avec les
           # polices qui n'ont pas de glyphe NBSP.
-          printable = value.gsub('\u00A0', ' ')
+          printable = safe_text(value.gsub('\u00A0', ' '))
           page.text(printable, at: {cursor, y})
           # La mesure doit rester cohérente avec la largeur réelle du
           # texte à l'écran : on mesure donc `printable`, pas `value`.
