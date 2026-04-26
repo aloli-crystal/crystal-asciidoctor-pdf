@@ -1697,17 +1697,7 @@ module AsciidoctorPDF
     # Ceci est nécessaire car page.font(String) ne fonctionne que pour les Type1,
     # alors que page.font(TrueTypeFont) est requis pour les polices TTF.
     private def set_font(page : PDF::Page, font_name : String, size : Float64) : Nil
-      ttf = case font_name
-            when @fn_body             then @font_body
-            when @fn_body_bold        then @font_body_bold
-            when @fn_body_italic      then @font_body_italic
-            when @fn_body_bold_italic then @font_body_bold_italic
-            when @fn_mono             then @font_mono
-            when @fn_mono_bold        then @font_mono_bold
-            when @fn_heading          then @font_body_bold
-            else                           nil
-            end
-
+      ttf = font_object_for(font_name)
       if ttf && ttf.is_a?(PDF::Fonts::TrueTypeFont)
         page.font(ttf, size: size)
       else
@@ -1756,29 +1746,74 @@ module AsciidoctorPDF
       total
     end
 
-    # Sanitise `text` pour qu'il puisse être rendu par les polices
-    # Type1 standard (encodage WinAnsi). Tout caractère hors plage
-    # est remplacé par `?` et l'auteur est prévenu via STDERR — une
-    # seule fois par caractère et par conversion, pour ne pas
-    # spammer la sortie quand un même emoji apparaît N fois.
+    # Sanitise `text` pour qu'il puisse être rendu par la police
+    # actuellement active. Tout caractère sans glyphe est remplacé
+    # par `?` et l'auteur est prévenu via STDERR — une seule fois
+    # par caractère et par conversion, pour ne pas spammer la
+    # sortie quand un même emoji apparaît N fois.
     #
-    # Cette méthode protège contre le cas le plus pénible : un
-    # emoji ou dingbat dans le source AsciiDoc qui sortirait en
-    # tofu silencieux dans le PDF. Mieux vaut un `?` visible plus
-    # un warning lisible.
+    # Algorithme de couverture :
     #
-    # NOTE : c'est une mesure conservatoire. Les emojis colorés
-    # (✅ ❌ 🔴 …) seront rendus correctement quand le shard
-    # `crystal-emojis` sera intégré (cf. roadmap).
-    def safe_text(text : String) : String
-      WinAnsi.sanitize(text) { |char| warn_unrenderable(char) }
+    # * Si la police active est une `PDF::Fonts::TrueTypeFont`
+    #   (typiquement DejaVu Sans embarquée par défaut), on lui
+    #   demande directement `has_glyph?(char)`. Cela couvre
+    #   correctement Latin étendu, Cyrillique, Grec, Hébreu, Arabe,
+    #   les dingbats simples (✓ ✗ ★) — bref tout ce que la police
+    #   peut effectivement rendre.
+    # * Si la police est Type1 standard (Helvetica, Courier — pas
+    #   d'embedding, fallback automatique), on retombe sur le test
+    #   WinAnsi statique du module `WinAnsi`.
+    #
+    # Avant cette logique (v2.3.24.10), on utilisait WinAnsi de
+    # façon inconditionnelle, ce qui rejetait à tort les caractères
+    # que DejaVu Sans pouvait rendre.
+    def safe_text(text : String, font_name : String = @fn_body) : String
+      ttf = font_object_for(font_name)
+      String.build do |io|
+        text.each_char do |char|
+          if char_renderable_by?(char, ttf)
+            io << char
+          else
+            io << '?'
+            warn_unrenderable(char)
+          end
+        end
+      end
+    end
+
+    # Returns true when `char` can be rendered by the given font.
+    # `ttf` is `nil` when the font is a Type1 standard (no embedded
+    # TrueType available) — in that case we fall back to the
+    # static WinAnsi coverage table.
+    private def char_renderable_by?(char : Char, ttf : PDF::Fonts::Base?) : Bool
+      if ttf && ttf.is_a?(PDF::Fonts::TrueTypeFont)
+        ttf.has_glyph?(char)
+      else
+        WinAnsi.representable?(char)
+      end
+    end
+
+    # Resolves a font name (string registered in `@fn_*`) to its
+    # underlying `PDF::Fonts::Base` instance. Returns `nil` when the
+    # font is not a TrueType (i.e. fall back to Type1 + WinAnsi).
+    private def font_object_for(font_name : String) : PDF::Fonts::Base?
+      case font_name
+      when @fn_body             then @font_body
+      when @fn_body_bold        then @font_body_bold
+      when @fn_body_italic      then @font_body_italic
+      when @fn_body_bold_italic then @font_body_bold_italic
+      when @fn_mono             then @font_mono
+      when @fn_mono_bold        then @font_mono_bold
+      when @fn_heading          then @font_body_bold
+      else                           nil
+      end
     end
 
     private def warn_unrenderable(char : Char) : Nil
       return if @warned_chars.includes?(char)
       @warned_chars << char
       hex = char.ord.to_s(16).upcase.rjust(4, '0')
-      STDERR.puts %(Avertissement : caractère « #{char} » (U+#{hex}) absent de WinAnsi, remplacé par « ? » dans le PDF.)
+      STDERR.puts %(Avertissement : caractère « #{char} » (U+#{hex}) sans glyphe dans la police active, remplacé par « ? » dans le PDF.)
     end
 
     # Dessine `text` à la position `(x, y)` sur `page`. Les drapeaux
@@ -1829,12 +1864,12 @@ module AsciidoctorPDF
                 page.svg(svg_data, at: {cursor, y + emoji_h}, width: emoji_w, height: emoji_h)
                 cursor += emoji_w
               else
-                printable = safe_text(value2)
+                printable = safe_text(value2, font_name)
                 page.text(printable, at: {cursor, y})
                 cursor += font.string_width(printable, font_size)
               end
             else
-              printable = safe_text(value2)
+              printable = safe_text(value2, font_name)
               page.text(printable, at: {cursor, y})
               cursor += font.string_width(printable, font_size)
             end

@@ -3,6 +3,35 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.12 — 2026-04-26
+
+**Meilleure détection de la couverture de la police** — corrige
+une substitution trop agressive de v2.3.24.10 qui transformait
+en `?` des caractères valides (Cyrillique Привет, Grec Καλημέρα,
+Hébreu שלום, dingbats simples ✓ ✗ ★) alors que DejaVu Sans (la
+police embarquée par défaut) pouvait parfaitement les rendre.
+
+L'ancien `safe_text` faisait un test WinAnsi statique en
+supposant Type1 Helvetica/Courier — mais le converter utilise
+en fait DejaVu Sans TrueType embarquée par défaut, qui couvre
+une plage de codepoints bien plus large. Le nouveau pipeline
+interroge directement la police active via la nouvelle méthode
+`TrueTypeFont#has_glyph?(char)` de `crystal-pdf v0.3.5`, et ne
+retombe sur la table WinAnsi statique que pour les polices Type1
+(rare — uniquement quand DejaVu est désactivée dans le thème).
+
+* Bump dep `crystal-pdf` à `~> 0.3.5`.
+* `Converter#safe_text(text, font_name = @fn_body)` prend
+  désormais le nom de la police et route la couverture
+  par-caractère via la requête TrueType `has_glyph?`.
+* `font_object_for(font_name)` extrait du `case` dupliqué de
+  `set_font` — source unique de vérité pour résoudre un nom de
+  police vers son instance `PDF::Fonts::Base`.
+* Message d'avertissement mis à jour : « caractère « X » (U+NNNN)
+  sans glyphe dans la police active » (avant : « absent de
+  WinAnsi »).
+* 94 tests, toujours verts, aucune régression.
+
 == v2.3.24.11 — 2026-04-26
 
 **Rendu des emojis en couleur** pour les ~208 emojis couverts par
