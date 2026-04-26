@@ -2,6 +2,7 @@ require "crystal-asciidoctor/src/crystal-asciidoctor"
 require "crystal-pdf/src/pdf"
 require "crystal-flags/src/crystal_flags"
 require "crystal-emojis/src/crystal_emojis"
+require "crystal-noto-cjk/src/crystal_noto_cjk"
 require "./inline_flags"
 
 module AsciidoctorPDF
@@ -31,6 +32,14 @@ module AsciidoctorPDF
     @font_mono : PDF::Fonts::Base?
     @font_mono_bold : PDF::Fonts::Base?
     @font_heading : PDF::Fonts::Base?
+    # Police CJK chargée au boot si crystal-noto-cjk a une variante
+    # en cache. `draw_text_run` bascule la police courante sur cette
+    # variante pour les segments contenant des codepoints CJK, puis
+    # remet la police principale pour le reste — même pattern que
+    # le rendu d'emojis qui utilise page.svg pour les glyphes
+    # spécifiques.
+    @font_cjk : PDF::Fonts::TrueTypeFont?
+    @fn_cjk : String = ""
 
     # Noms de polices utilisés dans les appels page.font()
     @fn_body : String = "Helvetica"
@@ -1701,6 +1710,18 @@ module AsciidoctorPDF
         @font_mono_bold = ttf
         @fn_mono_bold = ttf.name
       end
+
+      # Police CJK optionnelle. Si l'utilisateur a peuplé le cache
+      # crystal-noto-cjk (via `crystal-noto-cjk pull` ou
+      # `CrystalNotoCJK::Cache.pull`), on charge la première
+      # variante installée et on l'utilise automatiquement pour les
+      # codepoints CJK que DejaVu ne couvre pas. Sans ça, les CJK
+      # tombent sur le fallback `?` + warning du sanitize WinAnsi.
+      if (cjk_path = CrystalNotoCJK.font_path) && File.exists?(cjk_path)
+        ttf = @doc.load_font(cjk_path)
+        @font_cjk = ttf
+        @fn_cjk = ttf.name
+      end
     end
 
     # Applique une police sur la page courante, en utilisant l'objet TTF si disponible.
@@ -1850,10 +1871,14 @@ module AsciidoctorPDF
       STDERR.puts "depuis https://github.com/jdecked/twemoji vers"
       STDERR.puts "  #{CrystalEmojis::Cache.dir}"
       STDERR.puts ""
-      STDERR.puts "Pour les caractères non-emoji (CJK, autres scripts), un"
-      STDERR.puts "shard `crystal-noto-cjk` est prévu — entre-temps, configurez"
-      STDERR.puts "une police TrueType complémentaire dans le thème via"
-      STDERR.puts "  theme.base_font_path = \"/path/to/your/font.ttf\""
+      STDERR.puts "Pour les caractères CJK (idéogrammes chinois, japonais,"
+      STDERR.puts "coréens), peuplez le cache crystal-noto-cjk :"
+      STDERR.puts "  crystal-noto-cjk pull               # défaut : Chinois Simplifié"
+      STDERR.puts "  crystal-noto-cjk pull --variant jp  # Japonais"
+      STDERR.puts "  crystal-noto-cjk pull --variant all # les 4 variantes"
+      STDERR.puts ""
+      STDERR.puts "Cache CJK actuel : #{CrystalNotoCJK::Cache.dir}"
+      STDERR.puts "Variantes installées : #{CrystalNotoCJK::Cache.installed.empty? ? "(aucune)" : CrystalNotoCJK::Cache.installed.map(&.to_s).join(", ")}"
       STDERR.puts "──────────────────────────────────────────────────────────────"
     end
 
@@ -1900,7 +1925,8 @@ module AsciidoctorPDF
           emoji_w = flag_w
           emoji_h = flag_h
           text_with_emoji_segments(softened).each do |(kind2, value2)|
-            if kind2 == :emoji
+            case kind2
+            when :emoji
               if (svg_data = CrystalEmojis.svg(value2[0]))
                 page.svg(svg_data, at: {cursor, y + emoji_h}, width: emoji_w, height: emoji_h)
                 cursor += emoji_w
@@ -1909,6 +1935,18 @@ module AsciidoctorPDF
                 page.text(printable, at: {cursor, y})
                 cursor += font.string_width(printable, font_size)
               end
+            when :cjk
+              # Bascule temporairement la police courante sur
+              # @font_cjk, dessine, puis remet la police principale
+              # pour les segments suivants. Le sanitize WinAnsi
+              # n'intervient pas — la police CJK couvre par
+              # définition les caractères concernés.
+              cjk_font = @font_cjk.not_nil!
+              page.font(cjk_font, size: font_size)
+              page.text(value2, at: {cursor, y})
+              cursor += cjk_font.string_width(value2, font_size)
+              # Remet la police principale du run.
+              set_font(page, font_name, font_size)
             else
               printable = safe_text(value2, font_name)
               page.text(printable, at: {cursor, y})
@@ -1924,34 +1962,55 @@ module AsciidoctorPDF
     # Les mots qui dépassent seuls la largeur disponible (par exemple un
     # nom propre long dans une colonne étroite) sont découpés caractère
     # Découpe `text` en alternance de segments :text et :emoji selon
-    # ce que `crystal-emojis-lite` reconnaît. Les emojis sont rendus
-    # comme glyphes SVG en couleur par `draw_text_run`, le reste
-    # part dans le pipeline texte standard.
+    # ce que `crystal-emojis` et la police CJK optionnelle
+    # reconnaissent. Trois familles de segments :
     #
-    # Format : Array de tuples `{Symbol, String}` où :
-    #   * `{:text,  "..."}` — texte sans emoji connu, à passer à `page.text`
-    #   * `{:emoji, "X"}`   — un seul codepoint emoji, à rendre en SVG
+    #   * `{:text,  "..."}` — texte rendable par la police principale
+    #   * `{:emoji, "X"}`   — un emoji rendu en SVG (page.svg)
+    #   * `{:cjk,   "..."}` — un run de caractères CJK rendu avec la
+    #                         police @font_cjk (uniquement quand
+    #                         crystal-noto-cjk a une variante en cache)
     #
-    # Les emojis multi-codepoint (ZWJ, tons de peau, drapeaux) ne sont
-    # pas couverts par crystal-emojis-lite : ils retombent dans la
-    # branche `:text`, où le sanitize WinAnsi les remplacera par `?`.
-    # Pour les couvrir, l'utilisateur peut ajouter crystal-emojis-full
-    # à ses dépendances et fournir un patch dans cette méthode.
+    # Sans police CJK chargée, les caractères CJK retombent dans
+    # `:text` et seront substitués par `?` au sanitize.
     private def text_with_emoji_segments(text : String) : Array({Symbol, String})
       result = [] of {Symbol, String}
       buf = String::Builder.new
+      cjk_buf = String::Builder.new
+      flush_text = -> {
+        unless buf.bytesize == 0
+          result << {:text, buf.to_s}
+          buf = String::Builder.new
+        end
+      }
+      flush_cjk = -> {
+        unless cjk_buf.bytesize == 0
+          result << {:cjk, cjk_buf.to_s}
+          cjk_buf = String::Builder.new
+        end
+      }
+
+      cjk_font = @font_cjk
       text.each_char do |char|
         if CrystalEmojis.includes?(char)
-          unless buf.bytesize == 0
-            result << {:text, buf.to_s}
-            buf = String::Builder.new
-          end
+          flush_text.call
+          flush_cjk.call
           result << {:emoji, char.to_s}
+        elsif cjk_font && cjk_font.has_glyph?(char) && !WinAnsi.representable?(char)
+          # Le CJK est défini comme : char hors WinAnsi mais que la
+          # police CJK sait rendre. Le test WinAnsi évite de
+          # « voler » les caractères Latin que les deux polices
+          # connaissent (DejaVu reste la police par défaut pour
+          # ceux-là, plus cohérent stylistiquement).
+          flush_text.call
+          cjk_buf << char
         else
+          flush_cjk.call
           buf << char
         end
       end
-      result << {:text, buf.to_s} unless buf.bytesize == 0
+      flush_text.call
+      flush_cjk.call
       result
     end
 

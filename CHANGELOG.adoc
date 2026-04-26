@@ -3,6 +3,31 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.14 — 2026-04-26
+
+**CJK glyph rendering** via the new
+https://github.com/aloli-crystal/crystal-noto-cjk[crystal-noto-cjk]
+shard. When the user has populated the CJK cache (via
+`crystal-noto-cjk pull` or `CrystalNotoCJK::Cache.pull`), the
+converter automatically detects CJK characters in text runs,
+switches the active font to Noto Sans CJK for those segments
+only, and switches back to the main font for the rest. Same
+pattern as emojis switching to `page.svg` for individual glyphs.
+
+* New runtime dependency : `crystal-noto-cjk ~> 0.1`.
+* `text_with_emoji_segments` now returns three kinds of
+  segments : `:text` (default font), `:emoji` (page.svg), and
+  `:cjk` (font switch to @font_cjk). Mid-run font switching is
+  done inline in `draw_text_run`.
+* `load_theme_fonts` opportunistically loads
+  `CrystalNotoCJK.font_path` if a variant is in the cache. No
+  download is triggered automatically — the user explicitly
+  populates the cache.
+* End-of-conversion bilan now also points to `crystal-noto-cjk pull`
+  with concrete commands for each variant + the current cache
+  status.
+* No regression : 94 tests, all green.
+
 == v2.3.24.13 — 2026-04-26
 
 **Emoji pipeline reaches paragraphs** plus end-of-run hint

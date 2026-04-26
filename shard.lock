@@ -16,6 +16,10 @@ shards:
     git: https://github.com/aloli-crystal/crystal-flags.git
     version: 0.1.0
 
+  crystal-noto-cjk:
+    git: https://github.com/aloli-crystal/crystal-noto-cjk.git
+    version: 0.1.0
+
   crystal-pdf:
     git: https://github.com/aloli-crystal/crystal-pdf.git
     version: 0.3.5
