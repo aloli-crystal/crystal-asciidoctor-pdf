@@ -3,6 +3,31 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.13 — 2026-04-26
+
+**Le pipeline emoji atteint les paragraphes** plus message
+d'aide en fin d'exécution qui indique à l'auteur exactement quoi
+faire quand des caractères ont été substitués par `?`.
+
+* `render_segment_line` (le chemin utilisé pour le texte des
+  paragraphes) route désormais via `draw_text_run` au lieu
+  d'appeler `page.text` directement. Effet net : les emojis
+  dans le texte des paragraphes sont rendus en couleur via
+  crystal-emojis (avant, seuls les titres et quelques autres
+  chemins étaient emoji-aware).
+* Bilan en fin de conversion : quand `@warned_chars` n'est pas
+  vide, un message multi-ligne est affiché sur STDERR avec le
+  compte, un échantillon des caractères substitués, et les
+  commandes exactes à lancer pour obtenir une couverture
+  complète (`crystal-emojis pull`, plus une note sur le futur
+  `crystal-noto-cjk` pour le CJK).
+* Dépendance renommée `crystal-emojis-lite` → `crystal-emojis`
+  (~> 0.2). Même nom de module `CrystalEmojis`, même surface
+  d'API, plus le nouveau module `Cache` qui permet à
+  l'application hôte de populer le cache disque
+  programmatiquement.
+* Aucune régression : 94 tests, tous verts.
+
 == v2.3.24.12 — 2026-04-26
 
 **Meilleure détection de la couverture de la police** — corrige

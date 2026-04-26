@@ -3,6 +3,28 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.13 — 2026-04-26
+
+**Emoji pipeline reaches paragraphs** plus end-of-run hint
+message that tells the author exactly what to do when characters
+have been substituted by `?`.
+
+* `render_segment_line` (the path used for paragraph text) now
+  routes through `draw_text_run` instead of calling `page.text`
+  directly. Net effect : emojis in paragraph text get rendered
+  in colour via crystal-emojis (previously only headings and a
+  few other code paths were emoji-aware).
+* End-of-conversion bilan : when `@warned_chars` is non-empty,
+  a multi-line message is printed to STDERR with the count, a
+  sample of substituted characters, and the exact commands to
+  run to get full coverage (`crystal-emojis pull`, plus a note
+  about future `crystal-noto-cjk` for CJK).
+* Dependency renamed `crystal-emojis-lite` → `crystal-emojis`
+  (~> 0.2). Same module name `CrystalEmojis`, same API surface,
+  plus the new `Cache` module that lets the host application
+  populate the on-disk cache programmatically.
+* No regression : 94 tests, all green.
+
 == v2.3.24.12 — 2026-04-26
 
 **Better font coverage detection** — fixes a v2.3.24.10

@@ -1,7 +1,7 @@
 require "crystal-asciidoctor/src/crystal-asciidoctor"
 require "crystal-pdf/src/pdf"
 require "crystal-flags/src/crystal_flags"
-require "crystal-emojis-lite/src/crystal_emojis"
+require "crystal-emojis/src/crystal_emojis"
 require "./inline_flags"
 
 module AsciidoctorPDF
@@ -199,6 +199,10 @@ module AsciidoctorPDF
       render_headers_footers
       # Écrire le PDF
       write_pdf
+      # Bilan post-conversion : si des caractères ont été substitués
+      # par '?', proposer à l'auteur les pistes pour récupérer une
+      # bonne couverture (cache emojis Twemoji, polices supplémentaires).
+      report_unrenderable_chars
       ""
     end
 
@@ -1589,18 +1593,24 @@ module AsciidoctorPDF
         font = get_font(font_name)
         set_font(page, font_name, font_size)
         page.fill_color(seg.color || @theme.base_font_color)
-        page.text(seg.text, at: {current_x, y})
+
+        # Route through the same pipeline as `draw_text_run` so
+        # emojis are rendered as colour SVG (via crystal-emojis)
+        # and unrenderable characters are substituted with `?` plus
+        # a deduplicated warning. Width consumed by the run is
+        # captured by tracking `current_x` before/after.
+        before = current_x
+        draw_text_run(page, seg.text, current_x, y, font_name, font_size)
+        seg_w = font.string_width(seg.text, font_size)
+        current_x = before + seg_w
 
         # Ajouter une annotation lien si le segment contient un lien
         if (link = seg.link) && !link.empty?
-          seg_w = font.string_width(seg.text, font_size)
           page.link_uri(
-            rect: {current_x, y - 2, current_x + seg_w, y + font_size},
+            rect: {before, y - 2, current_x, y + font_size},
             uri: link
           )
         end
-
-        current_x += font.string_width(seg.text, font_size)
       end
     end
 
@@ -1814,6 +1824,37 @@ module AsciidoctorPDF
       @warned_chars << char
       hex = char.ord.to_s(16).upcase.rjust(4, '0')
       STDERR.puts %(Avertissement : caractère « #{char} » (U+#{hex}) sans glyphe dans la police active, remplacé par « ? » dans le PDF.)
+    end
+
+    # Affiche un récapitulatif en fin de conversion quand des
+    # caractères ont été substitués par '?'. Suggère les actions
+    # disponibles : peupler le cache emojis (couvre les emojis), ou
+    # patienter pour un futur shard CJK (couvre les idéogrammes).
+    #
+    # Le message vise à donner à l'auteur la bonne commande à
+    # copier-coller, sans interrompre le flow de la commande
+    # (pas de prompt interactif — on respecte les scripts CI).
+    private def report_unrenderable_chars : Nil
+      return if @warned_chars.empty?
+
+      sample = @warned_chars.first(10).map(&.to_s).join(' ')
+      STDERR.puts ""
+      STDERR.puts "──────────────────────────────────────────────────────────────"
+      STDERR.puts "Bilan : #{@warned_chars.size} caractère(s) substitué(s) par '?' dans le PDF."
+      STDERR.puts "Échantillon : #{sample}"
+      STDERR.puts ""
+      STDERR.puts "Pour rendre les emojis en couleur, peuplez le cache local :"
+      STDERR.puts "  crystal-emojis pull"
+      STDERR.puts ""
+      STDERR.puts "Cela téléchargera l'ensemble des SVG Twemoji (~4000, ~18 Mo)"
+      STDERR.puts "depuis https://github.com/jdecked/twemoji vers"
+      STDERR.puts "  #{CrystalEmojis::Cache.dir}"
+      STDERR.puts ""
+      STDERR.puts "Pour les caractères non-emoji (CJK, autres scripts), un"
+      STDERR.puts "shard `crystal-noto-cjk` est prévu — entre-temps, configurez"
+      STDERR.puts "une police TrueType complémentaire dans le thème via"
+      STDERR.puts "  theme.base_font_path = \"/path/to/your/font.ttf\""
+      STDERR.puts "──────────────────────────────────────────────────────────────"
     end
 
     # Dessine `text` à la position `(x, y)` sur `page`. Les drapeaux

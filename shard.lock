@@ -8,9 +8,9 @@ shards:
     git: https://github.com/aloli-crystal/crystal-asciidoctor.git
     version: 2.0.26
 
-  crystal-emojis-lite:
-    git: https://github.com/aloli-crystal/crystal-emojis-lite.git
-    version: 0.1.0
+  crystal-emojis:
+    git: https://github.com/aloli-crystal/crystal-emojis.git
+    version: 0.2.0
 
   crystal-flags:
     git: https://github.com/aloli-crystal/crystal-flags.git
