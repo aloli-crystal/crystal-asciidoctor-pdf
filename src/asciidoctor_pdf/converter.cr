@@ -182,15 +182,31 @@ module AsciidoctorPDF
       @doc.producer = "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"
 
       # Page de titre
+      # Décision : page de garde dédiée OU titre H1 en haut de page 1 OU rien.
+      # Convention :
+      #   :title-page:        ⇒ activée explicitement
+      #   :title-page: false  ⇒ désactivée explicitement (équivalent
+      #                          standard à `:!title-page:` — non
+      #                          détectable côté crystal-asciidoctor,
+      #                          d'où l'usage de la valeur explicite)
+      #   absent              ⇒ défaut du thème (`title_page_enabled`)
       title_rendered = false
       title_page_toc_active = false
-      if @theme.title_page_enabled && !@document_title.empty?
-        render_title_page(node)
-        title_rendered = true
-        # Si `render_title_page_with_toc` a été retenu, il a positionné
-        # @title_page_toc_index ≥ 0 — la TOC sera rendue sur la page de
-        # garde en post-traitement, pas sur une page réservée.
-        title_page_toc_active = @title_page_toc_index >= 0
+      inline_doctitle = false
+      if !@document_title.empty?
+        if title_page_active?(node)
+          render_title_page(node)
+          title_rendered = true
+          # Si `render_title_page_with_toc` a été retenu, il a positionné
+          # @title_page_toc_index ≥ 0 — la TOC sera rendue sur la page de
+          # garde en post-traitement, pas sur une page réservée.
+          title_page_toc_active = @title_page_toc_index >= 0
+        else
+          # Pas de page de garde : on rendra le doctitle comme un H1
+          # tout en haut de la première page de contenu, conformément
+          # au mode `:doctype: article` standard d'AsciiDoc.
+          inline_doctitle = true
+        end
       end
 
       # Table des matières (page réservée, sera remplie après le rendu du contenu)
@@ -206,6 +222,12 @@ module AsciidoctorPDF
         # page de garde pour éviter que le corps ne se superpose au
         # titre rendu sur la garde.
         new_page
+      end
+
+      # Doctitle inline (mode sans page de garde) — rendu en H1 sur la
+      # première page de contenu, juste avant le préambule.
+      if inline_doctitle
+        render_inline_doctitle(node)
       end
 
       # Contenu principal
@@ -1422,9 +1444,86 @@ module AsciidoctorPDF
     # Page de titre
     # =========================================================================
 
+    # Doit-on rendre une page de garde dédiée ? Trois cas :
+    #
+    #   :title-page:        ⇒ true (forcé)
+    #   :title-page: false  ⇒ false (forcé)  — équivalent fonctionnel
+    #                         de `:!title-page:` qui n'est pas
+    #                         détectable côté crystal-asciidoctor (la
+    #                         négation ne laisse pas de trace dans
+    #                         `attr?`/`attr`, indiscernable de l'absence)
+    #   absent              ⇒ défaut du thème (`title_page_enabled`)
+    private def title_page_active?(doc : Asciidoctor::Document) : Bool
+      raw = doc.attr("title-page")
+      case raw
+      when nil
+        @theme.title_page_enabled
+      when "false", "off", "no", "0"
+        false
+      else
+        true
+      end
+    end
+
+    # Rend le doctitle comme un titre H1 ordinaire en haut de la
+    # première page de contenu (mode « article » standard d'AsciiDoc :
+    # pas de page de garde, juste un titre suivi du préambule).
+    # Le sous-titre, l'auteur et la date — quand fournis — sont placés
+    # en sous-bandeau sous le titre.
+    private def render_inline_doctitle(doc : Asciidoctor::Document) : Nil
+      ensure_page
+      page = @current_page.not_nil!
+
+      title_font_size = @theme.title_font_size * 0.85
+      title_lines = wrap_text(@document_title, @content_width, title_font_size, @fn_body_bold)
+      title_line_height = title_font_size * 1.2
+
+      set_font(page, @fn_body_bold, title_font_size)
+      page.fill_color(@theme.title_font_color)
+      title_lines.each_with_index do |line, i|
+        y = @current_y - title_font_size - (i * title_line_height)
+        draw_text_run(page, line, @margin, y, @fn_body_bold, title_font_size)
+      end
+      @current_y -= title_lines.size * title_line_height + 4.0
+
+      # Sous-titre éventuel sous le titre.
+      if (subtitle = doc.attr("subtitle"))
+        set_font(page, @fn_body, @theme.subtitle_font_size)
+        page.fill_color(@theme.subtitle_font_color)
+        draw_text_run(page, decode_html_entities(subtitle), @margin,
+          @current_y - @theme.subtitle_font_size, @fn_body, @theme.subtitle_font_size)
+        @current_y -= @theme.subtitle_font_size * 1.4
+      end
+
+      # Bandeau auteur + date sur une ligne, en gris, façon « manchette ».
+      author = doc.attr("author")
+      revdate = doc.attr("revdate")
+      if author || revdate
+        parts = [] of String
+        parts << decode_html_entities(author.to_s) if author
+        parts << decode_html_entities(revdate.to_s) if revdate
+        bandeau = parts.join("  ·  ")
+        small = @theme.base_font_size
+        set_font(page, @fn_body, small)
+        page.fill_color("888888")
+        draw_text_run(page, bandeau, @margin, @current_y - small, @fn_body, small)
+        @current_y -= small * 1.4
+      end
+
+      # Trait de séparation, comme une page de garde miniature.
+      @current_y -= 6.0
+      page.stroke_color("cccccc")
+      page.line_width(0.6)
+      page.line({@margin, @current_y}, {@margin + @content_width, @current_y})
+      page.stroke
+      @current_y -= 18.0
+    end
+
     # Indique si la TOC doit être rendue sur la page de garde (option 3).
     # Activée par l'attribut AsciiDoc `:title-page-toc:` ou la propriété
     # de thème `title_page_with_toc`. L'attribut écrase le thème.
+    #
+    # Extension Aloli — pas de standard AsciiDoc équivalent.
     private def title_page_toc_enabled?(doc : Asciidoctor::Document) : Bool
       attr = doc.attr("title-page-toc")
       case attr

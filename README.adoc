@@ -73,6 +73,58 @@ theme = AsciidoctorPDF::ThemeLoader.load("mon-theme.yml")
 converter = AsciidoctorPDF::Converter.new("pdf", theme)
 ----
 
+=== Page de garde — comportement et options
+
+Par défaut le shard rend une page de garde dédiée (titre, sous-titre, auteur, date)
+sans en-tête ni pied de page, suivie du contenu sur la page suivante.
+
+Trois leviers contrôlent ce comportement :
+
+* `:title-page:` (attribut document) — force la page de garde dédiée même si
+  le thème la désactive. Standard AsciiDoc.
+
+* `:title-page: false` (attribut document) — désactive la page de garde.
+  Le doctitle est alors rendu comme un H1 en haut de la première page de
+  contenu, suivi d'une manchette « auteur · date » en gris, d'un séparateur,
+  puis du préambule. Équivalent fonctionnel du standard `:!title-page:`
+  (qui n'est pas détectable côté crystal-asciidoctor — la négation ne laisse
+  pas de trace lisible via `attr?` / `attr`).
+
+* `theme.title_page_enabled: false` (thème YAML) — défaut sans page de garde,
+  les attributs document peuvent toujours réactiver pour un doc précis.
+
+==== `:title-page-toc:` — extension Aloli (non standard)
+
+ATTENTION : `:title-page-toc:` est une *extension propre* à
+`crystal-asciidoctor-pdf`. Aucun équivalent natif n'existe dans AsciiDoc
+ni dans Ruby `asciidoctor-pdf`. Ne pas s'attendre à un rendu portable
+sur d'autres convertisseurs.
+
+Activée per-document :
+
+[source,asciidoc]
+----
+= Mon document
+:author: Auteur
+:revdate: 2026-04-29
+:toc:
+:title-page-toc:
+
+Préambule…
+
+== Section 1
+----
+
+Ou activée pour tout un thème via `theme.title_page_with_toc: true`.
+
+Effet : la page de garde n'a plus le titre centré-bas mais le titre tout en
+haut, suivi d'une ligne de séparation, du sommaire (table des matières
+cliquable, alimentée par `:toc:`), puis de l'auteur et de la date en bas
+de page. Le contenu démarre sur la page suivante.
+
+Cas d'usage typique : quiz, fiches de poste, notes courtes destinées à
+tenir sur 1-2 pages avec une mini-couverture compacte.
+
 == Installation
 
 . Ajoutez cette dépendance à votre fichier `shard.yml` :
