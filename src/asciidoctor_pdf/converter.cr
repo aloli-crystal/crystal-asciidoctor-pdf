@@ -1148,7 +1148,22 @@ module AsciidoctorPDF
     # =========================================================================
 
     def convert_page_break(node : Asciidoctor::AbstractNode) : String
+      # Saut de page de base (`<<<` ou `[%always]` — `always` est
+      # accepté par parité Ruby asciidoctor-pdf bien qu'il ne change
+      # rien au comportement, le saut étant déjà inconditionnel).
       new_page
+
+      # Options recto / verso : aligner la prochaine page de contenu
+      # sur une page impaire (recto, page de droite en livre ouvert)
+      # ou paire (verso, gauche). Si la nouvelle page créée n'est pas
+      # du bon parité, on en génère une de plus, qui restera vide.
+      if node.is_a?(Asciidoctor::Block)
+        if node.option?("recto") && @page_number.even?
+          new_page
+        elsif node.option?("verso") && @page_number.odd?
+          new_page
+        end
+      end
       ""
     end
 
