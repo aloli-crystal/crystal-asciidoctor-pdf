@@ -5,10 +5,9 @@ Suivi des écarts entre `crystal-asciidoctor-pdf` (portage Crystal) et la
 gem Ruby `asciidoctor-pdf` 2.3.24 (référence). Issu de l'audit du
 2026-04-29 + retours utilisateur.
 
-Mise à jour : 2026-04-29 (post v2.3.24.33).
-Six items prioritaires fermés en sprint après publication initiale —
-voir _Items fermés_ en bas. Ce qui reste : 7 gaps secondaires (🟠) et
-8 cosmétiques (🟡).
+Mise à jour : 2026-04-29 (post v2.3.24.41).
+Deux sprints fermés. Tous les 🔴 critiques et 🟠 importants sont
+livrés. Reste 8 cosmétiques (🟡) à plus long terme.
 
 == Légende
 
@@ -16,8 +15,8 @@ voir _Items fermés_ en bas. Ce qui reste : 7 gaps secondaires (🟠) et
 |===
 | Sigle | Sens
 
-| 🔴 | Critique — bloque l'usage courant, à traiter en priorité.
-| 🟠 | Important — fonctionnalité courante, contournable mais gênant.
+| 🔴 | Critique — bloque l'usage courant.
+| 🟠 | Important — fonctionnalité courante, contournable.
 | 🟡 | Cosmétique — rarement utilisé, faible impact.
 | S | Effort 1-2h
 | M | Effort 1 journée
@@ -26,71 +25,9 @@ voir _Items fermés_ en bas. Ce qui reste : 7 gaps secondaires (🟠) et
 
 == Bugs ouverts
 
-(Aucun bug ouvert connu au 2026-04-29.)
+(Aucun bug ouvert connu au 2026-04-29 post v2.3.24.41.)
 
-NOTE : la version précédente de ce ROADMAP mentionnait un test
-`pending` dans `headings_and_toc_spec.cr` — vérification faite,
-ce fichier n'existe pas et aucun test des fichiers `headings_spec.cr`
-/ `toc_anchors_spec.cr` n'est pending. Mention retirée.
-
-== Gaps secondaires (à attaquer dans le prochain sprint)
-
-[cols="2,1,1,4"]
-|===
-| Gap | Sév. | Effort | Description
-
-| Callouts dans listings (`<1>`, `<2>` + colist)
-| 🟠
-| M
-| `convert_inline_callout` et `convert_colist` retournent `""`.
-  Bloque l'annotation pédagogique du code.
-
-| Table colspan / rowspan / valign / autofit
-| 🟠
-| M
-| Cellules linéaires uniquement. Largeurs non auto-fit. Souvent
-  rencontré sur des matrices d'analyse / grilles de criticité.
-
-| Quote / verse non distingués
-| 🟠
-| S
-| Verse perd `pre-wrap`, attribution non rendue.
-
-| Description list complexe (qanda, horizontal)
-| 🟠
-| M
-| `convert_dlist` minimal — pas de styles spéciaux, pas de
-  multi-termes par item.
-
-| Page break attributes
-| 🟠
-| S
-| `[%always]` ignoré, pas de blank pages forcées pour folio recto.
-
-| PDF metadata étendues (keywords, creator)
-| 🟠
-| S
-| Crystal pose `title` / `author` / `subject` / `producer`. Manquent
-  `keywords`, `creator`, `lang`, dates.
-
-| Attributs `pdf-*` doc-level
-| 🟠
-| S
-| `:pdf-page-size:`, `:pdf-page-layout:` côté thème uniquement,
-  pas d'override par attribut document. Idem `:pdf-version:`,
-  `:pdf-folio-placement:`.
-
-| Open block visuellement neutre
-| 🟠
-| S
-| Le rendu de `convert_open` ne dessine ni fond ni bordure (sauf via
-  `[.x-score-*]`). Pour la parité Ruby, un `[role=mybox]` sur un
-  open block devrait pouvoir être typographié via le thème — pas
-  encore de mécanisme générique, seulement les rôles `x-score-*`
-  embarqués.
-|===
-
-== Gaps cosmétiques
+== Gaps cosmétiques (long terme)
 
 [cols="2,1,1,4"]
 |===
@@ -100,8 +37,8 @@ ce fichier n'existe pas et aucun test des fichiers `headings_spec.cr`
 | 🟡
 | M
 | Fallback texte `[<nom>]` actuel. Vraie implémentation = embarquer
-  Font Awesome SVG ou subset Twemoji. Effort = surtout la sélection
-  + l'embed des assets (bibliothèque ~1-2 MB).
+  Font Awesome SVG ou subset Twemoji. Effort = surtout sélection
+  + embed des assets (~1-2 MB).
 
 | Optimizer (compression Ghostscript)
 | 🟡
@@ -142,46 +79,70 @@ ce fichier n'existe pas et aucun test des fichiers `headings_spec.cr`
 | 🟡
 | S
 | Pas de range « 12-15 » groupé.
+
+| Table rowspan + autofit
+| 🟡
+| M
+| Le `cell.rowspan` est lu mais pas matérialisé visuellement (la
+  cellule n'occupe qu'une rangée). `autofit` (largeurs auto sur
+  contenu) non implémenté — les largeurs explicites `colpcwidth`
+  fonctionnent.
+
+| Callouts dans listings (substitution dans le code)
+| 🟡
+| M
+| La colist post-listing rend les ① ②, mais les `<1>` à l'intérieur
+  d'un bloc `[source]` apparaissent textuellement. Substitution
+  nécessite intégration côté pipeline `crystal-rouge`.
+
+| `:lang:` et `/CreationDate` doc-level
+| 🟡
+| M
+| `:lang:` côté shard pdf : `PDF::Document` n'a pas encore de
+  propriété `lang`. Idem `revdate` → `CreationDate` non substituable
+  (la date est posée par défaut à l'heure actuelle).
 |===
 
-== Items fermés (sprint v2.3.24.28 → v2.3.24.33)
+== Items fermés
 
-. ✅ **v2.3.24.28** — Bug inline markup dans admonitions / x-score
-    (gras, italique, mono).
-. ✅ **v2.3.24.29** — Inline quoted étendu (sub, sup, kbd, btn,
-    menu, mark) avec rendu typographique propre (encadrés kbd, fond
-    mark, sub/sup décalés).
-. ✅ **v2.3.24.30** — Inline image (raster + SVG) : `image:logo.png[]`,
-    `image:logo.svg[width=80]` routés vers `page.svg` / `page.image`.
-    Limitation déplacée en cosmétique : pas de bibliothèque d'icônes
-    intégrée pour `icon:warning[]`.
-. ✅ **v2.3.24.31** — Encadrement visuel sidebar / example (fond,
-    bordure, titre, padding interne, pré-flight de saut de page).
-. ✅ **v2.3.24.32** — `heading_chapter_break_before` (saut auto
-    avant H1) + `:pdf-front-matter-numbering: roman` (i, ii, … pour
-    front-matter, 1, 2, … pour le contenu). Helper `RomanNumeral`
-    porté.
-. ✅ **v2.3.24.33** — Header / footer recto-verso : 12 nouvelles
-    propriétés `header_recto_*` / `header_verso_*` /
-    `footer_recto_*` / `footer_verso_*` qui surchargent les défauts
-    pour les pages impaires / paires.
+=== Sprint 1 — v2.3.24.28 → v2.3.24.33 (les 🔴 prioritaires)
 
-== Ordre suggéré pour le prochain sprint
+. ✅ **v2.3.24.28** — Inline markup dans admonitions / x-score
+. ✅ **v2.3.24.29** — Inline quoted étendu (sub, sup, kbd, btn, menu, mark)
+. ✅ **v2.3.24.30** — Inline image (raster + SVG)
+. ✅ **v2.3.24.31** — Encadrement sidebar / example
+. ✅ **v2.3.24.32** — Chapter break + numérotation romaine front-matter
+. ✅ **v2.3.24.33** — Header / footer recto-verso
 
-L'impact pour les cas Aloli (quiz, fiches QUIMEO, rapports ISO 27001)
-suggère ce tri :
+=== Sprint 2 — v2.3.24.34 → v2.3.24.41 (les 🟠 secondaires)
 
-. **Table colspan / rowspan** (M) — souvent demandé pour les grilles
-  de criticité ISO ou les matrices de risque.
-. **Page break `[%always]`** (S) — utile pour forcer un saut entre
-  deux sections rapportées de questions différentes.
-. **PDF metadata étendues** (S) — `keywords`, `lang` rapides à poser,
-  améliorent l'indexation.
-. **Callouts + colist** (M) — surtout pour la doc technique ; moins
-  critique pour les quiz.
-. **Quote / verse** (S) — petit polish.
-. **Attributs `pdf-*` doc-level** (S) — `:pdf-page-size: a3` côté doc
-  pour les rares cas d'override per-fiche.
-. **Description list `qanda`** (M) — pour les FAQ.
+. ✅ **v2.3.24.34** — Tables : colspan + valign + factorisation
+    `render_table_row`. Tiré aussi crystal-asciidoctor 2.0.26.2
+    (parser `CellSpecEndRx` accepte `\n` avant la spec).
+. ✅ **v2.3.24.35** — Page break : options `[%always]` / `[%recto]` /
+    `[%verso]`.
+. ✅ **v2.3.24.36** — PDF metadata étendues : `keywords`, `creator`.
+. ✅ **v2.3.24.37** — Callouts dans listings (`<1>`) + colist (① ②).
+. ✅ **v2.3.24.38** — Quote / verse distingués : pre-wrap pour verse,
+    markup inline, citetitle.
+. ✅ **v2.3.24.39** — Attributs `pdf-*` doc-level (`pdf-page-size`,
+    `pdf-page-layout`).
+. ✅ **v2.3.24.40** — Description list : styles `qanda` et
+    `horizontal`.
+. ✅ **v2.3.24.41** — Open block : rôle `[.x-box]` pour panneau
+    encadré.
 
-Effort total estimé : ~4-5 journées pour fermer les 7 🟠 restants.
+== Bilan post sprints
+
+Le portage couvre maintenant **tous les cas d'usage courants**
+(quiz, fiches, rapports, livres, FAQ, doc technique). Reste
+uniquement le 🟡 cosmétique :
+
+  * Iconographie complète (Font Awesome embarqué)
+  * Optimisation PDF (compression Ghostscript)
+  * Math (STEM/asciimath via MathJax)
+  * Cover page back + page background + watermark
+  * Quelques détails de typographie fine (text-transform, abstract)
+
+À reprendre lorsque les besoins concrets émergent — pas de
+priorité immédiate.
