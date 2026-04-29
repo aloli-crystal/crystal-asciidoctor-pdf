@@ -103,11 +103,30 @@ module AsciidoctorPDF
     @title_page_toc_index : Int32 = -1
     @title_page_toc_y_start : Float64 = 0.0
 
-    # Dimensions de la page (A4 par défaut)
+    # Dimensions de la page (A4 par défaut). Surchargeables via le
+    # thème (`page_size`, `page_layout`) ou les attributs document
+    # `:pdf-page-size:`, `:pdf-page-layout:` au moment de
+    # `convert_document`.
     @page_width : Float64 = 595.28
     @page_height : Float64 = 841.89
     @margin : Float64 = 36.0
     @content_width : Float64 = 0.0
+
+    # Tailles de page standard en points PDF (1pt = 1/72 in).
+    # Format portrait : {largeur, hauteur}.
+    PAGE_SIZES = {
+      "A0"      => {2383.94, 3370.39},
+      "A1"      => {1683.78, 2383.94},
+      "A2"      => {1190.55, 1683.78},
+      "A3"      => {841.89, 1190.55},
+      "A4"      => {595.28, 841.89},
+      "A5"      => {419.53, 595.28},
+      "A6"      => {297.64, 419.53},
+      "B5"      => {498.90, 708.66},
+      "LETTER"  => {612.00, 792.00},
+      "LEGAL"   => {612.00, 1008.00},
+      "TABLOID" => {792.00, 1224.00},
+    }
 
     def initialize(backend : String = "pdf", theme : Theme? = nil)
       super(backend)
@@ -119,10 +138,27 @@ module AsciidoctorPDF
         outfilesuffix: ".pdf"
       )
       @margin = @theme.page_margin
-      @content_width = @page_width - (2 * @margin)
+      apply_page_size(@theme.page_size, @theme.page_layout)
 
       # Charger les polices TTF si définies dans le thème
       load_theme_fonts
+    end
+
+    # Applique une taille et orientation à la page. La taille est
+    # résolue depuis `PAGE_SIZES` (insensible à la casse). L'orientation
+    # `landscape` permute largeur et hauteur. Cas inconnu → A4.
+    private def apply_page_size(size : String, layout : String) : Nil
+      key = size.upcase
+      dims = PAGE_SIZES[key]? || PAGE_SIZES["A4"]
+      w, h = dims
+      if layout.downcase == "landscape"
+        @page_width = h
+        @page_height = w
+      else
+        @page_width = w
+        @page_height = h
+      end
+      @content_width = @page_width - (2 * @margin)
     end
 
     # Point d'entrée principal : convertit le document et écrit le PDF
@@ -191,6 +227,19 @@ module AsciidoctorPDF
       @output_path = determine_output_path(node)
 
       # Métadonnées PDF
+      # Override per-document de la taille / orientation par les
+      # attributs AsciiDoc `:pdf-page-size:`, `:pdf-page-layout:`.
+      # Permet à un doc précis d'imposer A3 paysage sans toucher au
+      # thème global. Parité Ruby asciidoctor-pdf.
+      pdf_size = node.attr("pdf-page-size")
+      pdf_layout = node.attr("pdf-page-layout")
+      if pdf_size || pdf_layout
+        apply_page_size(
+          (pdf_size || @theme.page_size).to_s,
+          (pdf_layout || @theme.page_layout).to_s,
+        )
+      end
+
       @doc.title = @document_title unless @document_title.empty?
       @doc.author = node.attr("author") if node.attr?("author")
       @doc.subject = node.attr("subject") if node.attr?("subject")
