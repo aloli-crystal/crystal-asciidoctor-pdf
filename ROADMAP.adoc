@@ -26,18 +26,12 @@ voir _Items fermés_ en bas. Ce qui reste : 7 gaps secondaires (🟠) et
 
 == Bugs ouverts
 
-[cols="2,1,1,4"]
-|===
-| Bug | Sév. | Effort | Description
+(Aucun bug ouvert connu au 2026-04-29.)
 
-| TOC absente du test "headings_and_toc"
-| 🟡
-| S
-| Voir spec/integration/headings_and_toc_spec.cr — un test marqué
-  `pending` parce que les rendus de TOC ne réagissent pas toujours
-  correctement aux niveaux de heading complexes. Latent depuis la
-  base, à investiguer.
-|===
+NOTE : la version précédente de ce ROADMAP mentionnait un test
+`pending` dans `headings_and_toc_spec.cr` — vérification faite,
+ce fichier n'existe pas et aucun test des fichiers `headings_spec.cr`
+/ `toc_anchors_spec.cr` n'est pending. Mention retirée.
 
 == Gaps secondaires (à attaquer dans le prochain sprint)
 

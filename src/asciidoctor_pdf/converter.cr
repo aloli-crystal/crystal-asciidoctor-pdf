@@ -891,140 +891,129 @@ module AsciidoctorPDF
       # En-têtes
       if node.has_header_option
         node.rows.head.each do |row|
-          # Pre-calculate wrapped lines for each cell to determine row height
-          cell_lines = row.map_with_index do |cell, ci|
-            cw = col_widths[ci]? || (@content_width / col_count)
-            text = strip_inline_markup(cell.text || "")
-            wrap_text(text, cw - 2 * padding, font_size, @fn_body_bold)
-          end
-          max_lines = cell_lines.max_of(&.size)
-          row_h = (max_lines * line_h) + (2 * padding)
-
-          check_page_break(row_h)
-          page = @current_page.not_nil!
-          x = @margin
-
-          row.each_with_index do |cell, ci|
-            cw = col_widths[ci]? || (@content_width / col_count)
-            page.fill_color(@theme.table_header_background_color)
-            page.rectangle(x, @current_y - row_h, cw, row_h)
-            page.fill
-
-            page.stroke_color(@theme.table_border_color)
-            page.line_width(@theme.table_border_width)
-            page.rectangle(x, @current_y - row_h, cw, row_h)
-            page.stroke
-
-            set_font(page, @fn_body_bold, font_size)
-            page.fill_color(@theme.table_header_font_color)
-            lines = cell_lines[ci]
-            halign = cell.attr("halign") || "left"
-            lines.each_with_index do |line, li|
-              tw = text_width(line, @fn_body_bold, font_size)
-              tx = case halign
-                   when "center" then x + (cw - tw) / 2
-                   when "right"  then x + cw - tw - padding
-                   else               x + padding
-                   end
-              draw_text_run(page, line, tx, @current_y - padding - font_size - (li * line_h), @fn_body_bold, font_size)
-            end
-            x += cw
-          end
-          @current_y -= row_h
+          render_table_row(row, col_widths, col_count, font_size, line_h, padding,
+            font_name: @fn_body_bold,
+            font_color: @theme.table_header_font_color,
+            bg_color: @theme.table_header_background_color)
         end
       end
 
       # Corps du tableau avec alternance de couleurs
       row_idx = 0
       node.rows.body.each do |row|
-        # Pre-calculate wrapped lines for each cell to determine row height
-        cell_lines = row.map_with_index do |cell, ci|
-          cw = col_widths[ci]? || (@content_width / col_count)
-          text = strip_inline_markup(cell.text || "")
-          wrap_text(text, cw - 2 * padding, font_size, @fn_body)
-        end
-        max_lines = cell_lines.max_of(&.size)
-        row_h = (max_lines * line_h) + (2 * padding)
-
-        check_page_break(row_h)
-        page = @current_page.not_nil!
-        x = @margin
         bg_color = (row_idx % 2 == 1) ? @theme.table_row_alt_background_color : nil
-
-        row.each_with_index do |cell, ci|
-          cw = col_widths[ci]? || (@content_width / col_count)
-
-          # Fond alterné
-          if bg_color
-            page.fill_color(bg_color)
-            page.rectangle(x, @current_y - row_h, cw, row_h)
-            page.fill
-          end
-
-          page.stroke_color(@theme.table_border_color)
-          page.line_width(@theme.table_border_width)
-          page.rectangle(x, @current_y - row_h, cw, row_h)
-          page.stroke
-
-          set_font(page, @fn_body, font_size)
-          page.fill_color(@theme.base_font_color)
-          lines = cell_lines[ci]
-          halign = cell.attr("halign") || "left"
-          lines.each_with_index do |line, li|
-            tw = text_width(line, @fn_body, font_size)
-            tx = case halign
-                 when "center" then x + (cw - tw) / 2
-                 when "right"  then x + cw - tw - padding
-                 else               x + padding
-                 end
-            draw_text_run(page, line, tx, @current_y - padding - font_size - (li * line_h), @fn_body, font_size)
-          end
-          x += cw
-        end
-        @current_y -= row_h
+        render_table_row(row, col_widths, col_count, font_size, line_h, padding,
+          font_name: @fn_body,
+          font_color: @theme.base_font_color,
+          bg_color: bg_color)
         row_idx += 1
       end
 
       # Pied de tableau
       unless node.rows.foot.empty?
         node.rows.foot.each do |row|
-          # Pre-calculate wrapped lines for each cell to determine row height
-          cell_lines = row.map_with_index do |cell, ci|
-            cw = col_widths[ci]? || (@content_width / col_count)
-            text = strip_inline_markup(cell.text || "")
-            wrap_text(text, cw - 2 * padding, font_size, @fn_body_bold)
-          end
-          max_lines = cell_lines.max_of(&.size)
-          row_h = (max_lines * line_h) + (2 * padding)
-
-          check_page_break(row_h)
-          page = @current_page.not_nil!
-          x = @margin
-          row.each_with_index do |cell, ci|
-            cw = col_widths[ci]? || (@content_width / col_count)
-            page.fill_color(@theme.table_footer_background_color)
-            page.rectangle(x, @current_y - row_h, cw, row_h)
-            page.fill
-
-            page.stroke_color(@theme.table_border_color)
-            page.line_width(@theme.table_border_width)
-            page.rectangle(x, @current_y - row_h, cw, row_h)
-            page.stroke
-
-            set_font(page, @fn_body_bold, font_size)
-            page.fill_color(@theme.base_font_color)
-            lines = cell_lines[ci]
-            lines.each_with_index do |line, li|
-              page.text(line, at: {x + padding, @current_y - padding - font_size - (li * line_h)})
-            end
-            x += cw
-          end
-          @current_y -= row_h
+          render_table_row(row, col_widths, col_count, font_size, line_h, padding,
+            font_name: @fn_body_bold,
+            font_color: @theme.base_font_color,
+            bg_color: @theme.table_footer_background_color)
         end
       end
 
       @current_y -= @theme.table_margin_bottom
       ""
+    end
+
+    # Rend une rangée de tableau, en gérant `colspan` et `valign`.
+    # `rowspan` n'est pas encore visuellement géré (la cellule occupe
+    # une seule rangée et le cell suivant remplit la position que le
+    # span aurait laissée libre — comportement minimaliste sûr).
+    private def render_table_row(
+      row,
+      col_widths : Array(Float64),
+      col_count : Int32,
+      font_size : Float64,
+      line_h : Float64,
+      padding : Float64,
+      *,
+      font_name : String,
+      font_color : String,
+      bg_color : String?,
+    ) : Nil
+      # Calculer les largeurs effectives par cellule (colspan), et
+      # wrapper le texte dans cette largeur pour mesurer la hauteur de
+      # la rangée.
+      cell_widths = [] of Float64
+      cell_lines = [] of Array(String)
+      col_idx = 0
+      row.each do |cell|
+        cs = cell.colspan || 1
+        cs = 1 if cs < 1
+        # Borne supérieure : ne pas déborder si l'auteur a indiqué un
+        # colspan > nombre de colonnes restantes.
+        remaining = col_count - col_idx
+        cs = remaining if remaining > 0 && cs > remaining
+        cw = (col_idx...col_idx + cs).sum { |k| col_widths[k]? || (@content_width / col_count) }
+        cell_widths << cw
+        text = strip_inline_markup(cell.text || "")
+        cell_lines << wrap_text(text, cw - 2 * padding, font_size, font_name)
+        col_idx += cs
+      end
+      max_lines = cell_lines.empty? ? 1 : cell_lines.max_of(&.size)
+      row_h = (max_lines * line_h) + (2 * padding)
+
+      check_page_break(row_h)
+      page = @current_page.not_nil!
+      x = @margin
+
+      row.each_with_index do |cell, ci|
+        cw = cell_widths[ci]
+
+        # Fond
+        if bg_color
+          page.fill_color(bg_color)
+          page.rectangle(x, @current_y - row_h, cw, row_h)
+          page.fill
+        end
+
+        # Bordure
+        page.stroke_color(@theme.table_border_color)
+        page.line_width(@theme.table_border_width)
+        page.rectangle(x, @current_y - row_h, cw, row_h)
+        page.stroke
+
+        # Texte
+        set_font(page, font_name, font_size)
+        page.fill_color(font_color)
+        lines = cell_lines[ci]
+        halign = cell.attr("halign") || "left"
+        valign = cell.attr("valign") || "top"
+        text_block_h = lines.size * line_h
+
+        # Position Y du haut du bloc texte selon valign.
+        # `top`    : padding sous le bord supérieur
+        # `middle` : centré dans la rangée
+        # `bottom` : padding au-dessus du bord inférieur
+        block_top_y = case valign
+                      when "middle" then @current_y - (row_h - text_block_h) / 2
+                      when "bottom" then @current_y - row_h + padding + text_block_h
+                      else               @current_y - padding
+                      end
+
+        lines.each_with_index do |line, li|
+          tw = text_width(line, font_name, font_size)
+          tx = case halign
+               when "center" then x + (cw - tw) / 2
+               when "right"  then x + cw - tw - padding
+               else               x + padding
+               end
+          ty = block_top_y - font_size - (li * line_h)
+          draw_text_run(page, line, tx, ty, font_name, font_size)
+        end
+
+        x += cw
+      end
+
+      @current_y -= row_h
     end
 
     # =========================================================================
