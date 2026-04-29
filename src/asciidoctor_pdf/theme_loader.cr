@@ -85,33 +85,35 @@ module AsciidoctorPDF
         when "mono_font_path"             then theme.mono_font_path = value.as_s?
         when "mono_font_bold_path"        then theme.mono_font_bold_path = value.as_s?
           # Titres
-        when "heading_font_family" then theme.heading_font_family = value.as_s? || theme.heading_font_family
-        when "heading_font_color"  then theme.heading_font_color = value.as_s? || theme.heading_font_color
-        when "heading_line_height" then theme.heading_line_height = parse_float(value, theme.heading_line_height)
-        when "h1_font_size"        then theme.h1_font_size = parse_float(value, theme.h1_font_size)
-        when "h1_font_style"       then theme.h1_font_style = value.as_s? || theme.h1_font_style
-        when "h1_margin_top"       then theme.h1_margin_top = parse_float(value, theme.h1_margin_top)
-        when "h1_margin_bottom"    then theme.h1_margin_bottom = parse_float(value, theme.h1_margin_bottom)
-        when "h2_font_size"        then theme.h2_font_size = parse_float(value, theme.h2_font_size)
-        when "h2_font_style"       then theme.h2_font_style = value.as_s? || theme.h2_font_style
-        when "h2_margin_top"       then theme.h2_margin_top = parse_float(value, theme.h2_margin_top)
-        when "h2_margin_bottom"    then theme.h2_margin_bottom = parse_float(value, theme.h2_margin_bottom)
-        when "h3_font_size"        then theme.h3_font_size = parse_float(value, theme.h3_font_size)
-        when "h3_font_style"       then theme.h3_font_style = value.as_s? || theme.h3_font_style
-        when "h3_margin_top"       then theme.h3_margin_top = parse_float(value, theme.h3_margin_top)
-        when "h3_margin_bottom"    then theme.h3_margin_bottom = parse_float(value, theme.h3_margin_bottom)
-        when "h4_font_size"        then theme.h4_font_size = parse_float(value, theme.h4_font_size)
-        when "h4_font_style"       then theme.h4_font_style = value.as_s? || theme.h4_font_style
-        when "h4_margin_top"       then theme.h4_margin_top = parse_float(value, theme.h4_margin_top)
-        when "h4_margin_bottom"    then theme.h4_margin_bottom = parse_float(value, theme.h4_margin_bottom)
-        when "h5_font_size"        then theme.h5_font_size = parse_float(value, theme.h5_font_size)
-        when "h5_font_style"       then theme.h5_font_style = value.as_s? || theme.h5_font_style
-        when "h5_margin_top"       then theme.h5_margin_top = parse_float(value, theme.h5_margin_top)
-        when "h5_margin_bottom"    then theme.h5_margin_bottom = parse_float(value, theme.h5_margin_bottom)
-        when "h6_font_size"        then theme.h6_font_size = parse_float(value, theme.h6_font_size)
-        when "h6_font_style"       then theme.h6_font_style = value.as_s? || theme.h6_font_style
-        when "h6_margin_top"       then theme.h6_margin_top = parse_float(value, theme.h6_margin_top)
-        when "h6_margin_bottom"    then theme.h6_margin_bottom = parse_float(value, theme.h6_margin_bottom)
+        when "heading_font_family"          then theme.heading_font_family = value.as_s? || theme.heading_font_family
+        when "heading_font_color"           then theme.heading_font_color = value.as_s? || theme.heading_font_color
+        when "heading_line_height"          then theme.heading_line_height = parse_float(value, theme.heading_line_height)
+        when "heading_chapter_break_before" then theme.heading_chapter_break_before = parse_int(value, theme.heading_chapter_break_before)
+        when "h0_font_size"                 then theme.h0_font_size = parse_float(value, theme.h0_font_size)
+        when "h1_font_size"                 then theme.h1_font_size = parse_float(value, theme.h1_font_size)
+        when "h1_font_style"                then theme.h1_font_style = value.as_s? || theme.h1_font_style
+        when "h1_margin_top"                then theme.h1_margin_top = parse_float(value, theme.h1_margin_top)
+        when "h1_margin_bottom"             then theme.h1_margin_bottom = parse_float(value, theme.h1_margin_bottom)
+        when "h2_font_size"                 then theme.h2_font_size = parse_float(value, theme.h2_font_size)
+        when "h2_font_style"                then theme.h2_font_style = value.as_s? || theme.h2_font_style
+        when "h2_margin_top"                then theme.h2_margin_top = parse_float(value, theme.h2_margin_top)
+        when "h2_margin_bottom"             then theme.h2_margin_bottom = parse_float(value, theme.h2_margin_bottom)
+        when "h3_font_size"                 then theme.h3_font_size = parse_float(value, theme.h3_font_size)
+        when "h3_font_style"                then theme.h3_font_style = value.as_s? || theme.h3_font_style
+        when "h3_margin_top"                then theme.h3_margin_top = parse_float(value, theme.h3_margin_top)
+        when "h3_margin_bottom"             then theme.h3_margin_bottom = parse_float(value, theme.h3_margin_bottom)
+        when "h4_font_size"                 then theme.h4_font_size = parse_float(value, theme.h4_font_size)
+        when "h4_font_style"                then theme.h4_font_style = value.as_s? || theme.h4_font_style
+        when "h4_margin_top"                then theme.h4_margin_top = parse_float(value, theme.h4_margin_top)
+        when "h4_margin_bottom"             then theme.h4_margin_bottom = parse_float(value, theme.h4_margin_bottom)
+        when "h5_font_size"                 then theme.h5_font_size = parse_float(value, theme.h5_font_size)
+        when "h5_font_style"                then theme.h5_font_style = value.as_s? || theme.h5_font_style
+        when "h5_margin_top"                then theme.h5_margin_top = parse_float(value, theme.h5_margin_top)
+        when "h5_margin_bottom"             then theme.h5_margin_bottom = parse_float(value, theme.h5_margin_bottom)
+        when "h6_font_size"                 then theme.h6_font_size = parse_float(value, theme.h6_font_size)
+        when "h6_font_style"                then theme.h6_font_style = value.as_s? || theme.h6_font_style
+        when "h6_margin_top"                then theme.h6_margin_top = parse_float(value, theme.h6_margin_top)
+        when "h6_margin_bottom"             then theme.h6_margin_bottom = parse_float(value, theme.h6_margin_bottom)
           # Paragraphes
         when "prose_margin_top"    then theme.prose_margin_top = parse_float(value, theme.prose_margin_top)
         when "prose_margin_bottom" then theme.prose_margin_bottom = parse_float(value, theme.prose_margin_bottom)
@@ -225,6 +227,10 @@ module AsciidoctorPDF
 
     private def self.parse_bool(value : YAML::Any, default : Bool) : Bool
       value.as_bool? || default
+    end
+
+    private def self.parse_int(value : YAML::Any, default : Int32) : Int32
+      value.as_i? || value.as_s?.try(&.to_i?) || default
     end
   end
 end

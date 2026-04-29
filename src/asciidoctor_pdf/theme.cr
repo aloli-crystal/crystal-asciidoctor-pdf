@@ -36,6 +36,11 @@ module AsciidoctorPDF
     # quand un `=` apparaît à l'intérieur du flux). On le typographie
     # comme un grand titre, sensiblement plus gros que h1.
     property h0_font_size : Float64 = 26.0
+    # Saut de page automatique avant un titre de niveau ≤ valeur
+    # (mode « chapter »). 0 = désactivé (défaut, mode article).
+    # Mettre à 1 pour qu'un H1 commence systématiquement sur une
+    # nouvelle page — convention pour les livres et les rapports.
+    property heading_chapter_break_before : Int32 = 0
     property h1_font_size : Float64 = 22.0
     property h1_font_style : String = "bold"
     property h1_margin_top : Float64 = 12.0

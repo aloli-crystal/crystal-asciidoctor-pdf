@@ -16,7 +16,22 @@ module AsciidoctorPDF
     # `chrome = false` désactive header / footer / footnotes sur la
     # page (utilisé pour la page de garde, qu'on veut typographiquement
     # « nue »).
-    record PageMeta, number : Int32, section_title : String, chrome : Bool = true
+    # `numbering` indique le style de numérotation à afficher dans le
+    # footer : `:none` (aucun numéro), `:roman` (i, ii, iii — front-
+    # matter), `:arabic` (1, 2, 3 — corps de doc).
+    # `displayed_number` est calculé après coup par
+    # `assign_displayed_numbers` pour que les compteurs roman / arabic
+    # repartent chacun de 1. Mutable parce qu'on l'assigne en post.
+    class PageMeta
+      property number : Int32
+      property section_title : String
+      property chrome : Bool
+      property numbering : Symbol
+      property displayed_number : Int32
+
+      def initialize(@number : Int32, @section_title : String, @chrome : Bool = true, @numbering : Symbol = :arabic, @displayed_number : Int32 = 0)
+      end
+    end
 
     # Entrée d'index
     record IndexEntry, term : String, page_number : Int32
@@ -181,6 +196,15 @@ module AsciidoctorPDF
       @doc.subject = node.attr("subject") if node.attr?("subject")
       @doc.producer = "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"
 
+      # Numérotation front-matter en chiffres romains : activée par
+      # l'attribut document `:pdf-front-matter-numbering: roman`
+      # (parité Ruby asciidoctor-pdf). Quand activée, la garde et la
+      # TOC réservée sont marquées :roman, le contenu :arabic ; les
+      # deux compteurs repartent de 1 chacun. Sinon, tout en :arabic
+      # continu (comportement historique).
+      front_matter_roman = (node.attr("pdf-front-matter-numbering").to_s.downcase == "roman")
+      front_numbering = front_matter_roman ? :roman : :arabic
+
       # Page de titre
       # Décision : page de garde dédiée OU titre H1 en haut de page 1 OU rien.
       # Convention :
@@ -213,7 +237,7 @@ module AsciidoctorPDF
       toc_page_index = -1
       if @theme.toc_enabled && node.attr?("toc") && !title_page_toc_active
         toc_page_index = @page_number # index 0-based de la page TOC
-        new_page
+        new_page(numbering: front_numbering)
         # Créer une nouvelle page pour le contenu afin d'éviter que le corps
         # ne se superpose à la TOC (qui sera rendue en post-traitement)
         new_page
@@ -234,6 +258,11 @@ module AsciidoctorPDF
       node.blocks.each do |block|
         convert(block)
       end
+
+      # Calculer les numéros de page logiques d'abord — la TOC en a
+      # besoin pour afficher les bons « 1, 2 » / « i, ii » dans ses
+      # entrées (via `format_page_number`), pas l'index PDF brut.
+      assign_displayed_numbers
 
       # Rendre la table des matières sur la page réservée…
       if toc_page_index >= 0
@@ -303,6 +332,15 @@ module AsciidoctorPDF
       dest_name = node.id || "_sect_#{@dest_counter}"
 
       ensure_page
+
+      # Saut de page automatique avant un titre de niveau ≤
+      # `heading_chapter_break_before` (mode « livre »). On ne saute
+      # pas si la page courante est encore vierge (sinon on enchaîne
+      # deux pages blanches).
+      cb = @theme.heading_chapter_break_before
+      if cb > 0 && level <= cb && level > 0 && @current_y < @page_height - @margin - 1
+        new_page
+      end
 
       # Marge supérieure
       margin_top = @theme.heading_margin_top(level)
@@ -1847,8 +1885,16 @@ module AsciidoctorPDF
         page.fill_color(text_color)
         draw_text_run(page, title, entry_x, y - font_size, toc_font_name, font_size)
 
-        # Numéro de page (aligné à droite)
+        # Numéro de page (aligné à droite). Si la numérotation
+        # romaine front-matter est active, on doit afficher le numéro
+        # *logique* (i, ii, …) ou *arabe* (1, 2, …) selon la zone où
+        # tombe la cible. On retrouve la PageMeta correspondante via
+        # `page_num` qui est l'index PDF (1-based).
         page_str = page_num.to_s
+        if (target_meta = @page_metas.find { |m| m.number == page_num })
+          formatted = format_page_number(target_meta)
+          page_str = formatted unless formatted.empty?
+        end
         page_num_w = text_width(page_str, toc_font_name, font_size)
         page.fill_color(text_color)
         page.text(page_str, at: {@margin + @content_width - page_num_w, y - font_size})
@@ -1995,7 +2041,9 @@ module AsciidoctorPDF
     private def render_title_page(doc : Asciidoctor::Document) : Nil
       # Page de garde sans header / footer / footnotes (convention
       # typographique : la page de titre est « nue »).
-      new_page(chrome: false)
+      # Garde : pas de chrome ET pas de compteur (sinon elle prend
+      # la place du « 1 » du contenu et tout décale d'une unité).
+      new_page(chrome: false, numbering: :none)
 
       if title_page_toc_enabled?(doc)
         render_title_page_with_toc(doc)
@@ -2316,8 +2364,14 @@ module AsciidoctorPDF
     end
 
     private def resolve_page_vars(template : String, meta : PageMeta) : String
+      # `{page_number}` affiche le numéro **logique** (compteur roman
+      # ou arabic redémarrant à 1 selon la zone), pas l'index PDF
+      # absolu. `{page_number_pdf}` reste accessible pour les rares
+      # cas où on veut l'index brut.
+      displayed = format_page_number(meta)
       template
-        .gsub("{page_number}", meta.number.to_s)
+        .gsub("{page_number}", displayed)
+        .gsub("{page_number_pdf}", meta.number.to_s)
         .gsub("{section_title}", meta.section_title)
         .gsub("{document_title}", @document_title)
         # Replace U+00A0 with ASCII space just before the string is
@@ -2326,17 +2380,51 @@ module AsciidoctorPDF
         .gsub('\u00A0', ' ')
     end
 
+    # Rend le numéro de page selon le style de la PageMeta :
+    #   :none   → "" (page non numérotée, ex. garde)
+    #   :roman  → "i", "ii", "iii", … (front-matter)
+    #   :arabic → "1", "2", "3", …    (corps de doc)
+    private def format_page_number(meta : PageMeta) : String
+      case meta.numbering
+      when :none   then ""
+      when :roman  then RomanNumeral.format(meta.displayed_number)
+      when :arabic then meta.displayed_number.to_s
+      else              meta.displayed_number.to_s
+      end
+    end
+
+    # Calcule `displayed_number` pour chaque PageMeta après que la
+    # passe de rendu ait posé toutes les pages. Compteur roman et
+    # arabic indépendants, chacun reparti de 1 ; `:none` reste à 0.
+    # À appeler avant `render_headers_footers`.
+    private def assign_displayed_numbers : Nil
+      roman_counter = 0
+      arabic_counter = 0
+      @page_metas.each do |meta|
+        case meta.numbering
+        when :none
+          meta.displayed_number = 0
+        when :roman
+          roman_counter += 1
+          meta.displayed_number = roman_counter
+        else # :arabic
+          arabic_counter += 1
+          meta.displayed_number = arabic_counter
+        end
+      end
+    end
+
     # =========================================================================
     # Gestion des pages
     # =========================================================================
 
-    private def new_page(chrome : Bool = true) : Nil
+    private def new_page(chrome : Bool = true, numbering : Symbol = :arabic) : Nil
       @page_number += 1
       @current_page = @doc.page(@page_width, @page_height) do |p|
         # Le bloc est requis, mais le contenu est ajouté de manière séquentielle.
       end
       @current_y = @page_height - @margin
-      @page_metas << PageMeta.new(@page_number, @current_section_title, chrome)
+      @page_metas << PageMeta.new(@page_number, @current_section_title, chrome, numbering)
     end
 
     private def ensure_page : Nil
