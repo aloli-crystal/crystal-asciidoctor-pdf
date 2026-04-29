@@ -110,6 +110,22 @@ module AsciidoctorPDF
     property admonition_caution_label : String = "CAUTION"
     property admonition_important_label : String = "IMPORTANT"
 
+    # --- Blocs de score (extension `x-score-*`) ---
+    # Cinq niveaux qualitatifs prédéfinis pour les barèmes de quiz.
+    # Activés via le rôle AsciiDoc `[.x-score-<niveau>]` sur un bloc
+    # delimited (`====` example ou `--` open). Couleurs/libellés
+    # personnalisables ci-dessous.
+    property x_score_excellent_color : String = "2e7d32"
+    property x_score_excellent_label : String = "EXCELLENT"
+    property x_score_tres_bien_color : String = "66bb6a"
+    property x_score_tres_bien_label : String = "TRÈS BIEN"
+    property x_score_bien_color : String = "fbc02d"
+    property x_score_bien_label : String = "BIEN"
+    property x_score_insuffisant_color : String = "ff9800"
+    property x_score_insuffisant_label : String = "INSUFFISANT"
+    property x_score_a_revoir_color : String = "d32f2f"
+    property x_score_a_revoir_label : String = "À REVOIR"
+
     # --- Tableaux ---
     property table_border_color : String = "dddddd"
     property table_border_width : Float64 = 0.5

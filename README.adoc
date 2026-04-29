@@ -215,6 +215,109 @@ on accepte la pagination normale (« if possible » du standard).
 NOTE : l'estimation est volontairement pessimiste. Mieux vaut sauter
 trop tôt que se retrouver avec un orphelin.
 
+=== Thèmes embarqués — appel par nom
+
+Le shard livre des thèmes prêts à l'emploi, embarqués dans le binaire
+au moment de la compilation (pas de dépendance fichier à l'exécution).
+Sélectionnables via trois canaux qui se comportent à l'identique :
+
+[cols="1,3"]
+|===
+| Canal | Syntaxe
+
+| CLI
+| `crystal-asciidoctor-pdf --theme fr mon-doc.adoc`
+
+| Source AsciiDoc
+| `:pdf-theme: fr` dans l'entête du document
+
+| API Crystal
+| `theme = AsciidoctorPDF::ThemeLoader.builtin("fr")`
+|===
+
+L'argument `--theme` accepte indifféremment un *nom embarqué* ou un
+*chemin de fichier YAML* (méthode `ThemeLoader.resolve`).
+
+==== Thèmes disponibles
+
+[cols="1,3"]
+|===
+| Nom (alias) | Description
+
+| `fr` (`francais`, `french`)
+| Français : labels d'admonitions traduits (NOTE / ASTUCE /
+  AVERTISSEMENT / ATTENTION / IMPORTANT), titre TOC « Table des
+  matières », titre Index « Index ». 5 niveaux de score
+  `[.x-score-*]` activés.
+|===
+
+==== Ordre de priorité
+
+. Argument CLI `--theme` (s'il est présent)
+. Attribut document `:pdf-theme:` (s'il est présent)
+. Thème par défaut intégré (anglais, défauts standard)
+
+=== Blocs de score — `[.x-score-<niveau>]` (extension)
+
+Pour les barèmes de quiz, fiches d'évaluation, classements, le shard
+fournit cinq niveaux qualitatifs prédéfinis avec couleurs et libellés
+configurables. Activés via le rôle AsciiDoc `[.x-score-<niveau>]`
+sur un bloc *example* (`====`) ou *open* (`--`) :
+
+[source,asciidoc]
+----
+[.x-score-excellent]
+====
+*12/12* — Charte parfaitement assimilée.
+====
+
+[.x-score-tres-bien]
+====
+*10-11/12* — Quelques détails à revoir.
+====
+
+[.x-score-bien]
+====
+*7-9/12* — Une relecture de certaines sections est conseillée.
+====
+
+[.x-score-insuffisant]
+====
+*4-6/12* — Une relecture complète de la charte est nécessaire.
+====
+
+[.x-score-a-revoir]
+====
+*0-3/12* — Veuillez relire attentivement l'ensemble de la charte.
+====
+----
+
+Rendu : bande verticale colorée à gauche + label en gras + texte
+indenté. Même mécanique que les admonitions standard, avec une
+palette dédiée au feedback de score (vert foncé → vert clair →
+jaune → orange → rouge).
+
+==== Personnalisation
+
+Couleurs et libellés modifiables via le thème YAML :
+
+[source,yaml]
+----
+x_score_excellent_color:   "2e7d32"
+x_score_excellent_label:   "EXCELLENT"
+x_score_tres_bien_color:   "66bb6a"
+x_score_tres_bien_label:   "TRÈS BIEN"
+x_score_bien_color:        "fbc02d"
+x_score_bien_label:        "BIEN"
+x_score_insuffisant_color: "ff9800"
+x_score_insuffisant_label: "INSUFFISANT"
+x_score_a_revoir_color:    "d32f2f"
+x_score_a_revoir_label:    "À REVOIR"
+----
+
+NOTE : extension non standard (préfixe `x-`). Sans équivalent dans
+AsciiDoc / Ruby asciidoctor-pdf — voir <<convention-x>>.
+
 === Traduction des admonitions
 
 Les étiquettes des admonitions (`NOTE`, `TIP`, `WARNING`, `CAUTION`,

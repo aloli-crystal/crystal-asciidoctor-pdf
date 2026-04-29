@@ -4,6 +4,37 @@ module AsciidoctorPDF
   # Charge un thème depuis un fichier YAML et peuple un objet Theme.
   # Équivalent du ThemeLoader d'asciidoctor-pdf Ruby.
   module ThemeLoader
+    # Thèmes embarqués au moment de la compilation : leur YAML est
+    # inliné dans le binaire, pas besoin que les fichiers existent
+    # à l'exécution. Ajout d'un nouveau thème :
+    #   1. Créer `themes/<nom>.yml`
+    #   2. Ajouter une entrée dans BUILTIN_THEMES ci-dessous
+    #   3. Documenter dans le README
+    BUILTIN_THEMES = {
+      "fr"       => {{ read_file("#{__DIR__}/../../themes/fr.yml") }},
+      "francais" => {{ read_file("#{__DIR__}/../../themes/fr.yml") }},
+      "french"   => {{ read_file("#{__DIR__}/../../themes/fr.yml") }},
+    }
+
+    # Liste des noms canoniques (alias compris) des thèmes embarqués,
+    # utile pour la complétion CLI ou la validation.
+    def self.builtin_names : Array(String)
+      BUILTIN_THEMES.keys
+    end
+
+    # Charge un thème embarqué (fr, francais, french). Le YAML est
+    # inliné dans le binaire — pas de dépendance de fichier à
+    # l'exécution. Insensible à la casse.
+    def self.builtin(name : String) : Theme
+      key = name.downcase
+      yaml_str = BUILTIN_THEMES[key]?
+      raise ArgumentError.new("Thème embarqué inconnu : '#{name}'. Disponibles : #{builtin_names.join(", ")}") unless yaml_str
+
+      theme = Theme.new
+      apply(theme, YAML.parse(yaml_str))
+      theme
+    end
+
     # Charge un thème depuis un fichier YAML.
     # Si le fichier n'existe pas, retourne le thème par défaut.
     def self.load(path : String) : Theme
@@ -16,6 +47,18 @@ module AsciidoctorPDF
     rescue ex
       STDERR.puts "Warning: impossible de charger le thème '#{path}': #{ex.message}"
       Theme.new
+    end
+
+    # Résout un thème par son nom OU son chemin :
+    #   * un nom embarqué (ex: "fr") → ThemeLoader.builtin
+    #   * un chemin existant → ThemeLoader.load
+    # Idéal pour le CLI ou pour respecter `:pdf-theme:` côté source
+    # AsciiDoc, où l'utilisateur peut indiquer indifféremment l'un
+    # ou l'autre.
+    def self.resolve(name_or_path : String) : Theme
+      key = name_or_path.downcase
+      return builtin(key) if BUILTIN_THEMES.has_key?(key)
+      load(name_or_path)
     end
 
     # Applique les valeurs YAML au thème
@@ -99,6 +142,17 @@ module AsciidoctorPDF
         when "admonition_warning_label"   then theme.admonition_warning_label = value.as_s? || theme.admonition_warning_label
         when "admonition_caution_label"   then theme.admonition_caution_label = value.as_s? || theme.admonition_caution_label
         when "admonition_important_label" then theme.admonition_important_label = value.as_s? || theme.admonition_important_label
+          # Blocs de score (extension x-score-*)
+        when "x_score_excellent_color"   then theme.x_score_excellent_color = value.as_s? || theme.x_score_excellent_color
+        when "x_score_excellent_label"   then theme.x_score_excellent_label = value.as_s? || theme.x_score_excellent_label
+        when "x_score_tres_bien_color"   then theme.x_score_tres_bien_color = value.as_s? || theme.x_score_tres_bien_color
+        when "x_score_tres_bien_label"   then theme.x_score_tres_bien_label = value.as_s? || theme.x_score_tres_bien_label
+        when "x_score_bien_color"        then theme.x_score_bien_color = value.as_s? || theme.x_score_bien_color
+        when "x_score_bien_label"        then theme.x_score_bien_label = value.as_s? || theme.x_score_bien_label
+        when "x_score_insuffisant_color" then theme.x_score_insuffisant_color = value.as_s? || theme.x_score_insuffisant_color
+        when "x_score_insuffisant_label" then theme.x_score_insuffisant_label = value.as_s? || theme.x_score_insuffisant_label
+        when "x_score_a_revoir_color"    then theme.x_score_a_revoir_color = value.as_s? || theme.x_score_a_revoir_color
+        when "x_score_a_revoir_label"    then theme.x_score_a_revoir_label = value.as_s? || theme.x_score_a_revoir_label
           # Tableaux
         when "table_border_color"            then theme.table_border_color = value.as_s? || theme.table_border_color
         when "table_border_width"            then theme.table_border_width = parse_float(value, theme.table_border_width)

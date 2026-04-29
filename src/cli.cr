@@ -10,7 +10,7 @@ attributes = {} of String => String
 OptionParser.parse do |parser|
   parser.banner = "Usage : crystal-asciidoctor-pdf [options] fichier.adoc"
   parser.on("-o FILE", "--out-file FILE", "Fichier de sortie PDF (par défaut : fichier.adoc.pdf)") { |f| output_file = f }
-  parser.on("-T FILE", "--theme FILE", "Fichier de thème YAML") { |f| theme_file = f }
+  parser.on("-T NAME", "--theme NAME", "Thème : nom embarqué (#{AsciidoctorPDF::ThemeLoader.builtin_names.join(", ")}) ou chemin YAML") { |f| theme_file = f }
   parser.on("-a ATTR", "--attribute ATTR", "Attribut nom=valeur") do |a|
     parts = a.split("=", 2)
     attributes[parts[0]] = parts.size > 1 ? parts[1] : ""
@@ -61,12 +61,24 @@ if output_file.empty?
   )
 end
 
-theme = theme_file.empty? ? AsciidoctorPDF::Theme.new : AsciidoctorPDF::ThemeLoader.load(theme_file)
-
 options = {"docfile" => input_file, "outfile" => output_file} of String => String
 attributes.each { |k, v| options[k] = v }
 
 doc = Asciidoctor.load_file(input_file, options)
+
+# Résolution du thème, par ordre de priorité décroissante :
+#   1. argument CLI `--theme` (nom embarqué OU chemin YAML)
+#   2. attribut document `:pdf-theme:` dans le source AsciiDoc
+#   3. thème par défaut intégré
+theme =
+  if !theme_file.empty?
+    AsciidoctorPDF::ThemeLoader.resolve(theme_file)
+  elsif (pdf_theme = doc.attr("pdf-theme")) && !pdf_theme.to_s.empty?
+    AsciidoctorPDF::ThemeLoader.resolve(pdf_theme.to_s)
+  else
+    AsciidoctorPDF::Theme.new
+  end
+
 converter = AsciidoctorPDF::Converter.new("pdf", theme)
 converter.convert(doc)
 

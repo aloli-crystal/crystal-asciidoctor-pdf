@@ -653,6 +653,92 @@ module AsciidoctorPDF
     end
 
     # =========================================================================
+    # Blocs de score (extension `x-score-*`) — non standard
+    # =========================================================================
+
+    # Cherche un rôle `x-score-<niveau>` sur le node et retourne le
+    # niveau (string) si trouvé. Niveaux reconnus :
+    # `excellent`, `tres-bien`, `bien`, `insuffisant`, `a-revoir`.
+    private X_SCORE_LEVELS = %w(excellent tres-bien bien insuffisant a-revoir)
+
+    private def detect_x_score_level(node : Asciidoctor::AbstractBlock) : String?
+      X_SCORE_LEVELS.each do |level|
+        return level if node.has_role?("x-score-#{level}")
+      end
+      nil
+    end
+
+    # Rend un bloc de score (extension non standard, parité visuelle
+    # avec les admonitions). Bande colorée à gauche + label en gras +
+    # contenu indenté. La couleur et le libellé sont configurables
+    # par le thème (`x_score_<niveau>_color/label`).
+    private def render_x_score_block(node : Asciidoctor::Block, level : String) : String
+      ensure_page
+
+      label_text, color = x_score_label_and_color(level)
+
+      # On extrait le texte des sous-blocs comme `convert_admonition`.
+      text_parts = [] of String
+      node.blocks.each do |b|
+        raw = b.responds_to?(:content) ? b.content : nil
+        chunk = raw.is_a?(Array) ? raw.join("\n") : (raw || "")
+        text_parts << strip_inline_markup(chunk) unless chunk.empty?
+      end
+      text = text_parts.join("\n\n")
+
+      font_size = @theme.base_font_size
+      line_h = font_size * @theme.base_line_height
+      padding = @theme.admonition_padding
+      label_size = font_size - 1
+      label_offset = @theme.admonition_border_width + 4.0
+      label_gap = 8.0
+      label_space = [60.0, label_offset + text_width(label_text, @fn_body_bold, label_size) + label_gap].max
+      content_w = @content_width - label_space - padding
+
+      lines = wrap_text(text, content_w, font_size)
+      block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
+      total_h = block_h + @theme.admonition_margin_top + @theme.admonition_margin_bottom
+
+      check_page_break(total_h)
+
+      page = @current_page.not_nil!
+      @current_y -= @theme.admonition_margin_top
+
+      # Bande de couleur à gauche
+      page.fill_color(color)
+      page.rectangle(@margin, @current_y - block_h, @theme.admonition_border_width, block_h)
+      page.fill
+
+      # Label
+      set_font(page, @fn_body_bold, label_size)
+      page.fill_color(color)
+      page.text(label_text, at: {@margin + label_offset, @current_y - padding - font_size})
+
+      # Texte
+      set_font(page, @fn_body, font_size)
+      page.fill_color(@theme.base_font_color)
+      y = @current_y - padding - font_size
+      lines.each do |line|
+        draw_text_run(page, line, @margin + label_space, y, @fn_body, font_size)
+        y -= line_h
+      end
+
+      @current_y -= block_h + @theme.admonition_margin_bottom
+      ""
+    end
+
+    private def x_score_label_and_color(level : String) : {String, String}
+      case level
+      when "excellent"   then {@theme.x_score_excellent_label, @theme.x_score_excellent_color}
+      when "tres-bien"   then {@theme.x_score_tres_bien_label, @theme.x_score_tres_bien_color}
+      when "bien"        then {@theme.x_score_bien_label, @theme.x_score_bien_color}
+      when "insuffisant" then {@theme.x_score_insuffisant_label, @theme.x_score_insuffisant_color}
+      when "a-revoir"    then {@theme.x_score_a_revoir_label, @theme.x_score_a_revoir_color}
+      else                    {level.upcase, @theme.admonition_note_color}
+      end
+    end
+
+    # =========================================================================
     # Listes
     # =========================================================================
 
@@ -1071,6 +1157,13 @@ module AsciidoctorPDF
 
     def convert_example(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Block)
+
+      # Extension : rôle `[.x-score-<niveau>]` sur un bloc example
+      # (`====`) le transforme en bloc de score coloré.
+      if (level = detect_x_score_level(node))
+        return render_x_score_block(node, level)
+      end
+
       ensure_page
       node.blocks.each { |b| convert(b) }
       ""
@@ -1078,6 +1171,12 @@ module AsciidoctorPDF
 
     def convert_open(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Block)
+
+      # Extension : rôle `[.x-score-<niveau>]` sur un open block
+      # (`--`) le transforme en bloc de score coloré.
+      if (level = detect_x_score_level(node))
+        return render_x_score_block(node, level)
+      end
 
       # Option `[%unbreakable]` : on essaie de garder tout le bloc sur
       # une même page. Estimation grossière de la hauteur cumulée
