@@ -855,8 +855,20 @@ module AsciidoctorPDF
 
     def convert_dlist(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::List)
-      # Liste de définitions : terme :: définition
-      node.items.each_with_index do |item, _idx|
+      style = node.responds_to?(:style) ? node.style : nil
+      case style
+      when "qanda"      then render_dlist_qanda(node)
+      when "horizontal" then render_dlist_horizontal(node)
+      else                   render_dlist_default(node)
+      end
+      ""
+    end
+
+    # Rendu par défaut : terme en gras sur sa ligne, définition (sous-blocs)
+    # juste en dessous. C'était l'unique mode avant l'ajout de qanda /
+    # horizontal — comportement préservé.
+    private def render_dlist_default(node : Asciidoctor::List) : Nil
+      node.items.each do |item|
         next unless item.is_a?(Asciidoctor::ListItem)
         ensure_page
         page = @current_page.not_nil!
@@ -865,12 +877,111 @@ module AsciidoctorPDF
         page.fill_color(@theme.base_font_color)
         draw_text_run(page, term, @margin, @current_y - @theme.base_font_size, @fn_body_bold, @theme.base_font_size)
         @current_y -= @theme.base_font_size * @theme.base_line_height
-
-        if item.blocks?
-          item.blocks.each { |b| convert(b) }
-        end
+        item.blocks.each { |b| convert(b) } if item.blocks?
       end
-      ""
+    end
+
+    # Style FAQ : « Q1. » devant chaque question (numérotée), « → »
+    # devant chaque réponse. Question en gras, réponse en flux normal.
+    private def render_dlist_qanda(node : Asciidoctor::List) : Nil
+      node.items.each_with_index do |item, idx|
+        next unless item.is_a?(Asciidoctor::ListItem)
+        ensure_page
+        page = @current_page.not_nil!
+        font_size = @theme.base_font_size
+        line_h = font_size * @theme.base_line_height
+
+        # Question
+        prefix = "Q#{idx + 1}. "
+        term = strip_inline_markup(item.text || "")
+        prefix_w = text_width(prefix, @fn_body_bold, font_size)
+        question_lines = wrap_text(term, @content_width - prefix_w, font_size, @fn_body_bold)
+        check_page_break(question_lines.size * line_h + 4.0)
+        page = @current_page.not_nil!
+        set_font(page, @fn_body_bold, font_size)
+        page.fill_color(@theme.base_font_color)
+        question_lines.each_with_index do |line, li|
+          x = li == 0 ? @margin : @margin + prefix_w
+          y = @current_y - font_size - (li * line_h)
+          if li == 0
+            draw_text_run(page, prefix + line, x, y, @fn_body_bold, font_size)
+          else
+            draw_text_run(page, line, x, y, @fn_body_bold, font_size)
+          end
+        end
+        @current_y -= question_lines.size * line_h + 2.0
+
+        # Réponse : indenter de la largeur du préfixe pour aligner
+        # visuellement sur le début du texte de la question.
+        if item.blocks?
+          saved_margin = @margin
+          saved_content_w = @content_width
+          @margin += prefix_w
+          @content_width -= prefix_w
+          item.blocks.each { |b| convert(b) }
+          @margin = saved_margin
+          @content_width = saved_content_w
+        end
+        @current_y -= 4.0
+      end
+    end
+
+    # Style horizontal : terme à gauche dans une colonne fixe (~25 %),
+    # définition à droite dans le reste. Pour les items où la
+    # définition fait plusieurs lignes, le terme reste aligné en haut
+    # de la première ligne.
+    private def render_dlist_horizontal(node : Asciidoctor::List) : Nil
+      term_col_w = @content_width * 0.25
+      def_col_x = @margin + term_col_w + 8.0
+      def_col_w = @content_width - term_col_w - 8.0
+      font_size = @theme.base_font_size
+      line_h = font_size * @theme.base_line_height
+
+      node.items.each do |item|
+        next unless item.is_a?(Asciidoctor::ListItem)
+        ensure_page
+
+        term = strip_inline_markup(item.text || "")
+        term_lines = wrap_text(term, term_col_w - 4.0, font_size, @fn_body_bold)
+
+        # Concaténer le contenu des sous-blocs (paragraphes) pour le
+        # rendu inline horizontal — pas de support des listings ou
+        # tables dans la colonne définition (ça nécessiterait une
+        # « zone » dédiée, hors scope de cette itération).
+        def_html = item.blocks? ? item.blocks.map do |b|
+          if b.responds_to?(:content)
+            content = b.content
+            content.is_a?(Array) ? content.join(" ") : (content || "").to_s
+          else
+            ""
+          end
+        end.reject(&.empty?).join("\n") : ""
+
+        def_segments = InlineRenderer.parse(def_html)
+        def_lines = wrap_segments(def_segments, def_col_w, font_size)
+        def_lines = [[] of InlineSegment] if def_lines.empty?
+
+        n_lines = [term_lines.size, def_lines.size].max
+        check_page_break(n_lines * line_h + 4.0)
+        page = @current_page.not_nil!
+
+        # Terme à gauche
+        set_font(page, @fn_body_bold, font_size)
+        page.fill_color(@theme.base_font_color)
+        term_lines.each_with_index do |line, li|
+          y = @current_y - font_size - (li * line_h)
+          draw_text_run(page, line, @margin, y, @fn_body_bold, font_size)
+        end
+
+        # Définition à droite
+        y = @current_y - font_size
+        def_lines.each do |line|
+          render_segment_line(page, line, def_col_x, y, font_size)
+          y -= line_h
+        end
+
+        @current_y -= n_lines * line_h + 4.0
+      end
     end
 
     private def render_list(node : Asciidoctor::List, ordered : Bool, indent : Float64 = 0.0) : String
