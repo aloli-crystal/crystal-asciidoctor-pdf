@@ -3,10 +3,26 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.15 — 2026-04-29
+
+=== Modifié
+
+* **Dépendances mises à jour** suite au renommage en cascade des
+  shards de niveau 0 (convention Aloli : les créations originales
+  abandonnent le préfixe `crystal-` sur l'URL GitHub) :
+** `crystal-pdf` → `pdf`
+** `crystal-flags` → `flags`
+** `crystal-emojis` → `emojis`
+** `crystal-noto-cjk` → `noto-cjk`
+* Clés de dépendance dans `shard.yml`, chemins `require` internes et
+  URLs documentaires mis à jour. Aucun changement fonctionnel.
+* Le shard crystal-asciidoctor-pdf lui-même est un portage de gem
+  Ruby et *conserve* son préfixe `crystal-` selon la convention.
+
 == v2.3.24.14 — 2026-04-26
 
 **Rendu des glyphes CJK** via le nouveau shard
-https://github.com/aloli-crystal/crystal-noto-cjk[crystal-noto-cjk].
+https://github.com/aloli-crystal/noto-cjk[noto-cjk].
 Quand l'utilisateur a peuplé le cache CJK (via
 `crystal-noto-cjk pull` ou `CrystalNotoCJK::Cache.pull`), le
 converter détecte automatiquement les caractères CJK dans les
@@ -46,8 +62,8 @@ faire quand des caractères ont été substitués par `?`.
   compte, un échantillon des caractères substitués, et les
   commandes exactes à lancer pour obtenir une couverture
   complète (`crystal-emojis pull`, plus une note sur le futur
-  `crystal-noto-cjk` pour le CJK).
-* Dépendance renommée `crystal-emojis-lite` → `crystal-emojis`
+  `noto-cjk` pour le CJK).
+* Dépendance renommée `crystal-emojis-lite` → `emojis`
   (~> 0.2). Même nom de module `CrystalEmojis`, même surface
   d'API, plus le nouveau module `Cache` qui permet à
   l'application hôte de populer le cache disque
@@ -71,7 +87,7 @@ interroge directement la police active via la nouvelle méthode
 retombe sur la table WinAnsi statique que pour les polices Type1
 (rare — uniquement quand DejaVu est désactivée dans le thème).
 
-* Bump dep `crystal-pdf` à `~> 0.3.5`.
+* Bump dep `pdf` à `~> 0.3.5`.
 * `Converter#safe_text(text, font_name = @fn_body)` prend
   désormais le nom de la police et route la couverture
   par-caractère via la requête TrueType `has_glyph?`.
@@ -101,7 +117,7 @@ pour une couverture complète, remplacer `crystal-emojis-lite` par
   `:emoji`, permettant à `draw_text_run` d'aiguiller chaque type
   vers le bon pipeline (texte → `page.text` + sanitize WinAnsi ;
   emoji → `page.svg` avec les mêmes dimensions que les drapeaux
-  de `crystal-flags`).
+  de `flags`).
 * Mise à jour du test de non-régression du tofu silencieux : ✅
   et ❌ ne se retrouvent plus comme `?` dans le flux texte WinAnsi ;
   les caractères CJK et les emojis hors set lite y restent.
@@ -135,8 +151,8 @@ Le correctif :
 
 C'est un correctif conservateur qui supprime le mode d'échec
 silencieux. L'étape suivante (prévue comme un shard à part) est
-`crystal-emojis`, qui rendra les vrais **emojis colorés** comme
-glyphes SVG embarqués (même pattern que `crystal-flags` pour les
+`emojis`, qui rendra les vrais **emojis colorés** comme
+glyphes SVG embarqués (même pattern que `flags` pour les
 drapeaux).
 
 == v2.3.24.9 — 2026-04-25
@@ -292,7 +308,7 @@ Extension du rendu des drapeaux + correctifs de glyphes d'espacement.
   ordinaire (la propriété « non séparable » est perdue, compromis
   acceptable étant donné que les polices Type1 standard n'exposent
   pas toujours un glyphe drawable pour le NBSP).
-* **Mise à jour de dépendance** : `crystal-pdf` → utilise v0.3.3 via
+* **Mise à jour de dépendance** : `pdf` → utilise v0.3.3 via
   `~> 0.3`, qui ajoute un cache d'instances `SVG::Parser` au niveau
   du document pour que les drapeaux répétés dans un même document
   ne soient parsés qu'une fois.
@@ -302,7 +318,7 @@ Extension du rendu des drapeaux + correctifs de glyphes d'espacement.
 Vrais drapeaux de pays dans les cellules de tableau, via un nouveau
 pipeline de rendu SVG.
 
-* **Nouvelle dépendance** `crystal-flags` (~> 0.1) — 271 drapeaux
+* **Nouvelle dépendance** `flags` (~> 0.1) — 271 drapeaux
   SVG ISO 3166-1 alpha-2 issus de lipis/flag-icons, embarqués à la
   compilation.
 * **Rendu inline des drapeaux dans les cellules de tableau** : les
@@ -316,7 +332,7 @@ pipeline de rendu SVG.
   chaque drapeau comme une largeur fixe dérivée de la taille de
   police, afin que les colonnes réservent l'espace correct plutôt
   que la largeur du glyphe `.notdef` de la police texte.
-* **Mise à jour de dépendance** : `crystal-pdf` → `~> 0.3` (utilise
+* **Mise à jour de dépendance** : `pdf` → `~> 0.3` (utilise
   le correctif de boucle du path-parser et le correctif de
   remplissage des formes fermées livrés dans crystal-pdf v0.3.1 et
   v0.3.2).

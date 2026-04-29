@@ -3,10 +3,26 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.15 — 2026-04-29
+
+=== Changed
+
+* **Dependencies updated** to follow the level-0 rename cascade
+  (Aloli convention: original creations drop the `crystal-` prefix on
+  the GitHub URL):
+** `crystal-pdf` → `pdf`
+** `crystal-flags` → `flags`
+** `crystal-emojis` → `emojis`
+** `crystal-noto-cjk` → `noto-cjk`
+* `shard.yml` dependency keys, internal `require` paths, and
+  documentation URLs updated. No behavioural change.
+* The crystal-asciidoctor-pdf shard itself is a Ruby-gem port and
+  *keeps* its `crystal-` prefix per the naming convention.
+
 == v2.3.24.14 — 2026-04-26
 
 **CJK glyph rendering** via the new
-https://github.com/aloli-crystal/crystal-noto-cjk[crystal-noto-cjk]
+https://github.com/aloli-crystal/noto-cjk[noto-cjk]
 shard. When the user has populated the CJK cache (via
 `crystal-noto-cjk pull` or `CrystalNotoCJK::Cache.pull`), the
 converter automatically detects CJK characters in text runs,
@@ -43,8 +59,8 @@ have been substituted by `?`.
   a multi-line message is printed to STDERR with the count, a
   sample of substituted characters, and the exact commands to
   run to get full coverage (`crystal-emojis pull`, plus a note
-  about future `crystal-noto-cjk` for CJK).
-* Dependency renamed `crystal-emojis-lite` → `crystal-emojis`
+  about future `noto-cjk` for CJK).
+* Dependency renamed `crystal-emojis-lite` → `emojis`
   (~> 0.2). Same module name `CrystalEmojis`, same API surface,
   plus the new `Cache` module that lets the host application
   populate the on-disk cache programmatically.
@@ -67,7 +83,7 @@ method, falling back to the static WinAnsi table only for Type1
 fonts (rare — only when DejaVu is intentionally disabled in the
 theme).
 
-* Bump dep `crystal-pdf` to `~> 0.3.5`.
+* Bump dep `pdf` to `~> 0.3.5`.
 * `Converter#safe_text(text, font_name = @fn_body)` now takes
   the font name and routes per-character coverage through the
   TrueType `has_glyph?` query.
@@ -95,7 +111,7 @@ dependency tree.
   splits a string into alternating `:text` and `:emoji` segments,
   letting `draw_text_run` route each kind to the right pipeline
   (text → `page.text` + WinAnsi sanitize ; emoji → `page.svg`
-  with the same sizing as country flags from `crystal-flags`).
+  with the same sizing as country flags from `flags`).
 * Updated regression test for the silent-tofu bug : ✅ and ❌
   no longer end up as `?` in the WinAnsi text stream ; CJK
   characters and emojis outside the lite set still do.
@@ -126,9 +142,9 @@ The fix :
   text is left untouched. **93 tests total, all green.**
 
 This is a conservative fix that removes the silent failure mode.
-The next step (planned as a separate shard) is `crystal-emojis`,
+The next step (planned as a separate shard) is `emojis`,
 which will render real **coloured emojis** as embedded SVG glyphs
-(same pattern as `crystal-flags` for country flags).
+(same pattern as `flags` for country flags).
 
 == v2.3.24.9 — 2026-04-25
 
@@ -270,7 +286,7 @@ Broader flag rendering plus a handful of white-space glyph fixes.
   U+00A0 are now normalised to an ordinary space (the non-break
   property is lost, which is an acceptable trade-off given Type1
   standard fonts don't always expose a drawable NBSP glyph).
-* **Dependency bump**: `crystal-pdf` → uses v0.3.3 via `~> 0.3`,
+* **Dependency bump**: `pdf` → uses v0.3.3 via `~> 0.3`,
   which adds a document-scoped cache of `SVG::Parser` instances so
   repeated flags on the same document are parsed only once.
 
@@ -278,7 +294,7 @@ Broader flag rendering plus a handful of white-space glyph fixes.
 
 Real country flags in table cells, via a new SVG rendering pipeline.
 
-* **New dependency** `crystal-flags` (~> 0.1) — 271 ISO 3166-1 alpha-2
+* **New dependency** `flags` (~> 0.1) — 271 ISO 3166-1 alpha-2
   SVG flags from lipis/flag-icons embedded at compile time.
 * **Inline flag rendering in table cells**: pairs of Unicode regional
   indicator characters (e.g. `🇫🇷`, `🇩🇪`) are detected in cell text
@@ -290,7 +306,7 @@ Real country flags in table cells, via a new SVG rendering pipeline.
   fixed width derived from the font size, so columns reserve the
   correct amount of space instead of counting the `.notdef` width
   from the text font.
-* **Dependency bump**: `crystal-pdf` → `~> 0.3` (uses the path-parser
+* **Dependency bump**: `pdf` → `~> 0.3` (uses the path-parser
   loop fix and the closed-shape fill fix shipped in crystal-pdf
   v0.3.1 and v0.3.2).
 * New helper module `AsciidoctorPDF::InlineFlags` with `segments`,

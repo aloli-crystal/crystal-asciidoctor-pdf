@@ -1,9 +1,9 @@
 name: crystal-asciidoctor-pdf
-version: 2.3.24.14
+version: 2.3.24.15
 
 description: |
   AsciiDoc to PDF converter for Crystal, equivalent of the asciidoctor-pdf Ruby gem.
-  Depends on crystal-asciidoctor (parser/AST) and crystal-pdf (PDF engine).
+  Depends on crystal-asciidoctor (parser/AST) and pdf (PDF engine).
   Ported from Ruby asciidoctor-pdf 2.3.24 (2025-11-15).
   Synchronized with Ruby asciidoctor 2.0.26 (parser) via crystal-asciidoctor dependency.
 
@@ -15,26 +15,26 @@ license: MIT
 # Pour le développement local, remplacer par :
 #   crystal-asciidoctor:
 #     path: ../crystal-asciidoctor
-#   crystal-pdf:
-#     path: ../crystal-pdf
+#   pdf:
+#     path: ../pdf
 dependencies:
   crystal-asciidoctor:
     github: aloli-crystal/crystal-asciidoctor
     version: "~> 2.0"
-  crystal-pdf:
-    github: aloli-crystal/crystal-pdf
+  pdf:
+    github: aloli-crystal/pdf
     version: "~> 0.3"
   crystal-rouge:
     github: aloli-crystal/crystal-rouge
     version: "~> 4.7"
-  crystal-flags:
-    github: aloli-crystal/crystal-flags
+  flags:
+    github: aloli-crystal/flags
     version: "~> 0.1"
-  crystal-emojis:
-    github: aloli-crystal/crystal-emojis
+  emojis:
+    github: aloli-crystal/emojis
     version: "~> 0.2"
-  crystal-noto-cjk:
-    github: aloli-crystal/crystal-noto-cjk
+  noto-cjk:
+    github: aloli-crystal/noto-cjk
     version: "~> 0.1"
 
 development_dependencies:

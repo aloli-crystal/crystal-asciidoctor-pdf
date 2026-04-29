@@ -1,4 +1,4 @@
-require "crystal-flags/src/crystal_flags"
+require "flags/src/crystal_flags"
 
 module AsciidoctorPDF
   # Inline flag handling for PDF rendering.

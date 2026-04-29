@@ -1,6 +1,6 @@
 = crystal-asciidoctor-pdf
 
-Un convertisseur AsciiDoc vers PDF pour Crystal, basé sur `crystal-asciidoctor` pour le parsing et `crystal-pdf` pour la génération du PDF.
+Un convertisseur AsciiDoc vers PDF pour Crystal, basé sur `crystal-asciidoctor` pour le parsing et `pdf` pour la génération du PDF.
 
 == Versions
 
@@ -184,14 +184,14 @@ Pour contribuer, clonez les trois dépôts au même niveau :
 [source,bash]
 ----
 git clone https://github.com/aloli-crystal/crystal-asciidoctor.git
-git clone https://github.com/aloli-crystal/crystal-pdf.git
+git clone https://github.com/aloli-crystal/pdf.git
 git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
 cd crystal-asciidoctor-pdf
 shards install
 crystal spec
 ----
 
-Les dépendances locales (`path: ../crystal-asciidoctor` et `path: ../crystal-pdf`) sont utilisées pour le développement.
+Les dépendances locales (`path: ../crystal-asciidoctor` et `path: ../pdf`) sont utilisées pour le développement.
 
 == Contribuer
 

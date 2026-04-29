@@ -1,8 +1,8 @@
 require "crystal-asciidoctor/src/crystal-asciidoctor"
-require "crystal-pdf/src/pdf"
-require "crystal-flags/src/crystal_flags"
-require "crystal-emojis/src/crystal_emojis"
-require "crystal-noto-cjk/src/crystal_noto_cjk"
+require "pdf/src/pdf"
+require "flags/src/crystal_flags"
+require "emojis/src/crystal_emojis"
+require "noto-cjk/src/crystal_noto_cjk"
 require "./inline_flags"
 
 module AsciidoctorPDF

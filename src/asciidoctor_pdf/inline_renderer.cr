@@ -1,5 +1,5 @@
-require "crystal-pdf/src/pdf"
-require "crystal-flags/src/crystal_flags"
+require "pdf/src/pdf"
+require "flags/src/crystal_flags"
 require "./inline_flags"
 
 module AsciidoctorPDF
