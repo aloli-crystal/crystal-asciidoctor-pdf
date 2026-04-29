@@ -12,8 +12,11 @@ module AsciidoctorPDF
   class Converter < Asciidoctor::Converter::Base
     register_for "pdf"
 
-    # Métadonnées de page pour les en-têtes/pieds de page
-    record PageMeta, number : Int32, section_title : String
+    # Métadonnées de page pour les en-têtes/pieds de page.
+    # `chrome = false` désactive header / footer / footnotes sur la
+    # page (utilisé pour la page de garde, qu'on veut typographiquement
+    # « nue »).
+    record PageMeta, number : Int32, section_title : String, chrome : Bool = true
 
     # Entrée d'index
     record IndexEntry, term : String, page_number : Int32
@@ -1338,7 +1341,9 @@ module AsciidoctorPDF
     # =========================================================================
 
     private def render_title_page(doc : Asciidoctor::Document) : Nil
-      new_page
+      # Page de garde sans header / footer / footnotes (convention
+      # typographique : la page de titre est « nue »).
+      new_page(chrome: false)
       page = @current_page.not_nil!
       center_x = @page_width / 2
 
@@ -1396,6 +1401,10 @@ module AsciidoctorPDF
       return unless @theme.header_enabled || @theme.footer_enabled
 
       @page_metas.each do |meta|
+        # Pages marquées sans chrome (page de garde) : ni header,
+        # ni footer, ni footnotes — typographie « nue ».
+        next unless meta.chrome
+
         page_idx = meta.number - 1
         next if page_idx < 0 || page_idx >= @doc.pages.size
         page = @doc.pages[page_idx]
@@ -1469,13 +1478,13 @@ module AsciidoctorPDF
     # Gestion des pages
     # =========================================================================
 
-    private def new_page : Nil
+    private def new_page(chrome : Bool = true) : Nil
       @page_number += 1
       @current_page = @doc.page(@page_width, @page_height) do |p|
         # Le bloc est requis, mais le contenu est ajouté de manière séquentielle.
       end
       @current_y = @page_height - @margin
-      @page_metas << PageMeta.new(@page_number, @current_section_title)
+      @page_metas << PageMeta.new(@page_number, @current_section_title, chrome)
     end
 
     private def ensure_page : Nil
