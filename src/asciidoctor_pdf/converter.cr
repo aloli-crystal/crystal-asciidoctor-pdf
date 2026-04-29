@@ -2333,9 +2333,10 @@ module AsciidoctorPDF
       set_font(page, @fn_body, font_size)
       page.fill_color(@theme.footer_font_color)
 
-      left = resolve_page_vars(@theme.footer_left, meta)
-      center = resolve_page_vars(@theme.footer_center, meta)
-      right = resolve_page_vars(@theme.footer_right, meta)
+      l, c, r = footer_templates_for(meta)
+      left = resolve_page_vars(l, meta)
+      center = resolve_page_vars(c, meta)
+      right = resolve_page_vars(r, meta)
 
       page.text(left, at: {@margin, y + font_size}) unless left.empty?
       page.text(center, at: {@page_width / 2 - 20.0, y + font_size}) unless center.empty?
@@ -2354,13 +2355,44 @@ module AsciidoctorPDF
       set_font(page, @fn_body, font_size)
       page.fill_color(@theme.header_font_color)
 
-      left = resolve_page_vars(@theme.header_left, meta)
-      center = resolve_page_vars(@theme.header_center, meta)
-      right = resolve_page_vars(@theme.header_right, meta)
+      l, c, r = header_templates_for(meta)
+      left = resolve_page_vars(l, meta)
+      center = resolve_page_vars(c, meta)
+      right = resolve_page_vars(r, meta)
 
       page.text(left, at: {@margin, y - font_size}) unless left.empty?
       page.text(center, at: {@page_width / 2 - 20.0, y + font_size}) unless center.empty?
       page.text(right, at: {@margin + @content_width - 20.0, y - font_size}) unless right.empty?
+    end
+
+    # Choisit les trois zones (left, center, right) du header pour
+    # une page donnée, en appliquant l'override recto/verso si
+    # défini dans le thème (chaîne non vide). La parité s'évalue sur
+    # le numéro PDF (1-based) — page 1 = recto, page 2 = verso, etc.
+    # Cohérent avec la convention typographique d'imprimerie où
+    # une feuille se plie avec le recto à droite.
+    private def header_templates_for(meta : PageMeta) : {String, String, String}
+      recto = meta.number.odd?
+      l = recto ? @theme.header_recto_left : @theme.header_verso_left
+      c = recto ? @theme.header_recto_center : @theme.header_verso_center
+      r = recto ? @theme.header_recto_right : @theme.header_verso_right
+      {
+        l.empty? ? @theme.header_left : l,
+        c.empty? ? @theme.header_center : c,
+        r.empty? ? @theme.header_right : r,
+      }
+    end
+
+    private def footer_templates_for(meta : PageMeta) : {String, String, String}
+      recto = meta.number.odd?
+      l = recto ? @theme.footer_recto_left : @theme.footer_verso_left
+      c = recto ? @theme.footer_recto_center : @theme.footer_verso_center
+      r = recto ? @theme.footer_recto_right : @theme.footer_verso_right
+      {
+        l.empty? ? @theme.footer_left : l,
+        c.empty? ? @theme.footer_center : c,
+        r.empty? ? @theme.footer_right : r,
+      }
     end
 
     private def resolve_page_vars(template : String, meta : PageMeta) : String

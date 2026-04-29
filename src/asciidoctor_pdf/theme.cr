@@ -199,6 +199,16 @@ module AsciidoctorPDF
     property toc_dot_leader_color : String = "aaaaaa"
 
     # --- En-têtes et pieds de page ---
+    # Convention recto-verso (parité Ruby asciidoctor-pdf) :
+    #   * `header_left` / `header_center` / `header_right`
+    #     sont les défauts, appliqués à toutes les pages.
+    #   * `header_recto_*` surchargent sur les pages impaires (recto)
+    #     si non vide (chaîne vide → fallback sur le défaut neutre).
+    #   * `header_verso_*` surchargent sur les pages paires (verso)
+    #     si non vide.
+    # Idem pour le pied de page. Activé via le thème uniquement —
+    # n'a d'intérêt que pour les documents destinés à l'impression
+    # double-face (livres, rapports formels).
     property header_enabled : Bool = false
     property header_height : Float64 = 20.0
     property header_border_width : Float64 = 0.5
@@ -208,6 +218,13 @@ module AsciidoctorPDF
     property header_left : String = ""
     property header_center : String = ""
     property header_right : String = "{page_number}"
+    # Recto-verso optionnels (vide ⇒ on garde le défaut neutre)
+    property header_recto_left : String = ""
+    property header_recto_center : String = ""
+    property header_recto_right : String = ""
+    property header_verso_left : String = ""
+    property header_verso_center : String = ""
+    property header_verso_right : String = ""
 
     property footer_enabled : Bool = true
     property footer_height : Float64 = 20.0
@@ -218,6 +235,12 @@ module AsciidoctorPDF
     property footer_left : String = "{document_title}"
     property footer_center : String = ""
     property footer_right : String = "{page_number}"
+    property footer_recto_left : String = ""
+    property footer_recto_center : String = ""
+    property footer_recto_right : String = ""
+    property footer_verso_left : String = ""
+    property footer_verso_center : String = ""
+    property footer_verso_right : String = ""
 
     # --- Couleurs de syntax highlighting ---
     property code_highlight_enabled : Bool = true

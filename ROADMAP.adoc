@@ -5,7 +5,8 @@ Suivi des écarts entre `crystal-asciidoctor-pdf` (portage Crystal) et la
 gem Ruby `asciidoctor-pdf` 2.3.24 (référence). Issu de l'audit du
 2026-04-29 + retours utilisateur.
 
-Mise à jour : 2026-04-29 (post v2.3.24.27).
+Mise à jour : 2026-04-29 (post v2.3.24.33). Six items fermés en un
+sprint après la première publication du ROADMAP.
 
 == Légende
 
@@ -188,23 +189,27 @@ Moins critiques mais utiles pour le rendu de docs réels.
 | Pas de range « 12-15 » groupé.
 |===
 
-== Roadmap proposée (ordre de bataille)
+== Items fermés (sprint v2.3.24.28 → v2.3.24.33)
 
-L'ordre privilégie l'**impact pour les cas d'usage Aloli** (quiz,
-fiches QUIMEO, futurs rapports d'audit ISO 27001).
+. ✅ **v2.3.24.28** — Bug inline markup dans admonitions / x-score
+    (gras, italique, mono).
+. ✅ **v2.3.24.29** — Inline quoted étendu (sub, sup, kbd, btn,
+    menu, mark) avec rendu typographique propre (encadrés kbd, fond
+    mark, sub/sup décalés).
+. ✅ **v2.3.24.30** — Inline image / icônes : `image:logo.png[]`,
+    SVG raster routés vers `page.svg` / `page.image`.
+    Limitation : pas de bibliothèque d'icônes intégrée pour
+    `icon:warning[]` (fallback texte).
+. ✅ **v2.3.24.31** — Encadrement visuel sidebar / example (fond,
+    bordure, titre).
+. ✅ **v2.3.24.32** — `heading_chapter_break_before` (saut auto
+    avant H1) + `:pdf-front-matter-numbering: roman` (i, ii, … pour
+    front-matter, 1, 2, … pour le contenu).
+. ✅ **v2.3.24.33** — Header / footer recto-verso : six nouvelles
+    propriétés `header_recto_*` / `header_verso_*` qui surchargent
+    les défauts pour les pages impaires / paires (cible ISO 27001
+    et tout document destiné à l'impression double-face).
 
-. **v2.3.24.28** — Bug : inline markup dans admonitions / x-score
-    (gras, italique, mono). Effort S. Bénéfice immédiat sur les
-    quiz existants.
-. **v2.3.24.29** — Inline quoted étendu (sub, sup, kbd, btn, menu,
-    mark). Effort M. Couvre une grosse partie du markup technique.
-. **v2.3.24.30** — Inline image / icônes. Effort M. Pour les
-    badges, icônes de criticité, logos inline.
-. **v2.3.24.31** — Encadrement visuel sidebar / example / open
-    (fond, bordure, titre). Effort S-M.
-. **v2.3.24.32** — Heading chapter break + numérotation romaine.
-    Effort S+S. Essentiel pour les rapports formels.
-. **v2.3.24.33** — Header / footer recto-verso + section_info.
-    Effort M. Cible ISO 27001.
-
-Au-delà : tableaux complexes, callouts, métadonnées étendues, etc.
+Au-delà : tableaux complexes (colspan/rowspan), callouts dans
+listings, métadonnées PDF étendues (keywords, creator), audio/video,
+optimizer Ghostscript, abstract block, …
