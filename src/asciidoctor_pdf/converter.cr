@@ -550,8 +550,13 @@ module AsciidoctorPDF
 
       ensure_page
       name = node.attr("name") || "note"
-      text = node.content || ""
-      text = strip_inline_markup(text)
+      # `node.content` retourne le HTML inline déjà substitué par
+      # crystal-asciidoctor (`<strong>`, `<em>`, `<code>`, …) qu'on
+      # parse ici en segments stylisés via `InlineRenderer.parse`.
+      # L'ancien comportement (`strip_inline_markup`) effaçait *gras*,
+      # _italique_, `mono` — bug confirmé sur les fiches de quiz.
+      raw = node.content
+      html = raw.is_a?(Array) ? raw.join("\n") : raw.to_s
 
       border_color = case name.downcase
                      when "tip"       then @theme.admonition_tip_color
@@ -580,7 +585,9 @@ module AsciidoctorPDF
       label_space = [60.0, label_offset + text_width(label_text, @fn_body_bold, label_size) + label_gap].max
       content_w = @content_width - label_space - padding
 
-      lines = wrap_text(text, content_w, font_size)
+      segments = InlineRenderer.parse(html)
+      lines = wrap_segments(segments, content_w, font_size)
+      lines = [[] of InlineSegment] if lines.empty?
       block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
       total_h = block_h + @theme.admonition_margin_top + @theme.admonition_margin_bottom
 
@@ -599,13 +606,10 @@ module AsciidoctorPDF
       page.fill_color(border_color)
       page.text(label_text, at: {@margin + label_offset, @current_y - padding - font_size})
 
-      # Texte de l'admonition
-      set_font(page, @fn_body, font_size)
-      page.fill_color(@theme.base_font_color)
-
+      # Texte de l'admonition (segments inline avec leur typographie)
       y = @current_y - padding - font_size
       lines.each do |line|
-        draw_text_run(page, line, @margin + label_space, y, @fn_body, font_size)
+        render_segment_line(page, line, @margin + label_space, y, font_size)
         y -= line_h
       end
 
@@ -677,14 +681,15 @@ module AsciidoctorPDF
 
       label_text, color = x_score_label_and_color(level)
 
-      # On extrait le texte des sous-blocs comme `convert_admonition`.
-      text_parts = [] of String
+      # Concaténer le HTML inline des sous-blocs et le parser en
+      # segments stylisés (cf. convert_admonition pour le rationale).
+      html_parts = [] of String
       node.blocks.each do |b|
         raw = b.responds_to?(:content) ? b.content : nil
         chunk = raw.is_a?(Array) ? raw.join("\n") : (raw || "")
-        text_parts << strip_inline_markup(chunk) unless chunk.empty?
+        html_parts << chunk.to_s unless chunk.to_s.empty?
       end
-      text = text_parts.join("\n\n")
+      html = html_parts.join("\n\n")
 
       font_size = @theme.base_font_size
       line_h = font_size * @theme.base_line_height
@@ -695,7 +700,9 @@ module AsciidoctorPDF
       label_space = [60.0, label_offset + text_width(label_text, @fn_body_bold, label_size) + label_gap].max
       content_w = @content_width - label_space - padding
 
-      lines = wrap_text(text, content_w, font_size)
+      segments = InlineRenderer.parse(html)
+      lines = wrap_segments(segments, content_w, font_size)
+      lines = [[] of InlineSegment] if lines.empty?
       block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
       total_h = block_h + @theme.admonition_margin_top + @theme.admonition_margin_bottom
 
@@ -714,12 +721,10 @@ module AsciidoctorPDF
       page.fill_color(color)
       page.text(label_text, at: {@margin + label_offset, @current_y - padding - font_size})
 
-      # Texte
-      set_font(page, @fn_body, font_size)
-      page.fill_color(@theme.base_font_color)
+      # Texte (segments inline avec leur typographie)
       y = @current_y - padding - font_size
       lines.each do |line|
-        draw_text_run(page, line, @margin + label_space, y, @fn_body, font_size)
+        render_segment_line(page, line, @margin + label_space, y, font_size)
         y -= line_h
       end
 
@@ -2249,6 +2254,53 @@ module AsciidoctorPDF
         render_segment_line(page, current_line_segs, x, @current_y - font_size, font_size)
         @current_y -= line_h
       end
+    end
+
+    # Découpe un flux de segments inline en lignes selon une largeur
+    # donnée. Préserve les attributs de style (gras, italique, mono,
+    # couleur, lien) — ce que `wrap_text` ne sait pas faire car il
+    # travaille sur du texte brut.
+    private def wrap_segments(
+      segments : Array(InlineSegment),
+      width : Float64,
+      font_size : Float64,
+    ) : Array(Array(InlineSegment))
+      lines = [] of Array(InlineSegment)
+      current_line = [] of InlineSegment
+      current_width = 0.0
+
+      segments.each do |seg|
+        font_name = resolve_inline_font(seg)
+        font = get_font(font_name)
+        space_w = font.string_width(" ", font_size)
+
+        words = seg.text.split(" ")
+        words.each_with_index do |word, idx|
+          word_w = font.string_width(word, font_size)
+          sep_w = (idx > 0 || !current_line.empty?) ? space_w : 0.0
+
+          if current_width + sep_w + word_w > width && !current_line.empty?
+            lines << current_line
+            current_line = [] of InlineSegment
+            current_width = 0.0
+            sep_w = 0.0
+          end
+
+          prefix = sep_w > 0 ? " " : ""
+          current_line << InlineSegment.new(
+            text: prefix + word,
+            bold: seg.bold,
+            italic: seg.italic,
+            mono: seg.mono,
+            color: seg.color,
+            link: seg.link
+          )
+          current_width += sep_w + word_w
+        end
+      end
+
+      lines << current_line unless current_line.empty?
+      lines
     end
 
     # Rend une ligne de segments inline sur la page PDF.
