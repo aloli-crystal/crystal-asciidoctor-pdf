@@ -84,14 +84,104 @@ Trois leviers contrôlent ce comportement :
   le thème la désactive. Standard AsciiDoc.
 
 * `:title-page: false` (attribut document) — désactive la page de garde.
-  Le doctitle est alors rendu comme un H1 en haut de la première page de
-  contenu, suivi d'une manchette « auteur · date » en gris, d'un séparateur,
+  Le doctitle est alors rendu comme un grand titre (28 pt) en haut de la
+  première page de contenu, précédé du logo `:title-logo-image:` s'il est
+  défini, suivi d'une manchette « auteur · date » en gris, d'un séparateur,
   puis du préambule. Équivalent fonctionnel du standard `:!title-page:`
   (qui n'est pas détectable côté crystal-asciidoctor — la négation ne laisse
   pas de trace lisible via `attr?` / `attr`).
 
 * `theme.title_page_enabled: false` (thème YAML) — défaut sans page de garde,
   les attributs document peuvent toujours réactiver pour un doc précis.
+
+==== Logo de garde — `:title-logo-image:`
+
+Standard AsciiDoc / Ruby asciidoctor-pdf 2.3 :
+
+[source,asciidoc]
+----
+:title-logo-image: image::path/to/logo.svg[align=center, pdfwidth=200]
+----
+
+Format accepté à l'identique :
+
+* `image::PATH[OPTS]` (forme canonique) — `OPTS` sépare par virgules :
+  `align=left|center|right`, `pdfwidth=<points>`, `width=<points>` (alias),
+  `alt=...` (descriptif positionnel).
+* `PATH` nu (sans `image::` ni `[]`) — défauts : centré, 200 pt de large.
+
+Le SVG comme le bitmap (PNG/JPEG) sont supportés. Pour un SVG, le shard
+parse le viewBox pour préserver le ratio.
+
+CAUTION : ne pas insérer une macro `image::PATH[]` *au-dessus* de la ligne
+`= Doctitle`. Cela démote le doctitle en section niveau 0 (« part » dans
+la terminologie AsciiDoc) — le titre apparaît alors typographié en taille
+de heading, pas en taille de couverture, et les attributs `:title-*:`
+ne s'appliquent plus correctement. Toujours utiliser `:title-logo-image:`
+pour le logo de garde / d'entête.
+
+=== Recettes — modèles de documents
+
+==== Quiz / fiche courte avec page de garde compacte (logo + titre + sommaire)
+
+Une seule page de garde qui combine logo, titre, sommaire intégré, auteur, date.
+Idéal pour les quiz et les fiches courtes (1-2 pages de contenu).
+
+[source,asciidoc]
+----
+= Quizz : Charte du télétravail
+:author: Philippe Nénert
+:revdate: 29 avril 2026
+:toc:
+:title-logo-image: image::assets/logo.svg[align=center, pdfwidth=150]
+:x-title-page-toc:
+
+Préambule du quiz.
+
+== Question 1 — Sur quelles valeurs ?
+
+* A. …
+----
+
+==== Document court sans page de garde — bandeau d'entête
+
+Pas de page de garde dédiée. Le doctitle, le logo et la manchette auteur/date
+forment un bandeau d'entête sur la page 1, suivi directement du contenu.
+
+[source,asciidoc]
+----
+= Quizz : Charte du télétravail
+:author: Philippe Nénert
+:revdate: 29 avril 2026
+:title-page: false
+:title-logo-image: image::assets/logo.svg[align=center, pdfwidth=150]
+
+== Identité
+
+Contenu de la section…
+----
+
+==== Document long avec page de garde + TOC séparée (défaut)
+
+Comportement par défaut. La page 1 est la page de garde (titre centré-bas,
+auteur, date), la page 2 est la table des matières, le contenu démarre
+page 3.
+
+[source,asciidoc]
+----
+= Manuel de procédures ISO 27001
+:author: ALOLI sas
+:revdate: 29 avril 2026
+:toc:
+
+== Introduction
+
+…
+----
+
+==== Garder un groupe d'éléments soudés à la pagination
+
+Voir <<unbreakable, `[%unbreakable]`>>.
 
 === Garder un groupe d'éléments ensemble — `[%unbreakable]`
 
