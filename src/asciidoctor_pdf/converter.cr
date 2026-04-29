@@ -1495,6 +1495,16 @@ module AsciidoctorPDF
         return render_x_score_block(node, level)
       end
 
+      # Extension : rôle `[.x-box]` sur un open block le transforme en
+      # panneau encadré avec fond, bordure et titre optionnel — sans
+      # passer par la sémantique « sidebar » ou « example », plus
+      # libre côté AsciiDoc. Pratique pour des encadrés visuels qu'on
+      # veut faire sans détourner les blocs sémantiques existants.
+      if node.has_role?("x-box")
+        render_panel(node, :sidebar)
+        return ""
+      end
+
       # Option `[%unbreakable]` : on essaie de garder tout le bloc sur
       # une même page. Estimation grossière de la hauteur cumulée
       # (paragraphes + tableaux + listes + listings + admonitions).
