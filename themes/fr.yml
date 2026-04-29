@@ -32,3 +32,13 @@ toc_title: "Table des matières"
 
 # --- Index ---
 index_title: "Index"
+
+# --- Blocs de score (extension `x-score-*`) ---
+# Les identifiants des niveaux restent en français côté source AsciiDoc
+# (`[.x-score-tres-bien]`, etc.) — ce qui est documenté côté API.
+# Ici on traduit uniquement les LIBELLÉS rendus dans la bande colorée.
+x_score_excellent_label: "EXCELLENT"
+x_score_tres_bien_label: "TRÈS BIEN"
+x_score_bien_label: "BIEN"
+x_score_insuffisant_label: "INSUFFISANT"
+x_score_a_revoir_label: "À REVOIR"

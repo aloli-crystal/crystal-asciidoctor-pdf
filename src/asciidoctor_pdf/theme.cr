@@ -115,16 +115,22 @@ module AsciidoctorPDF
     # Activés via le rôle AsciiDoc `[.x-score-<niveau>]` sur un bloc
     # delimited (`====` example ou `--` open). Couleurs/libellés
     # personnalisables ci-dessous.
+    #
+    # Les **identifiants** des niveaux (`excellent`, `tres-bien`, `bien`,
+    # `insuffisant`, `a-revoir`) sont en français — ils sont gravés dans
+    # la syntaxe AsciiDoc côté utilisateur. Les **libellés** par défaut
+    # sont en anglais, parité avec le reste du thème (NOTE, TIP, …) ;
+    # le thème embarqué `fr` les surcharge en français.
     property x_score_excellent_color : String = "2e7d32"
     property x_score_excellent_label : String = "EXCELLENT"
     property x_score_tres_bien_color : String = "66bb6a"
-    property x_score_tres_bien_label : String = "TRÈS BIEN"
+    property x_score_tres_bien_label : String = "VERY GOOD"
     property x_score_bien_color : String = "fbc02d"
-    property x_score_bien_label : String = "BIEN"
+    property x_score_bien_label : String = "GOOD"
     property x_score_insuffisant_color : String = "ff9800"
-    property x_score_insuffisant_label : String = "INSUFFISANT"
+    property x_score_insuffisant_label : String = "INSUFFICIENT"
     property x_score_a_revoir_color : String = "d32f2f"
-    property x_score_a_revoir_label : String = "À REVOIR"
+    property x_score_a_revoir_label : String = "NEEDS REVIEW"
 
     # --- Tableaux ---
     property table_border_color : String = "dddddd"
