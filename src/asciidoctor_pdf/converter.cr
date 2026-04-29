@@ -32,7 +32,7 @@ module AsciidoctorPDF
     @font_mono : PDF::Fonts::Base?
     @font_mono_bold : PDF::Fonts::Base?
     @font_heading : PDF::Fonts::Base?
-    # Police CJK chargée au boot si crystal-noto-cjk a une variante
+    # Police CJK chargée au boot si noto-cjk a une variante
     # en cache. `draw_text_run` bascule la police courante sur cette
     # variante pour les segments contenant des codepoints CJK, puis
     # remet la police principale pour le reste — même pattern que
@@ -1604,7 +1604,7 @@ module AsciidoctorPDF
         page.fill_color(seg.color || @theme.base_font_color)
 
         # Route through the same pipeline as `draw_text_run` so
-        # emojis are rendered as colour SVG (via crystal-emojis)
+        # emojis are rendered as colour SVG (via emojis)
         # and unrenderable characters are substituted with `?` plus
         # a deduplicated warning. Width consumed by the run is
         # captured by tracking `current_x` before/after.
@@ -1712,12 +1712,12 @@ module AsciidoctorPDF
       end
 
       # Police CJK optionnelle. Si l'utilisateur a peuplé le cache
-      # crystal-noto-cjk (via `crystal-noto-cjk pull` ou
-      # `CrystalNotoCJK::Cache.pull`), on charge la première
+      # noto-cjk (via `noto-cjk pull` ou
+      # `NotoCjk::Cache.pull`), on charge la première
       # variante installée et on l'utilise automatiquement pour les
       # codepoints CJK que DejaVu ne couvre pas. Sans ça, les CJK
       # tombent sur le fallback `?` + warning du sanitize WinAnsi.
-      if (cjk_path = CrystalNotoCJK.font_path) && File.exists?(cjk_path)
+      if (cjk_path = NotoCjk.font_path) && File.exists?(cjk_path)
         ttf = @doc.load_font(cjk_path)
         @font_cjk = ttf
         @fn_cjk = ttf.name
@@ -1755,7 +1755,7 @@ module AsciidoctorPDF
     # Mesure la largeur d'un texte en points en utilisant les métriques
     # exactes des polices (Type1 ou TrueType). Les drapeaux emoji
     # (paires de regional indicators, rendus comme SVG via
-    # crystal-flags) comptent pour une largeur fixe dérivée de la
+    # flags) comptent pour une largeur fixe dérivée de la
     # taille de police, pas comme les glyphes `.notdef` de la police
     # texte.
     private def text_width(text : String, font_name : String, font_size : Float64) : Float64
@@ -1865,25 +1865,25 @@ module AsciidoctorPDF
       STDERR.puts "Échantillon : #{sample}"
       STDERR.puts ""
       STDERR.puts "Pour rendre les emojis en couleur, peuplez le cache local :"
-      STDERR.puts "  crystal-emojis pull"
+      STDERR.puts "  emojis pull"
       STDERR.puts ""
       STDERR.puts "Cela téléchargera l'ensemble des SVG Twemoji (~4000, ~18 Mo)"
       STDERR.puts "depuis https://github.com/jdecked/twemoji vers"
-      STDERR.puts "  #{CrystalEmojis::Cache.dir}"
+      STDERR.puts "  #{Emojis::Cache.dir}"
       STDERR.puts ""
       STDERR.puts "Pour les caractères CJK (idéogrammes chinois, japonais,"
-      STDERR.puts "coréens), peuplez le cache crystal-noto-cjk :"
-      STDERR.puts "  crystal-noto-cjk pull               # défaut : Chinois Simplifié"
-      STDERR.puts "  crystal-noto-cjk pull --variant jp  # Japonais"
-      STDERR.puts "  crystal-noto-cjk pull --variant all # les 4 variantes"
+      STDERR.puts "coréens), peuplez le cache noto-cjk :"
+      STDERR.puts "  noto-cjk pull               # défaut : Chinois Simplifié"
+      STDERR.puts "  noto-cjk pull --variant jp  # Japonais"
+      STDERR.puts "  noto-cjk pull --variant all # les 4 variantes"
       STDERR.puts ""
-      STDERR.puts "Cache CJK actuel : #{CrystalNotoCJK::Cache.dir}"
-      STDERR.puts "Variantes installées : #{CrystalNotoCJK::Cache.installed.empty? ? "(aucune)" : CrystalNotoCJK::Cache.installed.map(&.to_s).join(", ")}"
+      STDERR.puts "Cache CJK actuel : #{NotoCjk::Cache.dir}"
+      STDERR.puts "Variantes installées : #{NotoCjk::Cache.installed.empty? ? "(aucune)" : NotoCjk::Cache.installed.map(&.to_s).join(", ")}"
       STDERR.puts "──────────────────────────────────────────────────────────────"
     end
 
     # Dessine `text` à la position `(x, y)` sur `page`. Les drapeaux
-    # emoji sont rendus comme SVG (via `crystal-flags`) au lieu du
+    # emoji sont rendus comme SVG (via `flags`) au lieu du
     # tofu produit par une police texte standard qui n'a pas de
     # glyphes pour ces codepoints. Le curseur X avance de la largeur
     # exacte de chaque segment (texte ou drapeau) pour que les runs
@@ -1896,7 +1896,7 @@ module AsciidoctorPDF
 
       InlineFlags.segments(text).each do |(kind, value)|
         if kind == :flag
-          if (svg_data = CrystalFlags.svg(value))
+          if (svg_data = Flags.svg(value))
             # `page.svg(at: {x, y})` treats `y` as the top of the SVG
             # bounding box (the renderer flips y internally). To align
             # the flag with the text's x-height, position the top of
@@ -1917,7 +1917,7 @@ module AsciidoctorPDF
           # polices qui n'ont pas de glyphe NBSP.
           softened = value.gsub('\u00A0', ' ')
           # Coupe la chaîne autour de chaque emoji connu de
-          # crystal-emojis-lite : le texte plain est rendu via
+          # emojis-lite : le texte plain est rendu via
           # `page.text` (avec sanitize WinAnsi pour les caractères
           # restant hors plage), les emojis comme glyphes SVG
           # alignés sur la baseline (mêmes dimensions qu un
@@ -1927,7 +1927,7 @@ module AsciidoctorPDF
           text_with_emoji_segments(softened).each do |(kind2, value2)|
             case kind2
             when :emoji
-              if (svg_data = CrystalEmojis.svg(value2[0]))
+              if (svg_data = Emojis.svg(value2[0]))
                 page.svg(svg_data, at: {cursor, y + emoji_h}, width: emoji_w, height: emoji_h)
                 cursor += emoji_w
               else
@@ -1962,14 +1962,14 @@ module AsciidoctorPDF
     # Les mots qui dépassent seuls la largeur disponible (par exemple un
     # nom propre long dans une colonne étroite) sont découpés caractère
     # Découpe `text` en alternance de segments :text et :emoji selon
-    # ce que `crystal-emojis` et la police CJK optionnelle
+    # ce que `emojis` et la police CJK optionnelle
     # reconnaissent. Trois familles de segments :
     #
     #   * `{:text,  "..."}` — texte rendable par la police principale
     #   * `{:emoji, "X"}`   — un emoji rendu en SVG (page.svg)
     #   * `{:cjk,   "..."}` — un run de caractères CJK rendu avec la
     #                         police @font_cjk (uniquement quand
-    #                         crystal-noto-cjk a une variante en cache)
+    #                         noto-cjk a une variante en cache)
     #
     # Sans police CJK chargée, les caractères CJK retombent dans
     # `:text` et seront substitués par `?` au sanitize.
@@ -1992,7 +1992,7 @@ module AsciidoctorPDF
 
       cjk_font = @font_cjk
       text.each_char do |char|
-        if CrystalEmojis.includes?(char)
+        if Emojis.includes?(char)
           flush_text.call
           flush_cjk.call
           result << {:emoji, char.to_s}

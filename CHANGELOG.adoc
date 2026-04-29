@@ -3,6 +3,20 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.16 — 2026-04-29
+
+=== Changed
+
+* **Module references updated** following the upstream rename of
+  internal modules (Aloli convention: drop the `Crystal` prefix on
+  internal module names):
+** `CrystalEmojis::*` → `Emojis::*`
+** `CrystalFlags::*` → `Flags::*`
+** `CrystalNotoCJK::*` → `NotoCjk::*`
+* `shard.yml` deps re-pinned :
+** emojis `~> 0.2.2`, flags `~> 0.1.2`, noto-cjk `~> 0.1.2`.
+* No behavioural change.
+
 == v2.3.24.15 — 2026-04-29
 
 === Changed
@@ -10,10 +24,10 @@
 * **Dependencies updated** to follow the level-0 rename cascade
   (Aloli convention: original creations drop the `crystal-` prefix on
   the GitHub URL):
-** `crystal-pdf` → `pdf`
-** `crystal-flags` → `flags`
-** `crystal-emojis` → `emojis`
-** `crystal-noto-cjk` → `noto-cjk`
+** `pdf` → `pdf`
+** `flags` → `flags`
+** `emojis` → `emojis`
+** `noto-cjk` → `noto-cjk`
 * `shard.yml` dependency keys, internal `require` paths, and
   documentation URLs updated. No behavioural change.
 * The crystal-asciidoctor-pdf shard itself is a Ruby-gem port and
@@ -24,13 +38,13 @@
 **CJK glyph rendering** via the new
 https://github.com/aloli-crystal/noto-cjk[noto-cjk]
 shard. When the user has populated the CJK cache (via
-`crystal-noto-cjk pull` or `CrystalNotoCJK::Cache.pull`), the
+`noto-cjk pull` or `CrystalNotoCJK::Cache.pull`), the
 converter automatically detects CJK characters in text runs,
 switches the active font to Noto Sans CJK for those segments
 only, and switches back to the main font for the rest. Same
 pattern as emojis switching to `page.svg` for individual glyphs.
 
-* New runtime dependency : `crystal-noto-cjk ~> 0.1`.
+* New runtime dependency : `noto-cjk ~> 0.1`.
 * `text_with_emoji_segments` now returns three kinds of
   segments : `:text` (default font), `:emoji` (page.svg), and
   `:cjk` (font switch to @font_cjk). Mid-run font switching is
@@ -39,7 +53,7 @@ pattern as emojis switching to `page.svg` for individual glyphs.
   `CrystalNotoCJK.font_path` if a variant is in the cache. No
   download is triggered automatically — the user explicitly
   populates the cache.
-* End-of-conversion bilan now also points to `crystal-noto-cjk pull`
+* End-of-conversion bilan now also points to `noto-cjk pull`
   with concrete commands for each variant + the current cache
   status.
 * No regression : 94 tests, all green.
@@ -53,14 +67,14 @@ have been substituted by `?`.
 * `render_segment_line` (the path used for paragraph text) now
   routes through `draw_text_run` instead of calling `page.text`
   directly. Net effect : emojis in paragraph text get rendered
-  in colour via crystal-emojis (previously only headings and a
+  in colour via emojis (previously only headings and a
   few other code paths were emoji-aware).
 * End-of-conversion bilan : when `@warned_chars` is non-empty,
   a multi-line message is printed to STDERR with the count, a
   sample of substituted characters, and the exact commands to
-  run to get full coverage (`crystal-emojis pull`, plus a note
+  run to get full coverage (`emojis pull`, plus a note
   about future `noto-cjk` for CJK).
-* Dependency renamed `crystal-emojis-lite` → `emojis`
+* Dependency renamed `emojis-lite` → `emojis`
   (~> 0.2). Same module name `CrystalEmojis`, same API surface,
   plus the new `Cache` module that lets the host application
   populate the on-disk cache programmatically.
@@ -78,7 +92,7 @@ The old `safe_text` was a static WinAnsi check assuming Type1
 Helvetica/Courier — but the converter actually defaults to
 embedded DejaVu Sans TrueType, which covers a much larger
 codepoint range. The new pipeline asks the active font directly
-via `crystal-pdf v0.3.5`'s new `TrueTypeFont#has_glyph?(char)`
+via `pdf v0.3.5`'s new `TrueTypeFont#has_glyph?(char)`
 method, falling back to the static WinAnsi table only for Type1
 fonts (rare — only when DejaVu is intentionally disabled in the
 theme).
@@ -97,15 +111,15 @@ theme).
 == v2.3.24.11 — 2026-04-26
 
 **Coloured emoji rendering** for the ~208 emojis covered by
-`crystal-emojis-lite`. Glyphs like ✅ ❌ ⚠ 🔴 🟢 🟡 🔵 💻 🔑 ⚙ are
+`emojis-lite`. Glyphs like ✅ ❌ ⚠ 🔴 🟢 🟡 🔵 💻 🔑 ⚙ are
 now rendered as embedded SVG (Twemoji, in colour) instead of being
 substituted with `?`. Emojis outside the lite set still fall back
 to `?` + warning (the v2.3.24.10 behaviour) — for full coverage,
-swap `crystal-emojis-lite` for `crystal-emojis-full` in the
+swap `emojis-lite` for `emojis-full` in the
 dependency tree.
 
 * New runtime dependency :
-  https://github.com/aloli-crystal/crystal-emojis-lite[crystal-emojis-lite]
+  https://github.com/aloli-crystal/emojis-lite[emojis-lite]
   ~> 0.1.
 * New private helper `Converter#text_with_emoji_segments(text)`
   splits a string into alternating `:text` and `:emoji` segments,
@@ -307,7 +321,7 @@ Real country flags in table cells, via a new SVG rendering pipeline.
   correct amount of space instead of counting the `.notdef` width
   from the text font.
 * **Dependency bump**: `pdf` → `~> 0.3` (uses the path-parser
-  loop fix and the closed-shape fill fix shipped in crystal-pdf
+  loop fix and the closed-shape fill fix shipped in pdf
   v0.3.1 and v0.3.2).
 * New helper module `AsciidoctorPDF::InlineFlags` with `segments`,
   `flag_width` and `flag_height`.

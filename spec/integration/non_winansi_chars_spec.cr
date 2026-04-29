@@ -6,7 +6,7 @@ require "./spec_helper"
 #
 # As of v2.3.24.11 :
 #
-# * Emojis covered by `crystal-emojis-lite` (~208 codepoints) are
+# * Emojis covered by `emojis-lite` (~208 codepoints) are
 #   rendered as **embedded SVG glyphs in colour** via `page.svg`.
 # * Other non-WinAnsi characters (CJK, dingbats not in Twemoji,
 #   exotic scripts) fall back to `?` plus a deduplicated STDERR

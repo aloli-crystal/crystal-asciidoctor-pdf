@@ -4,7 +4,7 @@ require "../../src/asciidoctor_pdf"
 
 # Integration-test helpers: run the real converter end-to-end on a
 # snippet of AsciiDoc, then read the produced PDF back via the sibling
-# `PDF::Reader` (crystal-pdf v0.3+) to extract what we need to assert
+# `PDF::Reader` (pdf v0.3+) to extract what we need to assert
 # on. Stays entirely in Crystal — no external tools.
 #
 # The goal is NOT byte-identical golden files (too brittle); each spec
@@ -92,7 +92,7 @@ module IntegrationHelper
   # literal `(...)` string as well as every hex `<...>` string (the
   # latter decoded assuming Identity-H, i.e. 2-byte big-endian
   # codepoints — the encoding used by TrueType fonts embedded by
-  # crystal-pdf).
+  # pdf).
   def self.text(pdf_path : String) : String
     reader = PDF::Reader.open(pdf_path)
     buf = String::Builder.new
@@ -169,7 +169,7 @@ module IntegrationHelper
   end
 
   # Inflates `bytes` when it looks like a zlib-compressed stream
-  # (the default `FlateDecode` filter used by crystal-pdf). Returns
+  # (the default `FlateDecode` filter used by pdf). Returns
   # the original bytes otherwise.
   private def self.inflate_if_needed(bytes : Bytes) : Bytes
     return bytes if bytes.size < 2

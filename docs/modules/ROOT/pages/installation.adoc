@@ -30,5 +30,5 @@ sudo cp bin/crystal-asciidoctor-pdf /usr/local/bin/
 == Dependencies
 
 * https://github.com/aloli-crystal/crystal-asciidoctor[crystal-asciidoctor] (~> 2.0) -- AsciiDoc parser
-* https://github.com/aloli-crystal/crystal-pdf[crystal-pdf] (~> 0.2) -- PDF engine
+* https://github.com/aloli-crystal/pdf[pdf] (~> 0.2) -- PDF engine
 * https://github.com/aloli-crystal/crystal-rouge[crystal-rouge] (~> 4.7) -- syntax highlighting

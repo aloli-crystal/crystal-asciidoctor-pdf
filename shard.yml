@@ -1,5 +1,5 @@
 name: crystal-asciidoctor-pdf
-version: 2.3.24.15
+version: 2.3.24.16
 
 description: |
   AsciiDoc to PDF converter for Crystal, equivalent of the asciidoctor-pdf Ruby gem.
@@ -29,13 +29,13 @@ dependencies:
     version: "~> 4.7"
   flags:
     github: aloli-crystal/flags
-    version: "~> 0.1"
+    version: "~> 0.1.2"
   emojis:
     github: aloli-crystal/emojis
-    version: "~> 0.2"
+    version: "~> 0.2.2"
   noto-cjk:
     github: aloli-crystal/noto-cjk
-    version: "~> 0.1"
+    version: "~> 0.1.2"
 
 development_dependencies:
   ameba:

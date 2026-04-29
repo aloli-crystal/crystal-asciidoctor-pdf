@@ -8,20 +8,20 @@ shards:
     git: https://github.com/aloli-crystal/crystal-asciidoctor.git
     version: 2.0.26
 
-  crystal-emojis:
-    git: https://github.com/aloli-crystal/crystal-emojis.git
+  emojis:
+    git: https://github.com/aloli-crystal/emojis.git
     version: 0.2.0
 
-  crystal-flags:
-    git: https://github.com/aloli-crystal/crystal-flags.git
+  flags:
+    git: https://github.com/aloli-crystal/flags.git
     version: 0.1.0
 
-  crystal-noto-cjk:
-    git: https://github.com/aloli-crystal/crystal-noto-cjk.git
+  noto-cjk:
+    git: https://github.com/aloli-crystal/noto-cjk.git
     version: 0.1.0
 
-  crystal-pdf:
-    git: https://github.com/aloli-crystal/crystal-pdf.git
+  pdf:
+    git: https://github.com/aloli-crystal/pdf.git
     version: 0.3.5
 
   crystal-rouge:
