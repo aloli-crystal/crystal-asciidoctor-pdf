@@ -194,6 +194,15 @@ module AsciidoctorPDF
       @doc.title = @document_title unless @document_title.empty?
       @doc.author = node.attr("author") if node.attr?("author")
       @doc.subject = node.attr("subject") if node.attr?("subject")
+      # Keywords : virgule-séparé est le format Ruby asciidoctor-pdf et
+      # le format conventionnel des métadonnées PDF.
+      @doc.keywords = node.attr("keywords") if node.attr?("keywords")
+      # Creator : nom de l'application qui a *produit* le contenu (par
+      # opposition à `producer` = nom du moteur PDF). Utile pour
+      # identifier la chaîne d'outillage qui a généré le document.
+      if node.attr?("creator")
+        @doc.creator = node.attr("creator")
+      end
       @doc.producer = "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"
 
       # Numérotation front-matter en chiffres romains : activée par
