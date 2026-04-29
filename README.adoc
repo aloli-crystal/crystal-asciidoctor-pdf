@@ -215,6 +215,58 @@ on accepte la pagination normale (« if possible » du standard).
 NOTE : l'estimation est volontairement pessimiste. Mieux vaut sauter
 trop tôt que se retrouver avec un orphelin.
 
+=== Traduction des admonitions
+
+Les étiquettes des admonitions (`NOTE`, `TIP`, `WARNING`, `CAUTION`,
+`IMPORTANT`) sont en anglais par défaut, comme dans Ruby
+asciidoctor-pdf. Deux mécanismes pour les traduire, qui se cumulent
+en cascade (la première qui matche gagne) :
+
+==== 1. Per-document via les attributs `:<name>-caption:`
+
+Le standard AsciiDoc. Mettre dans l'entête du document :
+
+[source,asciidoc]
+----
+:note-caption: NOTE
+:tip-caption: ASTUCE
+:warning-caption: AVERTISSEMENT
+:caution-caption: ATTENTION
+:important-caption: IMPORTANT
+----
+
+Idéal pour traduire un document particulier. Pour traduire tous les
+quiz d'un même projet sans répéter à chaque fois, factoriser ces
+lignes dans un fichier inclus :
+
+[source,asciidoc]
+----
+include::../config/admonitions-fr.adoc[]
+----
+
+==== 2. Pour tout un thème via le YAML
+
+Quand on veut un défaut côté thème (et que tous les docs qui
+chargent ce thème en bénéficient sans rien dire) :
+
+[source,yaml]
+----
+admonition_note_label: NOTE
+admonition_tip_label: ASTUCE
+admonition_warning_label: AVERTISSEMENT
+admonition_caution_label: ATTENTION
+admonition_important_label: IMPORTANT
+----
+
+==== Cascade de résolution
+
+. Attribut document `:<name>-caption:` (s'il diffère du défaut
+  *Note* / *Tip* / *Warning* / *Caution* / *Important* injecté par le
+  parser crystal-asciidoctor — sinon il est ignoré comme « non
+  surchargé »).
+. Propriété de thème `admonition_<name>_label`.
+. Fallback ultime : `name.upcase`.
+
 ==== Convention `x-` pour les extensions non standard
 
 Tout attribut AsciiDoc préfixé `x-` (et toute propriété de thème

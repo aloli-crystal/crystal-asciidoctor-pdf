@@ -569,7 +569,11 @@ module AsciidoctorPDF
       # au minimum 60pt pour aligner les labels entre admonitions, plus si
       # le texte du label mesuré est plus long (évite qu'il mange le début
       # du texte de l'admonition).
-      label_text = name.upcase
+      # Lookup en cascade pour permettre la traduction :
+      #   1. attribut document `:<name>-caption: TRADUCTION` (priorité)
+      #   2. propriété de thème `admonition_<name>_label` (fallback)
+      #   3. `name.upcase` (fallback ultime, comportement historique)
+      label_text = admonition_label(node, name)
       label_size = font_size - 1
       label_offset = @theme.admonition_border_width + 4.0
       label_gap = 8.0
@@ -607,6 +611,45 @@ module AsciidoctorPDF
 
       @current_y -= block_h + @theme.admonition_margin_bottom
       ""
+    end
+
+    # Défauts injectés par crystal-asciidoctor (title-case, pour rendu
+    # HTML). On les ignore lors de la lookup pour que le thème
+    # (`admonition_<name>_label = "WARNING"`) reste autoritaire tant que
+    # l'utilisateur n'a pas vraiment défini un override.
+    DEFAULT_ADMONITION_CAPTIONS = {
+      "note"      => "Note",
+      "tip"       => "Tip",
+      "warning"   => "Warning",
+      "caution"   => "Caution",
+      "important" => "Important",
+    }
+
+    # Résout le label d'une admonition selon la cascade :
+    # `<name>-caption` (attr du node ou du document, **si différent du
+    # défaut injecté par crystal-asciidoctor**) →
+    # `theme.admonition_<name>_label` → `name.upcase`.
+    # Permet la traduction sans patcher le code via, p. ex.,
+    # `:caution-caption: ATTENTION` au niveau document.
+    private def admonition_label(node : Asciidoctor::Block, name : String) : String
+      key = name.downcase
+      attr_key = "#{key}-caption"
+      caption = node.attr(attr_key) || node.document.attr(attr_key)
+      caption_str = caption.to_s
+      # Override explicite : valeur non vide ET différente du défaut
+      # injecté par le parser crystal-asciidoctor.
+      if !caption_str.empty? && DEFAULT_ADMONITION_CAPTIONS[key]? != caption_str
+        return caption_str
+      end
+
+      case key
+      when "note"      then @theme.admonition_note_label
+      when "tip"       then @theme.admonition_tip_label
+      when "warning"   then @theme.admonition_warning_label
+      when "caution"   then @theme.admonition_caution_label
+      when "important" then @theme.admonition_important_label
+      else                  name.upcase
+      end
     end
 
     # =========================================================================

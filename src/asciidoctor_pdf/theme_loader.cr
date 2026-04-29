@@ -94,6 +94,11 @@ module AsciidoctorPDF
         when "admonition_warning_color"   then theme.admonition_warning_color = value.as_s? || theme.admonition_warning_color
         when "admonition_caution_color"   then theme.admonition_caution_color = value.as_s? || theme.admonition_caution_color
         when "admonition_important_color" then theme.admonition_important_color = value.as_s? || theme.admonition_important_color
+        when "admonition_note_label"      then theme.admonition_note_label = value.as_s? || theme.admonition_note_label
+        when "admonition_tip_label"       then theme.admonition_tip_label = value.as_s? || theme.admonition_tip_label
+        when "admonition_warning_label"   then theme.admonition_warning_label = value.as_s? || theme.admonition_warning_label
+        when "admonition_caution_label"   then theme.admonition_caution_label = value.as_s? || theme.admonition_caution_label
+        when "admonition_important_label" then theme.admonition_important_label = value.as_s? || theme.admonition_important_label
           # Tableaux
         when "table_border_color"            then theme.table_border_color = value.as_s? || theme.table_border_color
         when "table_border_width"            then theme.table_border_width = parse_float(value, theme.table_border_width)

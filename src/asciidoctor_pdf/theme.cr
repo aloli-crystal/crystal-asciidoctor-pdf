@@ -98,6 +98,18 @@ module AsciidoctorPDF
     property admonition_caution_color : String = "d9534f"
     property admonition_important_color : String = "d9534f"
 
+    # Étiquettes des admonitions. Défauts en anglais (parité Ruby
+    # asciidoctor-pdf). Pour traduire : soit redéfinir ici via le thème
+    # YAML (`admonition_note_label: NOTE` etc.), soit per-document via
+    # les attributs AsciiDoc `:note-caption: NOTE`, `:tip-caption: …`,
+    # `:warning-caption: …`, `:caution-caption: …`,
+    # `:important-caption: …` — l'attribut document écrase le thème.
+    property admonition_note_label : String = "NOTE"
+    property admonition_tip_label : String = "TIP"
+    property admonition_warning_label : String = "WARNING"
+    property admonition_caution_label : String = "CAUTION"
+    property admonition_important_label : String = "IMPORTANT"
+
     # --- Tableaux ---
     property table_border_color : String = "dddddd"
     property table_border_width : Float64 = 0.5
