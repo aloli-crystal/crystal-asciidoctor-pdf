@@ -114,6 +114,12 @@ module AsciidoctorPDF
     property subtitle_font_color : String = "555555"
     property author_font_size : Float64 = 12.0
     property author_font_color : String = "333333"
+    # Quand true, rend la table des matières directement sur la page de
+    # garde (pas de page TOC séparée). Le titre n'est plus centré-bas
+    # mais positionné en tête de zone de contenu, suivi de la TOC, puis
+    # auteur + date en bas. Override per-document via l'attribut
+    # AsciiDoc `:title-page-toc:`.
+    property title_page_with_toc : Bool = false
 
     # --- Table des matières ---
     property toc_enabled : Bool = true

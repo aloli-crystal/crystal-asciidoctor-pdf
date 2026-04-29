@@ -81,6 +81,12 @@ module AsciidoctorPDF
     # cette conversion. On dédup pour ne pas spammer STDERR si un
     # même emoji apparaît N fois dans le source.
     @warned_chars : Set(Char) = Set(Char).new
+    # État du mode `title-page-toc` : page index (0-based) où rendre la
+    # TOC en post-traitement, et ordonnée Y (PDF, top) à partir de
+    # laquelle commencer le rendu. Restent à -1 / 0 quand le mode n'est
+    # pas activé.
+    @title_page_toc_index : Int32 = -1
+    @title_page_toc_y_start : Float64 = 0.0
 
     # Dimensions de la page (A4 par défaut)
     @page_width : Float64 = 595.28
@@ -177,23 +183,28 @@ module AsciidoctorPDF
 
       # Page de titre
       title_rendered = false
+      title_page_toc_active = false
       if @theme.title_page_enabled && !@document_title.empty?
         render_title_page(node)
         title_rendered = true
+        # Si `render_title_page_with_toc` a été retenu, il a positionné
+        # @title_page_toc_index ≥ 0 — la TOC sera rendue sur la page de
+        # garde en post-traitement, pas sur une page réservée.
+        title_page_toc_active = @title_page_toc_index >= 0
       end
 
       # Table des matières (page réservée, sera remplie après le rendu du contenu)
       toc_page_index = -1
-      if @theme.toc_enabled && node.attr?("toc")
+      if @theme.toc_enabled && node.attr?("toc") && !title_page_toc_active
         toc_page_index = @page_number # index 0-based de la page TOC
         new_page
         # Créer une nouvelle page pour le contenu afin d'éviter que le corps
         # ne se superpose à la TOC (qui sera rendue en post-traitement)
         new_page
       elsif title_rendered
-        # Sans TOC, basculer sur une nouvelle page après la page de titre
-        # pour éviter que le corps ne se superpose au titre rendu au milieu
-        # de la page de garde.
+        # Sans TOC séparée, basculer sur une nouvelle page après la
+        # page de garde pour éviter que le corps ne se superpose au
+        # titre rendu sur la garde.
         new_page
       end
 
@@ -202,9 +213,19 @@ module AsciidoctorPDF
         convert(block)
       end
 
-      # Rendre la table des matières sur la page réservée
+      # Rendre la table des matières sur la page réservée…
       if toc_page_index >= 0
         render_toc(toc_page_index)
+      end
+      # …ou directement sur la page de garde quand le mode `title-page-toc`
+      # est actif. Le titre « Sommaire » a déjà été dessiné par
+      # `render_title_page_with_toc` ⇒ render_title: false.
+      if title_page_toc_active
+        render_toc(
+          @title_page_toc_index,
+          y_start: @title_page_toc_y_start,
+          render_title: false,
+        )
       end
 
       # Générer la page d'index si activée et si des entrées ont été collectées
@@ -831,25 +852,11 @@ module AsciidoctorPDF
 
       if image_path && File.exists?(image_path)
         begin
-          img = PDF::Images::Image.load(image_path)
-
-          max_w = @content_width
-          display_w = width_attr ? [width_attr.to_f, max_w].min : [img.width.to_f, max_w].min
-          ratio = display_w / img.width.to_f
-          display_h = height_attr ? height_attr.to_f : img.height.to_f * ratio
-
-          check_page_break(display_h + 8.0)
-          page = @current_page.not_nil!
-
-          align = node.attr("align") || "left"
-          x = case align
-              when "center" then @margin + (@content_width - display_w) / 2
-              when "right"  then @margin + @content_width - display_w
-              else               @margin
-              end
-
-          page.image(img, at: {x, @current_y}, width: display_w)
-          @current_y -= display_h + 8.0
+          if svg_target?(target)
+            render_svg_image(image_path, node, width_attr, height_attr)
+          else
+            render_raster_image(image_path, node, width_attr, height_attr)
+          end
         rescue
           render_image_placeholder(alt)
         end
@@ -857,6 +864,73 @@ module AsciidoctorPDF
         render_image_placeholder(alt)
       end
       ""
+    end
+
+    # Vector path: route `.svg` → `page.svg`. Bitmap loaders (PDF::Images::Image)
+    # ne savent pas lire le SVG ; il faut le contenu textuel + le renderer SVG
+    # natif du shard pdf, qui dessine le SVG en primitives PDF.
+    private def svg_target?(target : String) : Bool
+      target.downcase.ends_with?(".svg")
+    end
+
+    private def render_svg_image(
+      path : String,
+      node : Asciidoctor::Block,
+      width_attr : String?,
+      height_attr : String?,
+    ) : Nil
+      svg_data = File.read(path)
+      parser = @doc.svg_parser_for(svg_data)
+
+      # Dimensions natives (préfère viewBox quand présent — c'est le repère
+      # de coord. interne du SVG, le « width=/height= » du tag <svg> n'est
+      # qu'une suggestion d'affichage).
+      svg_w = parser.width
+      svg_h = parser.height
+      if vb = parser.viewbox
+        svg_w = vb[2] if vb[2] > 0
+        svg_h = vb[3] if vb[3] > 0
+      end
+
+      max_w = @content_width
+      display_w = width_attr ? [width_attr.to_f, max_w].min : [svg_w, max_w].min
+      # Ratio préservé même quand seul width est précisé — sans ça
+      # SVG::Renderer prend la hauteur native, ce qui distord l'image.
+      ratio = display_w / svg_w
+      display_h = height_attr ? height_attr.to_f : svg_h * ratio
+
+      check_page_break(display_h + 8.0)
+      page = @current_page.not_nil!
+      x = align_image_x(node, display_w)
+      page.svg(svg_data, at: {x, @current_y}, width: display_w, height: display_h)
+      @current_y -= display_h + 8.0
+    end
+
+    private def render_raster_image(
+      path : String,
+      node : Asciidoctor::Block,
+      width_attr : String?,
+      height_attr : String?,
+    ) : Nil
+      img = PDF::Images::Image.load(path)
+      max_w = @content_width
+      display_w = width_attr ? [width_attr.to_f, max_w].min : [img.width.to_f, max_w].min
+      ratio = display_w / img.width.to_f
+      display_h = height_attr ? height_attr.to_f : img.height.to_f * ratio
+
+      check_page_break(display_h + 8.0)
+      page = @current_page.not_nil!
+      x = align_image_x(node, display_w)
+      page.image(img, at: {x, @current_y}, width: display_w)
+      @current_y -= display_h + 8.0
+    end
+
+    private def align_image_x(node : Asciidoctor::Block, display_w : Float64) : Float64
+      case node.attr("align") || "left"
+      when "center" then @margin + (@content_width - display_w) / 2
+      when "right"  then @margin + @content_width - display_w
+      else               @margin
+      end
     end
 
     private def resolve_image_path(node : Asciidoctor::Block, target : String) : String?
@@ -1259,24 +1333,32 @@ module AsciidoctorPDF
     # =========================================================================
     # Rend la table des matières sur la page réservée (index 0-based).
     # La TOC est rendue après le contenu principal pour avoir les numéros de page corrects.
-    private def render_toc(page_index : Int32) : Nil
+    private def render_toc(
+      page_index : Int32,
+      y_start : Float64? = nil,
+      render_title : Bool = true,
+    ) : Nil
       return if @toc_entries.empty?
       return if page_index < 0 || page_index >= @doc.pages.size
 
       page = @doc.pages[page_index]
-      y = @page_height - @margin
+      y = y_start || (@page_height - @margin)
       font_size = @theme.toc_font_size
       # Espacement entre les entrées : au moins 1.5x la taille de police
       line_h = font_size * 1.8
       dot_color = @theme.toc_dot_leader_color
       text_color = @theme.base_font_color
 
-      # Titre de la TOC
-      toc_title_size = font_size + 6.0
-      set_font(page, @fn_body_bold, toc_title_size)
-      page.fill_color(@theme.heading_font_color)
-      page.text(@theme.toc_title, at: {@margin, y - toc_title_size})
-      y -= toc_title_size * 2.0
+      # Titre de la TOC (sauf si l'appelant l'a déjà dessiné — cas
+      # `title-page-toc` où le sous-titre TOC est rendu avec la mise en
+      # forme générale de la page de garde).
+      if render_title
+        toc_title_size = font_size + 6.0
+        set_font(page, @fn_body_bold, toc_title_size)
+        page.fill_color(@theme.heading_font_color)
+        page.text(@theme.toc_title, at: {@margin, y - toc_title_size})
+        y -= toc_title_size * 2.0
+      end
 
       # Entrées de la TOC
       @toc_entries.each do |entry|
@@ -1340,12 +1422,43 @@ module AsciidoctorPDF
     # Page de titre
     # =========================================================================
 
+    # Indique si la TOC doit être rendue sur la page de garde (option 3).
+    # Activée par l'attribut AsciiDoc `:title-page-toc:` ou la propriété
+    # de thème `title_page_with_toc`. L'attribut écrase le thème.
+    private def title_page_toc_enabled?(doc : Asciidoctor::Document) : Bool
+      attr = doc.attr("title-page-toc")
+      case attr
+      when nil
+        @theme.title_page_with_toc
+      when "false", "off", "no", "0"
+        false
+      else
+        true
+      end
+    end
+
     private def render_title_page(doc : Asciidoctor::Document) : Nil
       # Page de garde sans header / footer / footnotes (convention
       # typographique : la page de titre est « nue »).
       new_page(chrome: false)
+
+      if title_page_toc_enabled?(doc)
+        render_title_page_with_toc(doc)
+      else
+        render_title_page_standard(doc)
+      end
+    end
+
+    private def render_title_page_standard(doc : Asciidoctor::Document) : Nil
       page = @current_page.not_nil!
       center_x = @page_width / 2
+
+      # Logo de garde optionnel. Conforme à l'attribut Ruby asciidoctor-pdf
+      # `:title-logo-image:` (présent depuis la 2.3) : posé dans la moitié
+      # supérieure de la page, centré par défaut. Le titre garde sa
+      # position habituelle (mi-hauteur) — les deux ne se chevauchent pas
+      # tant que le logo reste raisonnable (~150-250pt de hauteur).
+      render_title_logo(doc, page, @page_height - @margin - 20.0)
 
       # Titre principal — wrap long titles to fit within the page width.
       # Use `@document_title` (already decoded) so HTML entities like
@@ -1391,6 +1504,190 @@ module AsciidoctorPDF
       sep_y = title_y - title_total_height - 30.0
       page.line({@margin, sep_y}, {@margin + @content_width, sep_y})
       page.stroke
+    end
+
+    # Mode « page de garde + sommaire » (option `:title-page-toc:`).
+    # Mise en page :
+    #   ┌──────────────────────────┐
+    #   │ [logo]                   │  ← haut, optionnel
+    #   │ Titre                    │  ← gauche, juste sous logo
+    #   │ Sous-titre               │
+    #   │ ──────────────────────── │  ← séparateur
+    #   │ Sommaire                 │
+    #   │ Section A ........ p. N  │  ← rendu en post-traitement
+    #   │ Section B ........ p. N  │     par render_toc
+    #   │                          │
+    #   │ ──────────────────────── │  ← séparateur bas
+    #   │ Auteur / Date            │  ← bas
+    #   └──────────────────────────┘
+    private def render_title_page_with_toc(doc : Asciidoctor::Document) : Nil
+      page = @current_page.not_nil!
+
+      # Logo (optionnel) tout en haut.
+      logo_top = @page_height - @margin
+      logo_h = render_title_logo(doc, page, logo_top)
+      cursor_y = logo_top - logo_h
+      cursor_y -= 24.0 if logo_h > 0
+
+      # Titre — gauche, taille normale, plus de centrage vertical.
+      title = @document_title
+      title_font_size = @theme.title_font_size
+      title_lines = wrap_text(title, @content_width, title_font_size, @fn_body_bold)
+      title_line_height = title_font_size * 1.3
+
+      set_font(page, @fn_body_bold, title_font_size)
+      page.fill_color(@theme.title_font_color)
+      title_lines.each_with_index do |line, i|
+        draw_text_run(page, line, @margin, cursor_y - title_line_height + (title_line_height - title_font_size) - (i * title_line_height), @fn_body_bold, title_font_size)
+      end
+      cursor_y -= title_lines.size * title_line_height
+
+      # Sous-titre éventuel.
+      if (subtitle = doc.attr("subtitle"))
+        cursor_y -= 4.0
+        set_font(page, @fn_body, @theme.subtitle_font_size)
+        page.fill_color(@theme.subtitle_font_color)
+        draw_text_run(page, decode_html_entities(subtitle), @margin, cursor_y - @theme.subtitle_font_size, @fn_body, @theme.subtitle_font_size)
+        cursor_y -= @theme.subtitle_font_size * 1.3
+      end
+
+      # Séparateur entre l'en-tête de garde et la TOC.
+      cursor_y -= 16.0
+      page.stroke_color("cccccc")
+      page.line_width(1.0)
+      page.line({@margin, cursor_y}, {@margin + @content_width, cursor_y})
+      page.stroke
+      cursor_y -= 18.0
+
+      # Sous-titre « Sommaire » (la même typographie que le titre TOC
+      # standard, mais on le rend ici pour qu'il s'inscrive dans la
+      # mise en page de la garde).
+      toc_title_size = @theme.toc_font_size + 4.0
+      set_font(page, @fn_body_bold, toc_title_size)
+      page.fill_color(@theme.heading_font_color)
+      draw_text_run(page, @theme.toc_title, @margin, cursor_y - toc_title_size, @fn_body_bold, toc_title_size)
+      cursor_y -= toc_title_size * 1.6
+
+      # Mémoriser l'état pour le post-rendu : la TOC sera dessinée
+      # ici quand `@toc_entries` aura été collectée.
+      @title_page_toc_index = @page_number - 1 # PDF index 0-based
+      @title_page_toc_y_start = cursor_y
+
+      # Auteur + date en bas de page.
+      bottom_y = @margin + 12.0
+      if (revdate = doc.attr("revdate"))
+        set_font(page, @fn_body, @theme.base_font_size)
+        page.fill_color("888888")
+        draw_text_run(page, decode_html_entities(revdate), @margin, bottom_y, @fn_body, @theme.base_font_size)
+        bottom_y += @theme.base_font_size + 4.0
+      end
+      if (author = doc.attr("author"))
+        set_font(page, @fn_body, @theme.author_font_size)
+        page.fill_color(@theme.author_font_color)
+        draw_text_run(page, decode_html_entities(author), @margin, bottom_y, @fn_body, @theme.author_font_size)
+      end
+    end
+
+    # Rend le logo de garde quand `:title-logo-image:` est défini.
+    # Format upstream Ruby asciidoctor-pdf, accepté ici à l'identique :
+    #
+    #     :title-logo-image: image::path/logo.svg[align=center, pdfwidth=200]
+    #
+    # Le format court `:title-logo-image: path/logo.svg` est aussi
+    # accepté (pas d'options ⇒ défauts : centré, largeur 200pt).
+    #
+    # `y_top` est l'ordonnée du **haut** de l'image (repère PDF, origine
+    # en bas-gauche — `page.svg` / `page.image` traitent y comme le
+    # bord supérieur). Retourne la hauteur effectivement consommée par
+    # le logo, ou 0.0 si rien n'a été dessiné.
+    private def render_title_logo(
+      doc : Asciidoctor::Document, page : PDF::Page, y_top : Float64,
+    ) : Float64
+      raw = doc.attr("title-logo-image")
+      return 0.0 if raw.nil?
+      raw_str = raw.to_s.strip
+      return 0.0 if raw_str.empty?
+
+      target, opts = parse_title_logo_macro(raw_str)
+      return 0.0 if target.empty?
+
+      image_path = resolve_image_path_str(doc, target)
+      return 0.0 unless image_path && File.exists?(image_path)
+
+      pdfwidth = (opts["pdfwidth"]? || opts["width"]?).try(&.to_f?) || 200.0
+      pdfwidth = pdfwidth.clamp(0.0, @content_width)
+      align = opts["align"]? || "center"
+
+      begin
+        if svg_target?(target)
+          svg_data = File.read(image_path)
+          parser = @doc.svg_parser_for(svg_data)
+          svg_w = parser.width
+          svg_h = parser.height
+          if vb = parser.viewbox
+            svg_w = vb[2] if vb[2] > 0
+            svg_h = vb[3] if vb[3] > 0
+          end
+          ratio = pdfwidth / svg_w
+          logo_h = svg_h * ratio
+          logo_x = align_logo_x(align, pdfwidth)
+          page.svg(svg_data, at: {logo_x, y_top}, width: pdfwidth, height: logo_h)
+          logo_h
+        else
+          img = PDF::Images::Image.load(image_path)
+          ratio = pdfwidth / img.width.to_f
+          logo_h = img.height.to_f * ratio
+          logo_x = align_logo_x(align, pdfwidth)
+          page.image(img, at: {logo_x, y_top}, width: pdfwidth)
+          logo_h
+        end
+      rescue
+        # Logo introuvable / illisible : on laisse la page de garde
+        # se rendre sans logo, plutôt que de faire planter la conversion.
+        0.0
+      end
+    end
+
+    # Parse une valeur d'attribut au format `image::PATH[OPTS]` ou un
+    # chemin nu. Retourne `{target, options}`.
+    private def parse_title_logo_macro(raw : String) : {String, Hash(String, String)}
+      opts = {} of String => String
+      s = raw
+      s = s[7..] if s.starts_with?("image::")
+      if (idx = s.index('['))
+        target = s[0...idx]
+        body = s[idx + 1..]
+        body = body.rchop(']') if body.ends_with?(']')
+        body.split(',').each do |kv|
+          kv = kv.strip
+          next if kv.empty?
+          if (eq = kv.index('='))
+            opts[kv[0...eq].strip] = kv[eq + 1..].strip
+          end
+        end
+        return {target, opts}
+      end
+      {s, opts}
+    end
+
+    private def resolve_image_path_str(doc : Asciidoctor::Document, target : String) : String?
+      return nil if target.empty?
+      return target if File.exists?(target)
+      if (docdir = doc.attr("docdir"))
+        candidate = File.join(docdir, target)
+        return candidate if File.exists?(candidate)
+        candidate2 = File.join(docdir, "images", target)
+        return candidate2 if File.exists?(candidate2)
+      end
+      nil
+    end
+
+    private def align_logo_x(align : String, w : Float64) : Float64
+      case align
+      when "center" then (@page_width - w) / 2
+      when "right"  then @page_width - @margin - w
+      else               @margin
+      end
     end
 
     # =========================================================================
