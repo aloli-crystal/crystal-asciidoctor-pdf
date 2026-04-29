@@ -1155,8 +1155,7 @@ module AsciidoctorPDF
 
     def convert_sidebar(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Block)
-      ensure_page
-      node.blocks.each { |b| convert(b) }
+      render_panel(node, :sidebar)
       ""
     end
 
@@ -1169,9 +1168,111 @@ module AsciidoctorPDF
         return render_x_score_block(node, level)
       end
 
-      ensure_page
-      node.blocks.each { |b| convert(b) }
+      render_panel(node, :example)
       ""
+    end
+
+    # Rend un bloc encadré (sidebar / example).
+    #
+    # Stratégie : on estime la hauteur du bloc (paragraphes + tableaux
+    # + listes + …) via `estimate_block_height`, on dessine fond +
+    # bordure d'avance, puis on rend le contenu par-dessus. Le
+    # contenu opaque écrase le fond et le rend visible — l'inverse
+    # (rétroactif) masquerait le contenu sous une couche unie.
+    #
+    # Si l'estimation diffère de la hauteur réelle, on aura un fond
+    # un peu plus court ou un peu trop long ; on accepte cet écart
+    # visuel mineur en échange de la simplicité (pas de mode
+    # « deux passes » avec dry-run du rendu).
+    private def render_panel(node : Asciidoctor::Block, kind : Symbol) : Nil
+      ensure_page
+
+      bg, border, border_w, padding, mtop, mbot, title_color, title_size =
+        case kind
+        when :sidebar
+          {
+            @theme.sidebar_background_color,
+            @theme.sidebar_border_color,
+            @theme.sidebar_border_width,
+            @theme.sidebar_padding,
+            @theme.sidebar_margin_top,
+            @theme.sidebar_margin_bottom,
+            @theme.sidebar_title_font_color,
+            @theme.sidebar_title_font_size,
+          }
+        else
+          {
+            @theme.example_background_color,
+            @theme.example_border_color,
+            @theme.example_border_width,
+            @theme.example_padding,
+            @theme.example_margin_top,
+            @theme.example_margin_bottom,
+            @theme.example_title_font_color,
+            @theme.example_title_font_size,
+          }
+        end
+
+      # Estimation de la hauteur cumulée du contenu interne.
+      content_h_est = node.blocks.sum { |b| estimate_block_height(b) }
+      title_h = node.title? ? title_size * 1.6 : 0.0
+      total_h_est = content_h_est + 2 * padding + title_h
+
+      # Pré-flight : si le bloc tient sur une page entière mais pas
+      # dans l'espace restant, on saute proprement.
+      page_content_h = @page_height - 2 * @margin
+      if @current_y - total_h_est < @margin && total_h_est <= page_content_h
+        new_page
+      end
+
+      page = @current_page.not_nil!
+      @current_y -= mtop
+      y_start = @current_y
+
+      # 1) Fond + bordure dessinés EN PREMIER, dimensionnés via
+      #    l'estimation. Ce qui suit (titre, contenu) sera tracé
+      #    par-dessus.
+      saved_margin = @margin
+      saved_content_w = @content_width
+
+      if !bg.empty?
+        page.fill_color(bg)
+        page.rectangle(saved_margin, y_start - total_h_est, saved_content_w, total_h_est)
+        page.fill
+      end
+      if !border.empty?
+        page.stroke_color(border)
+        page.line_width(border_w)
+        page.rectangle(saved_margin, y_start - total_h_est, saved_content_w, total_h_est)
+        page.stroke
+      end
+
+      # 2) Titre du bloc (caption `.Mon titre`).
+      if node.title? && (title = node.title)
+        inner_x = saved_margin + padding
+        set_font(page, @fn_body_bold, title_size)
+        page.fill_color(title_color)
+        draw_text_run(page, decode_html_entities(title), inner_x, @current_y - padding - title_size, @fn_body_bold, title_size)
+        @current_y -= padding + title_size * 1.4
+      else
+        @current_y -= padding
+      end
+
+      # 3) Contenu : on indente via @margin/@content_width temporaires.
+      @margin += padding
+      @content_width -= 2 * padding
+      begin
+        node.blocks.each { |b| convert(b) }
+      ensure
+        @margin = saved_margin
+        @content_width = saved_content_w
+      end
+
+      # Aligner @current_y sur le bas estimé du panneau pour ne pas
+      # créer de décalage avec les blocs qui suivent. Au pire on
+      # gagne ou perd quelques points par rapport au tracé réel.
+      @current_y = y_start - total_h_est
+      @current_y -= mbot
     end
 
     def convert_open(node : Asciidoctor::AbstractNode) : String

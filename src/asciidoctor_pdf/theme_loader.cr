@@ -137,6 +137,24 @@ module AsciidoctorPDF
         when "admonition_warning_color"   then theme.admonition_warning_color = value.as_s? || theme.admonition_warning_color
         when "admonition_caution_color"   then theme.admonition_caution_color = value.as_s? || theme.admonition_caution_color
         when "admonition_important_color" then theme.admonition_important_color = value.as_s? || theme.admonition_important_color
+          # Sidebar
+        when "sidebar_background_color" then theme.sidebar_background_color = value.as_s? || theme.sidebar_background_color
+        when "sidebar_border_color"     then theme.sidebar_border_color = value.as_s? || theme.sidebar_border_color
+        when "sidebar_border_width"     then theme.sidebar_border_width = parse_float(value, theme.sidebar_border_width)
+        when "sidebar_padding"          then theme.sidebar_padding = parse_float(value, theme.sidebar_padding)
+        when "sidebar_margin_top"       then theme.sidebar_margin_top = parse_float(value, theme.sidebar_margin_top)
+        when "sidebar_margin_bottom"    then theme.sidebar_margin_bottom = parse_float(value, theme.sidebar_margin_bottom)
+        when "sidebar_title_font_color" then theme.sidebar_title_font_color = value.as_s? || theme.sidebar_title_font_color
+        when "sidebar_title_font_size"  then theme.sidebar_title_font_size = parse_float(value, theme.sidebar_title_font_size)
+          # Example block
+        when "example_background_color"   then theme.example_background_color = value.as_s? || theme.example_background_color
+        when "example_border_color"       then theme.example_border_color = value.as_s? || theme.example_border_color
+        when "example_border_width"       then theme.example_border_width = parse_float(value, theme.example_border_width)
+        when "example_padding"            then theme.example_padding = parse_float(value, theme.example_padding)
+        when "example_margin_top"         then theme.example_margin_top = parse_float(value, theme.example_margin_top)
+        when "example_margin_bottom"      then theme.example_margin_bottom = parse_float(value, theme.example_margin_bottom)
+        when "example_title_font_color"   then theme.example_title_font_color = value.as_s? || theme.example_title_font_color
+        when "example_title_font_size"    then theme.example_title_font_size = parse_float(value, theme.example_title_font_size)
         when "admonition_note_label"      then theme.admonition_note_label = value.as_s? || theme.admonition_note_label
         when "admonition_tip_label"       then theme.admonition_tip_label = value.as_s? || theme.admonition_tip_label
         when "admonition_warning_label"   then theme.admonition_warning_label = value.as_s? || theme.admonition_warning_label

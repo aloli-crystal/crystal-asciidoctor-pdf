@@ -104,6 +104,28 @@ module AsciidoctorPDF
     # les attributs AsciiDoc `:note-caption: NOTE`, `:tip-caption: …`,
     # `:warning-caption: …`, `:caution-caption: …`,
     # `:important-caption: …` — l'attribut document écrase le thème.
+    # --- Sidebar (`****` ou `[sidebar]`) ---
+    # Encadré gris clair, type aside, pour mettre en valeur une digression.
+    property sidebar_background_color : String = "f5f5f5"
+    property sidebar_border_color : String = "cccccc"
+    property sidebar_border_width : Float64 = 0.6
+    property sidebar_padding : Float64 = 10.0
+    property sidebar_margin_top : Float64 = 8.0
+    property sidebar_margin_bottom : Float64 = 8.0
+    property sidebar_title_font_color : String = "1a1a1a"
+    property sidebar_title_font_size : Float64 = 11.0
+
+    # --- Example block (`====` ou `[example]`) ---
+    # Encadré simple à fond très léger pour les exemples illustratifs.
+    property example_background_color : String = "fafafa"
+    property example_border_color : String = "dddddd"
+    property example_border_width : Float64 = 0.5
+    property example_padding : Float64 = 10.0
+    property example_margin_top : Float64 = 8.0
+    property example_margin_bottom : Float64 = 8.0
+    property example_title_font_color : String = "555555"
+    property example_title_font_size : Float64 = 10.0
+
     property admonition_note_label : String = "NOTE"
     property admonition_tip_label : String = "TIP"
     property admonition_warning_label : String = "WARNING"
