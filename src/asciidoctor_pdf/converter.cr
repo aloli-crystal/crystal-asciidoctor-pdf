@@ -1195,13 +1195,13 @@ module AsciidoctorPDF
     def convert_quote(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Block)
       ensure_page
-      render_indented_block(node, left_bar_color: "aaaaaa", indent: 16.0)
+      render_indented_block(node, left_bar_color: "aaaaaa", indent: 16.0, kind: :quote)
     end
 
     def convert_verse(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Block)
       ensure_page
-      render_indented_block(node, left_bar_color: "aaaaaa", indent: 16.0)
+      render_indented_block(node, left_bar_color: "aaaaaa", indent: 16.0, kind: :verse)
     end
 
     def convert_sidebar(node : Asciidoctor::AbstractNode) : String
@@ -1736,14 +1736,31 @@ module AsciidoctorPDF
     # Helpers de rendu
     # =========================================================================
 
-    private def render_indented_block(node : Asciidoctor::Block, left_bar_color : String, indent : Float64) : String
-      text = node.content || ""
-      text = strip_inline_markup(text)
+    private def render_indented_block(
+      node : Asciidoctor::Block,
+      left_bar_color : String,
+      indent : Float64,
+      kind : Symbol = :quote,
+    ) : String
+      raw = node.content
+      html = raw.is_a?(Array) ? raw.join("\n") : raw.to_s
+
       font_size = @theme.base_font_size
       line_h = font_size * @theme.base_line_height
       content_w = @content_width - indent - 8.0
 
-      lines = wrap_text(text, content_w, font_size)
+      # Verse : préserve les sauts de ligne du source (pre-wrap). Chaque
+      # ligne du source devient sa propre ligne dans le PDF, et le wrap
+      # n'est appliqué qu'aux lignes qui débordent vraiment.
+      # Quote : flow continu, retours à la ligne traités comme espaces.
+      lines = if kind == :verse
+                segs_per_line = html.split('\n').map { |para| InlineRenderer.parse(para) }
+                segs_per_line.flat_map { |segments| wrap_segments(segments, content_w, font_size) }
+              else
+                wrap_segments(InlineRenderer.parse(html), content_w, font_size)
+              end
+      lines = [[] of InlineSegment] if lines.empty?
+
       block_h = lines.size * line_h + 8.0
 
       check_page_break(block_h + 12.0)
@@ -1756,24 +1773,55 @@ module AsciidoctorPDF
       page.rectangle(@margin, @current_y - block_h, 3.0, block_h)
       page.fill
 
-      # Texte en italique
-      set_font(page, @fn_body_italic, font_size)
-      page.fill_color(@theme.base_font_color)
-
+      # Texte avec markup inline préservé.
       y = @current_y - font_size
       lines.each do |line|
-        page.text(line, at: {@margin + indent, y})
+        # Forcer italique pour les segments de quote/verse sauf si déjà
+        # italiques (pour ne pas inverser). Pragma : si le segment n'a
+        # pas d'italique explicite, on l'ajoute ; sinon on respecte.
+        styled_line = line.map do |seg|
+          if seg.italic
+            seg
+          else
+            InlineSegment.new(
+              text: seg.text,
+              bold: seg.bold,
+              italic: true,
+              mono: seg.mono,
+              sup: seg.sup,
+              sub: seg.sub,
+              mark: seg.mark,
+              kbd: seg.kbd,
+              button: seg.button,
+              menu: seg.menu,
+              color: seg.color,
+              link: seg.link,
+              image_path: seg.image_path,
+              image_width: seg.image_width,
+              image_height: seg.image_height
+            )
+          end
+        end
+        render_segment_line(page, styled_line, @margin + indent, y, font_size)
         y -= line_h
       end
 
       @current_y -= block_h + 6.0
 
-      # Attribution
-      if (attribution = node.attr("attribution"))
-        set_font(page, @fn_body, font_size - 1)
-        page.fill_color("555555")
-        page.text("— #{attribution}", at: {@margin + indent, @current_y - font_size})
-        @current_y -= font_size + 4.0
+      # Attribution + citetitle. Ruby asciidoctor-pdf accepte les deux
+      # via `[quote, Auteur, Titre]`.
+      attribution = node.attr("attribution")
+      citetitle = node.attr("citetitle")
+      if attribution || citetitle
+        parts = [] of String
+        parts << attribution.to_s if attribution && !attribution.to_s.empty?
+        parts << citetitle.to_s if citetitle && !citetitle.to_s.empty?
+        unless parts.empty?
+          set_font(page, @fn_body, font_size - 1)
+          page.fill_color("555555")
+          page.text("— #{parts.join(", ")}", at: {@margin + indent, @current_y - font_size})
+          @current_y -= font_size + 4.0
+        end
       end
       ""
     end
