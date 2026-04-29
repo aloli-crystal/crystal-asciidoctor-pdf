@@ -81,7 +81,7 @@ module AsciidoctorPDF
     # cette conversion. On dédup pour ne pas spammer STDERR si un
     # même emoji apparaît N fois dans le source.
     @warned_chars : Set(Char) = Set(Char).new
-    # État du mode `title-page-toc` : page index (0-based) où rendre la
+    # État du mode `x-title-page-toc` : page index (0-based) où rendre la
     # TOC en post-traitement, et ordonnée Y (PDF, top) à partir de
     # laquelle commencer le rendu. Restent à -1 / 0 quand le mode n'est
     # pas activé.
@@ -239,7 +239,7 @@ module AsciidoctorPDF
       if toc_page_index >= 0
         render_toc(toc_page_index)
       end
-      # …ou directement sur la page de garde quand le mode `title-page-toc`
+      # …ou directement sur la page de garde quand le mode `x-title-page-toc`
       # est actif. Le titre « Sommaire » a déjà été dessiné par
       # `render_title_page_with_toc` ⇒ render_title: false.
       if title_page_toc_active
@@ -1470,7 +1470,7 @@ module AsciidoctorPDF
       text_color = @theme.base_font_color
 
       # Titre de la TOC (sauf si l'appelant l'a déjà dessiné — cas
-      # `title-page-toc` où le sous-titre TOC est rendu avec la mise en
+      # `x-title-page-toc` où le sous-titre TOC est rendu avec la mise en
       # forme générale de la page de garde).
       if render_title
         toc_title_size = font_size + 6.0
@@ -1563,16 +1563,27 @@ module AsciidoctorPDF
       end
     end
 
-    # Rend le doctitle comme un titre H1 ordinaire en haut de la
-    # première page de contenu (mode « article » standard d'AsciiDoc :
-    # pas de page de garde, juste un titre suivi du préambule).
-    # Le sous-titre, l'auteur et la date — quand fournis — sont placés
-    # en sous-bandeau sous le titre.
+    # Rend le doctitle comme un grand titre en haut de la première
+    # page de contenu (mode « article » standard d'AsciiDoc : pas de
+    # page de garde, juste un titre suivi du préambule).
+    # Le logo `:title-logo-image:`, le sous-titre, l'auteur et la date —
+    # quand fournis — sont placés autour du titre comme une mini-
+    # manchette d'entête.
     private def render_inline_doctitle(doc : Asciidoctor::Document) : Nil
       ensure_page
       page = @current_page.not_nil!
 
-      title_font_size = @theme.title_font_size * 0.85
+      # Logo en bandeau supérieur, s'il y en a un. Il vit dans la
+      # marge de la zone de contenu (au-dessus du titre).
+      logo_h = render_title_logo(doc, page, @current_y)
+      if logo_h > 0
+        @current_y -= logo_h + 14.0
+      end
+
+      # Pleine taille du titre (la même que sur une page de garde),
+      # pour que le doctitle ait du poids visuel — c'est lui le
+      # premier signal d'identité du document.
+      title_font_size = @theme.title_font_size
       title_lines = wrap_text(@document_title, @content_width, title_font_size, @fn_body_bold)
       title_line_height = title_font_size * 1.2
 
@@ -1618,15 +1629,17 @@ module AsciidoctorPDF
     end
 
     # Indique si la TOC doit être rendue sur la page de garde (option 3).
-    # Activée par l'attribut AsciiDoc `:title-page-toc:` ou la propriété
-    # de thème `title_page_with_toc`. L'attribut écrase le thème.
+    # Activée par l'attribut AsciiDoc `:x-title-page-toc:` ou la propriété
+    # de thème `x_title_page_with_toc`. L'attribut écrase le thème.
     #
-    # Extension Aloli — pas de standard AsciiDoc équivalent.
+    # Extension non standard du shard — préfixe `x-` à la mode des
+    # extensions HTTP/MIME pour signaler explicitement l'absence
+    # d'équivalent dans AsciiDoc / Ruby asciidoctor-pdf.
     private def title_page_toc_enabled?(doc : Asciidoctor::Document) : Bool
-      attr = doc.attr("title-page-toc")
+      attr = doc.attr("x-title-page-toc")
       case attr
       when nil
-        @theme.title_page_with_toc
+        @theme.x_title_page_with_toc
       when "false", "off", "no", "0"
         false
       else
@@ -1703,7 +1716,7 @@ module AsciidoctorPDF
       page.stroke
     end
 
-    # Mode « page de garde + sommaire » (option `:title-page-toc:`).
+    # Mode « page de garde + sommaire » (option `:x-title-page-toc:`).
     # Mise en page :
     #   ┌──────────────────────────┐
     #   │ [logo]                   │  ← haut, optionnel

@@ -31,6 +31,11 @@ module AsciidoctorPDF
     property heading_font_color : String = "1a1a1a"
     property heading_line_height : Float64 = 1.2
 
+    # Niveau 0 = « part » en AsciiDoc (rare, mais valide quand le
+    # doctitle a été redéfini en section de niveau 0 par défaut, ou
+    # quand un `=` apparaît à l'intérieur du flux). On le typographie
+    # comme un grand titre, sensiblement plus gros que h1.
+    property h0_font_size : Float64 = 26.0
     property h1_font_size : Float64 = 22.0
     property h1_font_style : String = "bold"
     property h1_margin_top : Float64 = 12.0
@@ -118,8 +123,13 @@ module AsciidoctorPDF
     # garde (pas de page TOC séparée). Le titre n'est plus centré-bas
     # mais positionné en tête de zone de contenu, suivi de la TOC, puis
     # auteur + date en bas. Override per-document via l'attribut
-    # AsciiDoc `:title-page-toc:`.
-    property title_page_with_toc : Bool = false
+    # AsciiDoc `:x-title-page-toc:`.
+    #
+    # Le préfixe `x_` (pour `x-` côté YAML) marque cette propriété
+    # comme **extension non standard** propre au shard, sans équivalent
+    # dans AsciiDoc / Ruby asciidoctor-pdf — convention héritée de
+    # `X-*` dans HTTP/MIME.
+    property x_title_page_with_toc : Bool = false
 
     # --- Table des matières ---
     property toc_enabled : Bool = true
@@ -167,9 +177,11 @@ module AsciidoctorPDF
     property index_font_size : Float64 = 9.0
     property index_page_number_color : String = "555555"
 
-    # Retourne la taille de police pour un niveau de titre donné (1-6)
+    # Retourne la taille de police pour un niveau de titre donné (0-6).
+    # Le niveau 0 (« part ») est rendu comme un grand titre dédié.
     def heading_font_size(level : Int32) : Float64
       case level
+      when 0 then h0_font_size
       when 1 then h1_font_size
       when 2 then h2_font_size
       when 3 then h3_font_size
@@ -179,9 +191,11 @@ module AsciidoctorPDF
       end
     end
 
-    # Retourne la marge supérieure pour un niveau de titre donné
+    # Retourne la marge supérieure pour un niveau de titre donné.
+    # Le niveau 0 (part) reprend la marge de h1.
     def heading_margin_top(level : Int32) : Float64
       case level
+      when 0 then h1_margin_top
       when 1 then h1_margin_top
       when 2 then h2_margin_top
       when 3 then h3_margin_top
@@ -191,9 +205,11 @@ module AsciidoctorPDF
       end
     end
 
-    # Retourne la marge inférieure pour un niveau de titre donné
+    # Retourne la marge inférieure pour un niveau de titre donné.
+    # Le niveau 0 (part) reprend la marge de h1.
     def heading_margin_bottom(level : Int32) : Float64
       case level
+      when 0 then h1_margin_bottom
       when 1 then h1_margin_bottom
       when 2 then h2_margin_bottom
       when 3 then h3_margin_bottom

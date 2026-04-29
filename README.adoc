@@ -125,12 +125,19 @@ on accepte la pagination normale (« if possible » du standard).
 NOTE : l'estimation est volontairement pessimiste. Mieux vaut sauter
 trop tôt que se retrouver avec un orphelin.
 
-==== `:title-page-toc:` — extension Aloli (non standard)
+==== Convention `x-` pour les extensions non standard
 
-ATTENTION : `:title-page-toc:` est une *extension propre* à
-`crystal-asciidoctor-pdf`. Aucun équivalent natif n'existe dans AsciiDoc
-ni dans Ruby `asciidoctor-pdf`. Ne pas s'attendre à un rendu portable
-sur d'autres convertisseurs.
+Tout attribut AsciiDoc préfixé `x-` (et toute propriété de thème
+préfixée `x_` côté YAML) est une *extension propre* à
+`crystal-asciidoctor-pdf`, sans équivalent natif dans AsciiDoc
+standard ni dans Ruby `asciidoctor-pdf`. À utiliser en connaissance de
+cause si la portabilité du source vers d'autres convertisseurs vous
+importe.
+
+Convention héritée de `X-*` dans HTTP/MIME — explicite, court,
+universellement compris comme « extension hors standard ».
+
+==== `:x-title-page-toc:` — page de garde + sommaire intégré
 
 Activée per-document :
 
@@ -140,14 +147,14 @@ Activée per-document :
 :author: Auteur
 :revdate: 2026-04-29
 :toc:
-:title-page-toc:
+:x-title-page-toc:
 
 Préambule…
 
 == Section 1
 ----
 
-Ou activée pour tout un thème via `theme.title_page_with_toc: true`.
+Ou activée pour tout un thème via `theme.x_title_page_with_toc: true`.
 
 Effet : la page de garde n'a plus le titre centré-bas mais le titre tout en
 haut, suivi d'une ligne de séparation, du sommaire (table des matières
