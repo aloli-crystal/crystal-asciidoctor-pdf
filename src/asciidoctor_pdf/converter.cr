@@ -141,14 +141,14 @@ module AsciidoctorPDF
       when "floating_title"   then convert_floating_title(node)
       when "inline_anchor"    then convert_inline_anchor(node)
       when "inline_break"     then ""
-      when "inline_button"    then ""
+      when "inline_button"    then convert_inline_button(node)
       when "inline_callout"   then ""
       when "inline_footnote"  then convert_inline_footnote(node)
       when "inline_image"     then ""
       when "inline_indexterm" then convert_inline_indexterm(node)
-      when "inline_kbd"       then ""
-      when "inline_menu"      then ""
-      when "inline_quoted"    then ""
+      when "inline_kbd"       then convert_inline_kbd(node)
+      when "inline_menu"      then convert_inline_menu(node)
+      when "inline_quoted"    then convert_inline_quoted(node)
       when "pass"             then ""
       when "stem"             then ""
       when "audio"            then ""
@@ -1312,6 +1312,67 @@ module AsciidoctorPDF
       ""
     end
 
+    # Conversion d'un quoted inline (gras / italique / mono / sub / sup
+    # / mark / quotes) en HTML, qui sera ensuite digéré par
+    # `InlineRenderer.parse` avec son markup. Parité de la table
+    # `QUOTE_TAGS` côté HTML5 d'asciidoctor (Ruby et Crystal).
+    def convert_inline_quoted(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Inline)
+      type = node.type || :strong
+      text = node.text || ""
+      case type
+      when :strong      then "<strong>#{text}</strong>"
+      when :emphasis    then "<em>#{text}</em>"
+      when :monospaced  then "<code>#{text}</code>"
+      when :superscript then "<sup>#{text}</sup>"
+      when :subscript   then "<sub>#{text}</sub>"
+      when :mark        then "<mark>#{text}</mark>"
+      when :double      then "“#{text}”"
+      when :single      then "‘#{text}’"
+      else                   text
+      end
+    end
+
+    # `kbd:[Ctrl+C]` — produit le HTML keyseq parité Ruby/HTML5.
+    # `InlineRenderer` mappera `<kbd>` sur monospace + traitement
+    # spécifique (réservé pour un futur encadré).
+    def convert_inline_kbd(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Inline)
+      keys_str = node.attr("keys") || ""
+      keys = keys_str.split('+').map(&.strip).reject(&.empty?)
+      return "" if keys.empty?
+      if keys.size == 1
+        "<kbd>#{keys[0]}</kbd>"
+      else
+        "<span class=\"keyseq\"><kbd>#{keys.join("</kbd>+<kbd>")}</kbd></span>"
+      end
+    end
+
+    # `btn:[OK]` — bouton d'interface utilisateur. HTML : <b class="button">.
+    def convert_inline_button(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Inline)
+      "<b class=\"button\">#{node.text}</b>"
+    end
+
+    # `menu:[Fichier > Quitter]` — chaîne de menus. HTML standard.
+    def convert_inline_menu(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Inline)
+      menu = node.attr("menu") || ""
+      menuitem = node.attr("menuitem") || ""
+      submenus = node.attr("submenus") || ""
+      caret = " › "
+      if submenus.empty?
+        if !menuitem.empty?
+          "<span class=\"menuseq\"><b class=\"menu\">#{menu}</b>#{caret}<b class=\"menuitem\">#{menuitem}</b></span>"
+        else
+          "<b class=\"menuref\">#{menu}</b>"
+        end
+      else
+        joiner = "</b>#{caret}<b class=\"submenu\">"
+        "<span class=\"menuseq\"><b class=\"menu\">#{menu}</b>#{caret}<b class=\"submenu\">#{submenus.split(",").map(&.strip).join(joiner)}</b>#{caret}<b class=\"menuitem\">#{menuitem}</b></span>"
+      end
+    end
+
     # Gestion des notes de bas de page
     # Les notes sont collectées pendant le rendu, puis affichées en bas de chaque page.
     def convert_inline_footnote(node : Asciidoctor::AbstractNode) : String
@@ -2205,6 +2266,10 @@ module AsciidoctorPDF
 
     # Rend le contenu HTML inline ligne par ligne sur la page PDF courante.
     # Gère le retour à la ligne automatique et le rendu des segments stylisés.
+    # Tous les attributs (sup, sub, mark, kbd, button, menu, link, color)
+    # sont préservés lors du wrapping — `wrap_segments` clone fidèlement
+    # le segment d'origine, là où l'ancienne implémentation locale ne
+    # propageait que bold/italic/mono/color/link et perdait les nouveaux.
     private def render_inline_lines(
       page : PDF::Page,
       html : String,
@@ -2214,44 +2279,9 @@ module AsciidoctorPDF
       line_h : Float64,
     ) : Nil
       segments = InlineRenderer.parse(html)
-
-      # Regrouper les segments en lignes avec mesure exacte
-      current_line_segs = [] of InlineSegment
-      current_line_width = 0.0
-
-      segments.each do |seg|
-        font_name = resolve_inline_font(seg)
-        font = get_font(font_name)
-        space_w = font.string_width(" ", font_size)
-
-        words = seg.text.split(" ")
-        words.each_with_index do |word, idx|
-          word_w = font.string_width(word, font_size)
-          sep_w = (idx > 0 || !current_line_segs.empty?) ? space_w : 0.0
-
-          if current_line_width + sep_w + word_w > width && !current_line_segs.empty?
-            render_segment_line(page, current_line_segs, x, @current_y - font_size, font_size)
-            @current_y -= line_h
-            current_line_segs = [] of InlineSegment
-            current_line_width = 0.0
-            sep_w = 0.0
-          end
-
-          prefix = sep_w > 0 ? " " : ""
-          current_line_segs << InlineSegment.new(
-            text: prefix + word,
-            bold: seg.bold,
-            italic: seg.italic,
-            mono: seg.mono,
-            color: seg.color,
-            link: seg.link
-          )
-          current_line_width += sep_w + word_w
-        end
-      end
-
-      unless current_line_segs.empty?
-        render_segment_line(page, current_line_segs, x, @current_y - font_size, font_size)
+      lines = wrap_segments(segments, width, font_size)
+      lines.each do |line|
+        render_segment_line(page, line, x, @current_y - font_size, font_size)
         @current_y -= line_h
       end
     end
@@ -2292,6 +2322,12 @@ module AsciidoctorPDF
             bold: seg.bold,
             italic: seg.italic,
             mono: seg.mono,
+            sup: seg.sup,
+            sub: seg.sub,
+            mark: seg.mark,
+            kbd: seg.kbd,
+            button: seg.button,
+            menu: seg.menu,
             color: seg.color,
             link: seg.link
           )
@@ -2305,6 +2341,8 @@ module AsciidoctorPDF
 
     # Rend une ligne de segments inline sur la page PDF.
     # Utilise les métriques exactes des polices pour l'avancement horizontal.
+    # Gère sub/sup (taille réduite + décalage Y), mark (fond surligné),
+    # kbd (mono + petite police).
     private def render_segment_line(
       page : PDF::Page,
       segments : Array(InlineSegment),
@@ -2316,21 +2354,70 @@ module AsciidoctorPDF
       segments.each do |seg|
         next if seg.text.empty?
         font_name = resolve_inline_font(seg)
+
+        # Sub / sup : taille réduite + décalage Y (sup remonte, sub
+        # descend). Kbd : police légèrement réduite pour singulariser.
+        eff_font_size = font_size
+        eff_y = y
+        if seg.sup
+          eff_font_size = font_size * 0.75
+          eff_y = y + font_size * 0.35
+        elsif seg.sub
+          eff_font_size = font_size * 0.75
+          eff_y = y - font_size * 0.15
+        elsif seg.kbd
+          eff_font_size = font_size * 0.9
+        end
+
         font = get_font(font_name)
-        set_font(page, font_name, font_size)
+        set_font(page, font_name, eff_font_size)
+
+        # Mesurer d'abord pour dessiner d'éventuels arrière-plans
+        seg_w = font.string_width(seg.text, eff_font_size)
+        before = current_x
+
+        # Mark : surlignage jaune pâle derrière le texte. Le segment
+        # garde sa couleur de texte d'origine.
+        if seg.mark
+          mark_pad = 1.5
+          page.fill_color("fff59d") # jaune pastel
+          page.rectangle(before - mark_pad, eff_y - 2, seg_w + 2 * mark_pad, eff_font_size + 4)
+          page.fill
+        end
+        # Kbd : encadré gris clair façon « touche de clavier ».
+        if seg.kbd
+          kbd_pad_x = 3.0
+          kbd_pad_y = 1.0
+          page.fill_color("f5f5f5")
+          page.rectangle(before - kbd_pad_x, eff_y - kbd_pad_y, seg_w + 2 * kbd_pad_x, eff_font_size + 2 * kbd_pad_y)
+          page.fill
+          page.stroke_color("cccccc")
+          page.line_width(0.4)
+          page.rectangle(before - kbd_pad_x, eff_y - kbd_pad_y, seg_w + 2 * kbd_pad_x, eff_font_size + 2 * kbd_pad_y)
+          page.stroke
+        end
+        # Bouton : encadré gris pâle à coins arrondis simulés
+        # (rectangle plat — le PDF natif ne fait pas les coins
+        # arrondis sans Bezier dédié, on garde simple).
+        if seg.button
+          page.fill_color("e0e0e0")
+          page.rectangle(before - 3, eff_y - 1.5, seg_w + 6, eff_font_size + 3)
+          page.fill
+        end
+
         page.fill_color(seg.color || @theme.base_font_color)
 
-        # Route through the same pipeline as `draw_text_run` so
-        # emojis are rendered as colour SVG (via emojis)
-        # and unrenderable characters are substituted with `?` plus
-        # a deduplicated warning. Width consumed by the run is
-        # captured by tracking `current_x` before/after.
-        before = current_x
-        draw_text_run(page, seg.text, current_x, y, font_name, font_size)
-        seg_w = font.string_width(seg.text, font_size)
+        # Route through `draw_text_run` so emojis & unrenderable chars
+        # get the same treatment as the rest of the engine.
+        draw_text_run(page, seg.text, current_x, eff_y, font_name, eff_font_size)
+        # Avancement horizontal : la mesure est faite à `eff_font_size`,
+        # plus une petite réserve pour kbd/button/mark afin que les
+        # encadrés ne se touchent pas.
         current_x = before + seg_w
+        current_x += 4.0 if seg.kbd || seg.button
+        current_x += 2.0 if seg.mark
 
-        # Ajouter une annotation lien si le segment contient un lien
+        # Annotation lien
         if (link = seg.link) && !link.empty?
           page.link_uri(
             rect: {before, y - 2, current_x, y + font_size},
