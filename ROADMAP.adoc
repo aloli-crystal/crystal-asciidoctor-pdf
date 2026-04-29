@@ -1,0 +1,210 @@
+= Roadmap — bugs et gaps connus
+:toc:
+
+Suivi des écarts entre `crystal-asciidoctor-pdf` (portage Crystal) et la
+gem Ruby `asciidoctor-pdf` 2.3.24 (référence). Issu de l'audit du
+2026-04-29 + retours utilisateur.
+
+Mise à jour : 2026-04-29 (post v2.3.24.27).
+
+== Légende
+
+[cols="1,3"]
+|===
+| Sigle | Sens
+
+| 🔴 | Critique — bloque l'usage courant, à traiter en priorité.
+| 🟠 | Important — fonctionnalité courante, contournable mais gênant.
+| 🟡 | Cosmétique — rarement utilisé, faible impact.
+| S | Effort 1-2h
+| M | Effort 1 journée
+| L | Effort plusieurs jours
+|===
+
+== Bugs ouverts
+
+Comportements incorrects de fonctionnalités déjà présentes.
+
+[cols="2,1,1,4"]
+|===
+| Bug | Sév. | Effort | Description
+
+| Inline markup retiré dans les admonitions
+| 🔴
+| S
+| `convert_admonition` appelle `strip_inline_markup` qui efface
+  *gras*, _italique_, `mono`. Résultat : un `[CAUTION]` contenant
+  `*Quizz non validé*` rend en texte plat. Affecte aussi les blocs
+  `x-score-*` (même fonction utilisée). Symptôme observé sur les
+  fiches de quiz QUIMEO.
+
+| TOC absente du test "headings_and_toc"
+| 🟡
+| S
+| Voir spec/integration/headings_and_toc_spec.cr — un test
+  marqué `pending` parce que les rendus de TOC ne réagissent pas
+  toujours correctement aux niveaux de heading complexes.
+|===
+
+== Gaps prioritaires (parité Ruby)
+
+Fonctionnalités présentes dans Ruby asciidoctor-pdf 2.3.24, absentes
+ou tronquées côté Crystal.
+
+[cols="2,1,1,4"]
+|===
+| Gap | Sév. | Effort | Description
+
+| Inline quoted étendu
+| 🔴
+| M
+| `convert_inline_quoted` retourne `""`. Sub, sup, kbd:[Ctrl+C],
+  btn:[OK], menu:[Fichier > Quitter], mark, smallcaps, line-through
+  ne sont pas dispatchés. Bloque tout corpus technique.
+
+| Inline image / icônes
+| 🔴
+| M
+| `convert_inline_image` retourne `""`. `image:logo.png[]`,
+  `icon:warning[]` invisibles. Tous les pré-requis SVG/raster sont
+  pourtant déjà dans `convert_image`.
+
+| Encadrement visuel sidebar / example / open
+| 🔴
+| S-M
+| Ces blocs sont rendus comme paragraphes (pas de fond, pas de
+  bordure, pas de titre). Fortement visible en doc.
+
+| Heading chapter break + numérotation romaine front-matter
+| 🟠
+| S+S
+| `theme.heading_chapter_break_before` non lu. Pas de saut auto avant
+  un H1 (« chapter »). Pas de numérotation `i, ii, iii` sur le
+  front-matter (helper `roman_numeral.rb` non porté).
+
+| Header / footer recto-verso
+| 🟠
+| M
+| Crystal a un seul template ; pas de variantes
+  `header_recto_*` / `header_verso_*` ni de variables
+  `{section_title}` distinctes par côté. `section_info_by_page.rb`
+  manquant.
+|===
+
+== Gaps secondaires
+
+Moins critiques mais utiles pour le rendu de docs réels.
+
+[cols="2,1,1,4"]
+|===
+| Gap | Sév. | Effort | Description
+
+| Callouts dans listings (`<1>`, `<2>` + colist)
+| 🟠
+| M
+| `convert_inline_callout` et `convert_colist` retournent `""`.
+
+| Table colspan / rowspan / valign / autofit
+| 🟠
+| M
+| Cellules linéaires uniquement. Largeurs non auto-fit.
+
+| Quote / verse non distingués
+| 🟠
+| S
+| Verse perd `pre-wrap`, attribution non rendue.
+
+| Description list complexe (qanda, horizontal)
+| 🟠
+| M
+| `convert_dlist` minimal — pas de styles spéciaux, pas de
+  multi-termes par item.
+
+| Page break attributes
+| 🟠
+| S
+| `[%always]` ignoré, pas de blank pages forcées pour folio recto.
+
+| PDF metadata étendues (keywords, creator)
+| 🟠
+| S
+| Crystal pose `title` / `author` / `subject` / `producer`. Manquent
+  `keywords`, `creator`, `lang`, dates.
+
+| Attributs `pdf-*` doc-level
+| 🟠
+| S
+| `:pdf-page-size:`, `:pdf-page-layout:` côté thème uniquement,
+  pas d'override par attribut document. Idem `:pdf-version:`,
+  `:pdf-folio-placement:`.
+|===
+
+== Gaps cosmétiques
+
+À traiter quand le reste sera mûr.
+
+[cols="2,1,1,4"]
+|===
+| Gap | Sév. | Effort | Description
+
+| Optimizer (compression Ghostscript)
+| 🟡
+| M
+| `optimizer.rb` non porté. Pas de linearization PDF.
+
+| Sanitizer dédié
+| 🟡
+| S
+| Strip simple par regex côté Crystal ; échappements partiels.
+
+| Text transformer (uppercase, smallcaps, capitalize)
+| 🟡
+| S
+| `text_transformer.rb` non porté. Impacte `text-transform` sur titres.
+
+| Audio / video / stem / pass
+| 🟡
+| S
+| Renvoient `""`. STEM (math) demande MathJax → effort majeur séparé.
+
+| Collapsible blocks
+| 🟡
+| S
+| Pas de dispatch dédié.
+
+| Cover page (face: front/back) + background
+| 🟡
+| M
+| Pas de cover face arrière, pas de page background, pas de watermark.
+
+| Abstract block
+| 🟡
+| S
+| Rendu via paragraphe générique, pas de style dédié.
+
+| Index pagenum sequence style
+| 🟡
+| S
+| Pas de range « 12-15 » groupé.
+|===
+
+== Roadmap proposée (ordre de bataille)
+
+L'ordre privilégie l'**impact pour les cas d'usage Aloli** (quiz,
+fiches QUIMEO, futurs rapports d'audit ISO 27001).
+
+. **v2.3.24.28** — Bug : inline markup dans admonitions / x-score
+    (gras, italique, mono). Effort S. Bénéfice immédiat sur les
+    quiz existants.
+. **v2.3.24.29** — Inline quoted étendu (sub, sup, kbd, btn, menu,
+    mark). Effort M. Couvre une grosse partie du markup technique.
+. **v2.3.24.30** — Inline image / icônes. Effort M. Pour les
+    badges, icônes de criticité, logos inline.
+. **v2.3.24.31** — Encadrement visuel sidebar / example / open
+    (fond, bordure, titre). Effort S-M.
+. **v2.3.24.32** — Heading chapter break + numérotation romaine.
+    Effort S+S. Essentiel pour les rapports formels.
+. **v2.3.24.33** — Header / footer recto-verso + section_info.
+    Effort M. Cible ISO 27001.
+
+Au-delà : tableaux complexes, callouts, métadonnées étendues, etc.
