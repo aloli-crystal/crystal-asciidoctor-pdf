@@ -1,8 +1,8 @@
-require "crystal-asciidoctor/src/crystal-asciidoctor"
-require "pdf/src/pdf"
-require "flags/src/crystal_flags"
-require "emojis/src/crystal_emojis"
-require "noto-cjk/src/crystal_noto_cjk"
+require "crystal-asciidoctor"
+require "pdf"
+require "country-flags"
+require "emojis"
+require "noto-cjk"
 require "./inline_flags"
 
 module AsciidoctorPDF
@@ -1896,7 +1896,7 @@ module AsciidoctorPDF
 
       InlineFlags.segments(text).each do |(kind, value)|
         if kind == :flag
-          if (svg_data = Flags.svg(value))
+          if (svg_data = CountryFlags.svg(value))
             # `page.svg(at: {x, y})` treats `y` as the top of the SVG
             # bounding box (the renderer flips y internally). To align
             # the flag with the text's x-height, position the top of

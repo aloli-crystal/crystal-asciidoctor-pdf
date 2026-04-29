@@ -1,5 +1,5 @@
-require "pdf/src/pdf"
-require "flags/src/crystal_flags"
+require "pdf"
+require "country-flags"
 require "./inline_flags"
 
 module AsciidoctorPDF
@@ -74,7 +74,7 @@ module AsciidoctorPDF
         # styling (bold/italic/mono/colour).
         InlineFlags.segments(seg.text).each do |(kind, value)|
           if kind == :flag
-            if (svg_data = Flags.svg(value))
+            if (svg_data = CountryFlags.svg(value))
               page.svg(svg_data, at: {current_x, y + flag_h}, width: flag_w, height: flag_h)
             else
               page.text("[#{value}]", at: {current_x, y})
