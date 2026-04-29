@@ -144,7 +144,7 @@ module AsciidoctorPDF
       when "inline_button"    then convert_inline_button(node)
       when "inline_callout"   then ""
       when "inline_footnote"  then convert_inline_footnote(node)
-      when "inline_image"     then ""
+      when "inline_image"     then convert_inline_image(node)
       when "inline_indexterm" then convert_inline_indexterm(node)
       when "inline_kbd"       then convert_inline_kbd(node)
       when "inline_menu"      then convert_inline_menu(node)
@@ -1354,6 +1354,42 @@ module AsciidoctorPDF
       "<b class=\"button\">#{node.text}</b>"
     end
 
+    # `image:logo.png[]` ou `icon:warning[]` — image inline.
+    # Pour les images : produit un `<img>` HTML qui sera digéré par
+    # `InlineRenderer.parse_html` et rendu via `page.image` ou
+    # `page.svg`. Pour les icônes (`type == :icon`) : on retourne pour
+    # l'instant un placeholder textuel `[<nom>]` faute de bibliothèque
+    # d'icônes intégrée. Une vraie roadmap demanderait Font Awesome /
+    # icônes Twemoji.
+    def convert_inline_image(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Inline)
+      target = node.target || ""
+      return "" if target.empty?
+
+      type = node.type || :image
+      alt = node.attr("alt") || target
+
+      if type == :icon
+        return "[#{target}]" # fallback texte tant que pas de bibliothèque d'icônes
+      end
+
+      image_path = resolve_image_path_str(node.document, target)
+      return "[#{alt}]" unless image_path && File.exists?(image_path)
+
+      # Width/height : prioritaire `pdfwidth`, sinon `width`. Si rien,
+      # le rendu prendra une taille raisonnable « inline » (cf.
+      # `render_segment_line`). On encode l'alt comme texte du segment
+      # pour le fallback (et pour la lisibilité du HTML produit).
+      width = node.attr("pdfwidth") || node.attr("width") || ""
+      height = node.attr("height") || ""
+
+      attrs = %( src="#{image_path}")
+      attrs += %( width="#{width}") unless width.empty?
+      attrs += %( height="#{height}") unless height.empty?
+      attrs += %( alt="#{alt}")
+      "<img#{attrs}/>"
+    end
+
     # `menu:[Fichier > Quitter]` — chaîne de menus. HTML standard.
     def convert_inline_menu(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Inline)
@@ -2286,6 +2322,49 @@ module AsciidoctorPDF
       end
     end
 
+    # Dessine une image inline (raster ou SVG) à la position courante
+    # de la ligne. Hauteur calée sur la taille de police pour donner
+    # un comportement « icône inline » par défaut.
+    private def render_inline_image(
+      seg : InlineSegment,
+      img_path : String,
+      x : Float64,
+      y : Float64,
+      font_size : Float64,
+    ) : Nil
+      page = @current_page.not_nil!
+      display_w = seg.image_width || (font_size * 1.2)
+      display_h = seg.image_height || display_w
+      begin
+        if svg_target?(img_path)
+          svg_data = File.read(img_path)
+          parser = @doc.svg_parser_for(svg_data)
+          svg_w = parser.width
+          svg_h = parser.height
+          if vb = parser.viewbox
+            svg_w = vb[2] if vb[2] > 0
+            svg_h = vb[3] if vb[3] > 0
+          end
+          # Ratio préservé si seul width est précisé.
+          unless seg.image_height
+            display_h = svg_h * (display_w / svg_w)
+          end
+          # `page.svg` interprète y comme le HAUT du SVG → on offset.
+          page.svg(svg_data, at: {x, y + display_h}, width: display_w, height: display_h)
+        else
+          img = PDF::Images::Image.load(img_path)
+          unless seg.image_height
+            display_h = img.height.to_f * (display_w / img.width.to_f)
+          end
+          # `page.image` traite y comme le HAUT — même offset.
+          page.image(img, at: {x, y + display_h}, width: display_w)
+        end
+      rescue ex
+        # Fallback : texte alt sans formatage particulier.
+        draw_text_run(page, seg.text, x, y, @fn_body, font_size)
+      end
+    end
+
     # Découpe un flux de segments inline en lignes selon une largeur
     # donnée. Préserve les attributs de style (gras, italique, mono,
     # couleur, lien) — ce que `wrap_text` ne sait pas faire car il
@@ -2300,6 +2379,21 @@ module AsciidoctorPDF
       current_width = 0.0
 
       segments.each do |seg|
+        # Image inline : occupe une largeur connue (pdfwidth / width
+        # explicite, ou défaut basé sur la taille de police). Pas de
+        # split par mots — on traite le segment comme un atome.
+        if seg.image_path
+          img_w = seg.image_width || (font_size * 1.2)
+          if current_width + img_w > width && !current_line.empty?
+            lines << current_line
+            current_line = [] of InlineSegment
+            current_width = 0.0
+          end
+          current_line << seg
+          current_width += img_w + 2.0
+          next
+        end
+
         font_name = resolve_inline_font(seg)
         font = get_font(font_name)
         space_w = font.string_width(" ", font_size)
@@ -2329,7 +2423,10 @@ module AsciidoctorPDF
             button: seg.button,
             menu: seg.menu,
             color: seg.color,
-            link: seg.link
+            link: seg.link,
+            image_path: seg.image_path,
+            image_width: seg.image_width,
+            image_height: seg.image_height
           )
           current_width += sep_w + word_w
         end
@@ -2352,6 +2449,16 @@ module AsciidoctorPDF
     ) : Nil
       current_x = x
       segments.each do |seg|
+        # Image inline (raster ou SVG) : route vers `page.svg` ou
+        # `page.image` selon l'extension. La taille est calculée à
+        # partir des attrs (pdfwidth/width/height) ; à défaut on prend
+        # une icône inline ~ taille de la ligne.
+        if (img_path = seg.image_path)
+          render_inline_image(seg, img_path, current_x, y, font_size)
+          img_w = seg.image_width || (font_size * 1.2)
+          current_x += img_w + 2.0
+          next
+        end
         next if seg.text.empty?
         font_name = resolve_inline_font(seg)
 

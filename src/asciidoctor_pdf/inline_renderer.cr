@@ -8,6 +8,8 @@ module AsciidoctorPDF
   # vertical au rendu). `mark` active un fond de surlignage. `kbd`,
   # `button`, `menu` correspondent aux macros AsciiDoc :
   # `kbd:[Ctrl+C]`, `btn:[OK]`, `menu:[Fichier > Quitter]`.
+  # `image_path` (et width/height) basculent le segment en image
+  # inline — le `text` sert alors d'alt-text de fallback.
   record InlineSegment,
     text : String,
     bold : Bool = false,
@@ -20,7 +22,10 @@ module AsciidoctorPDF
     button : Bool = false,
     menu : Bool = false,
     color : String? = nil,
-    link : String? = nil
+    link : String? = nil,
+    image_path : String? = nil,
+    image_width : Float64? = nil,
+    image_height : Float64? = nil
 
   # Rend le markup inline HTML généré par crystal-asciidoctor sur une page PDF.
   # Gère les balises <strong>, <em>, <code>, <a href>, <span style="color:...">, etc.
@@ -228,7 +233,24 @@ module AsciidoctorPDF
             when "sup"        then sup_depth += 1
             when "sub"        then sub_depth += 1
             when "mark"       then mark_depth += 1
-            when "br"         then buf += " " # hard line break — espace
+            when "img"
+              # Image inline : posée comme un segment dédié (texte vide,
+              # `image_path` renseigné). Le rendu route vers `page.image`
+              # ou `page.svg` selon l'extension. Self-closing en HTML, pas
+              # de tag de fermeture à attendre — on émet directement.
+              if (m = tag.match(/src="([^"]+)"/))
+                img_path = m[1]
+                img_alt = tag.match(/alt="([^"]+)"/).try &.[1]
+                img_w = tag.match(/width="([^"]+)"/).try &.[1].to_f?
+                img_h = tag.match(/height="([^"]+)"/).try &.[1].to_f?
+                segments << InlineSegment.new(
+                  text: img_alt || "",
+                  image_path: img_path,
+                  image_width: img_w,
+                  image_height: img_h
+                )
+              end
+            when "br" then buf += " " # hard line break — espace
             # pour l'instant. Un vrai `<br>` exigerait un saut de ligne
             # explicite dans la render pipeline ; un `\n` litéral
             # afficherait un tofu (pas de glyphe newline en Type1).
