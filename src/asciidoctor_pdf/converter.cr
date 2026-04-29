@@ -173,8 +173,10 @@ module AsciidoctorPDF
       @doc.producer = "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"
 
       # Page de titre
+      title_rendered = false
       if @theme.title_page_enabled && !@document_title.empty?
         render_title_page(node)
+        title_rendered = true
       end
 
       # Table des matières (page réservée, sera remplie après le rendu du contenu)
@@ -184,6 +186,11 @@ module AsciidoctorPDF
         new_page
         # Créer une nouvelle page pour le contenu afin d'éviter que le corps
         # ne se superpose à la TOC (qui sera rendue en post-traitement)
+        new_page
+      elsif title_rendered
+        # Sans TOC, basculer sur une nouvelle page après la page de titre
+        # pour éviter que le corps ne se superpose au titre rendu au milieu
+        # de la page de garde.
         new_page
       end
 
