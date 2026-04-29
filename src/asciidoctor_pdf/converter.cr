@@ -157,7 +157,7 @@ module AsciidoctorPDF
       when "inline_anchor"    then convert_inline_anchor(node)
       when "inline_break"     then ""
       when "inline_button"    then convert_inline_button(node)
-      when "inline_callout"   then ""
+      when "inline_callout"   then convert_inline_callout(node)
       when "inline_footnote"  then convert_inline_footnote(node)
       when "inline_image"     then convert_inline_image(node)
       when "inline_indexterm" then convert_inline_indexterm(node)
@@ -168,7 +168,7 @@ module AsciidoctorPDF
       when "stem"             then ""
       when "audio"            then ""
       when "video"            then ""
-      when "colist"           then ""
+      when "colist"           then convert_colist(node)
       when "outline"          then ""
       when "embedded"         then convert_embedded(node)
       else                         ""
@@ -1461,6 +1461,71 @@ module AsciidoctorPDF
       return "" unless node.is_a?(Asciidoctor::Inline)
       term = node.text || ""
       @index_entries << IndexEntry.new(term, @page_number) unless term.empty?
+      ""
+    end
+
+    # Callout inline `<1>` `<2>` … dans un bloc listing.
+    # Rendu : un disque sombre avec le numéro en blanc, mêlé au flux
+    # de code. Parité Ruby : `<b class="conum">(1)</b>`.
+    def convert_inline_callout(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Inline)
+      text = node.text || ""
+      # Encodage typographique simple : utiliser les chiffres
+      # entourés d'un cercle (Unicode ① ② … ⑳) quand possible. Au-delà,
+      # fallback sur `(N)` en gras.
+      n = text.to_i?
+      glyph = if n && n >= 1 && n <= 20
+                # ① = U+2460 → décalage selon le numéro
+                ((0x2460 + n - 1).chr.to_s)
+              else
+                "(#{text})"
+              end
+      "<b class=\"conum\">#{glyph}</b>"
+    end
+
+    # Liste de callouts (colist) qui suit un listing annoté.
+    # Format AsciiDoc : `<1> Description du premier callout.`
+    # Rendu : liste à marqueurs ① ② … alignés sur le bloc texte.
+    def convert_colist(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::List)
+      ensure_page
+
+      font_size = @theme.base_font_size
+      line_h = font_size * @theme.base_line_height
+      marker_w = 18.0 # espace réservé au marqueur ①
+
+      @current_y -= 4.0
+      node.items.each_with_index do |item, idx|
+        n = idx + 1
+        glyph = (n >= 1 && n <= 20) ? ((0x2460 + n - 1).chr.to_s) : "(#{n})"
+
+        text = ""
+        if item.responds_to?(:text)
+          itext = item.text
+          text = itext.is_a?(Array) ? itext.join(" ") : (itext || "").to_s
+        end
+
+        segments = InlineRenderer.parse(text)
+        lines = wrap_segments(segments, @content_width - marker_w, font_size)
+        lines = [[] of InlineSegment] if lines.empty?
+
+        # Hauteur totale de l'item pour anti-orphelin.
+        check_page_break(lines.size * line_h + 4.0)
+        page = @current_page.not_nil!
+
+        # Marqueur en gras à gauche.
+        set_font(page, @fn_body_bold, font_size)
+        page.fill_color(@theme.heading_font_color)
+        draw_text_run(page, glyph, @margin, @current_y - font_size, @fn_body_bold, font_size)
+
+        # Texte indenté sous le marqueur, multi-ligne.
+        y = @current_y - font_size
+        lines.each do |line|
+          render_segment_line(page, line, @margin + marker_w, y, font_size)
+          y -= line_h
+        end
+        @current_y -= lines.size * line_h + 4.0
+      end
       ""
     end
 
