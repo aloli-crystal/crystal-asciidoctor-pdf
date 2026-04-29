@@ -93,6 +93,38 @@ Trois leviers contrôlent ce comportement :
 * `theme.title_page_enabled: false` (thème YAML) — défaut sans page de garde,
   les attributs document peuvent toujours réactiver pour un doc précis.
 
+=== Garder un groupe d'éléments ensemble — `[%unbreakable]`
+
+Pour empêcher qu'un texte soit orphelin de son tableau (ou qu'un groupe
+quelconque se retrouve coupé par un saut de page), regrouper les
+éléments dans un *open block* (`--`) et y ajouter l'option
+`[%unbreakable]` :
+
+[source,asciidoc]
+----
+[%unbreakable]
+--
+[options="header"]
+|===
+| # | Équipement | Salarié | Employeur
+| 1 | Ordinateur portable | | ✓
+| 2 | Connexion Internet | ✓ |
+|===
+
+_Statut : Bonne réponse._
+--
+----
+
+Comportement : avant de commencer le rendu du bloc, le shard estime sa
+hauteur cumulée (paragraphes + tableaux + listes + listings +
+admonitions). Si l'espace restant sur la page courante est insuffisant
+mais que le bloc tient sur une page entière, on saute à la page
+suivante avant de commencer. Si le bloc dépasse la hauteur d'une page,
+on accepte la pagination normale (« if possible » du standard).
+
+NOTE : l'estimation est volontairement pessimiste. Mieux vaut sauter
+trop tôt que se retrouver avec un orphelin.
+
 ==== `:title-page-toc:` — extension Aloli (non standard)
 
 ATTENTION : `:title-page-toc:` est une *extension propre* à

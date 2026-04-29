@@ -1035,8 +1035,106 @@ module AsciidoctorPDF
 
     def convert_open(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Block)
+
+      # Option `[%unbreakable]` : on essaie de garder tout le bloc sur
+      # une même page. Estimation grossière de la hauteur cumulée
+      # (paragraphes + tableaux + listes + listings + admonitions).
+      # Si le bloc tient sur une page mais pas dans l'espace restant,
+      # on saute à la page suivante avant de commencer le rendu.
+      # Si le bloc dépasse la hauteur d'une page entière, on accepte
+      # la pagination normale (cf. « if possible » du standard).
+      if node.option?("unbreakable")
+        ensure_page
+        total_h = node.blocks.sum { |b| estimate_block_height(b) }
+        page_content_h = @page_height - 2 * @margin
+        space_left = @current_y - @margin
+        if total_h <= page_content_h && total_h > space_left
+          new_page
+        end
+      end
+
       node.blocks.each { |b| convert(b) }
       ""
+    end
+
+    # Estime la hauteur en points qu'occupera un bloc enfant lors du
+    # rendu. Utilisé par `convert_open` (option `[%unbreakable]`) pour
+    # décider d'un saut de page anticipé. Volontairement pessimiste
+    # (mieux vaut sauter trop que pas assez).
+    private def estimate_block_height(block : Asciidoctor::AbstractBlock) : Float64
+      case block.context.to_s
+      when "paragraph"
+        raw = block.content
+        text = raw.is_a?(Array) ? raw.join(" ") : (raw || "")
+        return 0.0 if text.empty?
+        lines = wrap_text(text, @content_width, @theme.base_font_size, @fn_body)
+        lines.size * @theme.base_font_size * @theme.base_line_height + 8.0
+      when "table"
+        estimate_table_height(block)
+      when "listing", "literal"
+        estimate_listing_height(block)
+      when "ulist", "olist", "dlist"
+        estimate_list_height(block)
+      when "admonition"
+        line_h = @theme.base_font_size * @theme.base_line_height
+        raw = block.content
+        text = raw.is_a?(Array) ? raw.join("\n") : (raw || "")
+        (text.lines.size + 1) * line_h + 16.0
+      when "image"
+        # Sans charger l'image on ne sait pas la hauteur réelle ; on
+        # surestime pour rester côté safe.
+        160.0
+      when "open"
+        # Bloc imbriqué : somme récursive des enfants.
+        if block.responds_to?(:blocks)
+          block.blocks.sum { |b| estimate_block_height(b) }
+        else
+          40.0
+        end
+      else
+        # Fallback raisonnable pour les types non couverts.
+        40.0
+      end
+    end
+
+    private def estimate_table_height(block : Asciidoctor::AbstractBlock) : Float64
+      return 40.0 unless block.responds_to?(:rows)
+      font_size = @theme.base_font_size
+      line_h = font_size * @theme.base_line_height
+      padding = @theme.table_cell_padding * 2
+
+      total = @theme.table_margin_top + @theme.table_margin_bottom
+      rows = block.rows
+      [rows.head, rows.body, rows.foot].each do |section|
+        section.each do |row|
+          row_h = padding + line_h
+          row.each do |cell|
+            text = cell.text || ""
+            next if text.empty?
+            # Largeur de cellule estimée : content_width / nb cellules.
+            est_col_w = @content_width / [row.size, 1].max
+            wrapped = wrap_text(text, est_col_w - padding, font_size, @fn_body)
+            cell_h = wrapped.size * line_h + padding
+            row_h = cell_h if cell_h > row_h
+          end
+          total += row_h
+        end
+      end
+      total
+    end
+
+    private def estimate_listing_height(block : Asciidoctor::AbstractBlock) : Float64
+      return 40.0 unless block.responds_to?(:lines)
+      line_h = @theme.code_font_size * @theme.base_line_height
+      block.lines.size * line_h + 2 * @theme.code_padding +
+        @theme.code_margin_top + @theme.code_margin_bottom
+    end
+
+    private def estimate_list_height(block : Asciidoctor::AbstractBlock) : Float64
+      return 40.0 unless block.responds_to?(:items)
+      line_h = @theme.base_font_size * @theme.base_line_height
+      # Approximation : chaque item ≈ 1 ligne + petit espacement.
+      block.items.size * (line_h + 4.0) + 8.0
     end
 
     def convert_preamble(node : Asciidoctor::AbstractNode) : String
