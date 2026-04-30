@@ -1504,7 +1504,7 @@ module AsciidoctorPDF
         return render_x_score_block(node, level)
       end
 
-      render_panel(node, :example)
+      render_panel(node, :example, collapsible: node.option?("collapsible"))
       ""
     end
 
@@ -1520,7 +1520,7 @@ module AsciidoctorPDF
     # un peu plus court ou un peu trop long ; on accepte cet écart
     # visuel mineur en échange de la simplicité (pas de mode
     # « deux passes » avec dry-run du rendu).
-    private def render_panel(node : Asciidoctor::Block, kind : Symbol) : Nil
+    private def render_panel(node : Asciidoctor::Block, kind : Symbol, collapsible : Bool = false) : Nil
       ensure_page
 
       bg, border, border_w, padding, mtop, mbot, title_color, title_size =
@@ -1583,12 +1583,17 @@ module AsciidoctorPDF
         page.stroke
       end
 
-      # 2) Titre du bloc (caption `.Mon titre`).
+      # 2) Titre du bloc (caption `.Mon titre`). Préfixé d'un ▾ quand
+      # le bloc porte l'option `[%collapsible]` — signal visuel du
+      # caractère « dépliable » côté HTML, simplement informatif en
+      # PDF (pas d'interactivité possible).
       if node.title? && (title = node.title)
         inner_x = saved_margin + padding
         set_font(page, @fn_body_bold, title_size)
         page.fill_color(title_color)
-        draw_text_run(page, decode_html_entities(title), inner_x, @current_y - padding - title_size, @fn_body_bold, title_size)
+        rendered_title = decode_html_entities(title)
+        rendered_title = "▾ #{rendered_title}" if collapsible
+        draw_text_run(page, rendered_title, inner_x, @current_y - padding - title_size, @fn_body_bold, title_size)
         @current_y -= padding + title_size * 1.4
       else
         @current_y -= padding
