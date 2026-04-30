@@ -128,8 +128,15 @@ module AsciidoctorPDF
       "TABLOID" => {792.00, 1224.00},
     }
 
+    # `@theme_provided` mémorise si l'appelant a passé un thème
+    # explicite. Quand non (theme: nil), `convert_document` peut
+    # résoudre dynamiquement via l'attribut document `:pdf-theme:`
+    # — alignement avec le comportement du CLI.
+    @theme_provided : Bool = false
+
     def initialize(backend : String = "pdf", theme : Theme? = nil)
       super(backend)
+      @theme_provided = !theme.nil?
       @theme = theme || Theme.new
       @doc = PDF::Document.new
       @backend_traits = Asciidoctor::Converter::BackendTraits.new(
@@ -225,6 +232,19 @@ module AsciidoctorPDF
       # ASCII spaces only just before each `page.text` call.
       @document_title = decode_html_entities(node.doctitle || "")
       @output_path = determine_output_path(node)
+
+      # Résolution per-document du thème : si l'utilisateur n'a pas
+      # passé de thème explicite au constructeur, on lit l'attribut
+      # AsciiDoc `:pdf-theme:` et on charge le thème embarqué (ou un
+      # fichier YAML) correspondant. Alignement de comportement entre
+      # le CLI (qui faisait déjà ça) et l'API directe (qui ignorait
+      # cet attribut).
+      if !@theme_provided && (pdf_theme = node.attr("pdf-theme")) && !pdf_theme.to_s.empty?
+        @theme = ThemeLoader.resolve(pdf_theme.to_s)
+        @margin = @theme.page_margin
+        apply_page_size(@theme.page_size, @theme.page_layout)
+        load_theme_fonts
+      end
 
       # Métadonnées PDF
       # Override per-document de la taille / orientation par les
