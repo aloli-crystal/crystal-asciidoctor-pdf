@@ -134,13 +134,20 @@ module AsciidoctorPDF
         when "code_margin_bottom"    then theme.code_margin_bottom = parse_float(value, theme.code_margin_bottom)
         when "code_font_color"       then theme.code_font_color = value.as_s? || theme.code_font_color
           # Admonitions
-        when "admonition_border_width"    then theme.admonition_border_width = parse_float(value, theme.admonition_border_width)
-        when "admonition_padding"         then theme.admonition_padding = parse_float(value, theme.admonition_padding)
-        when "admonition_note_color"      then theme.admonition_note_color = value.as_s? || theme.admonition_note_color
-        when "admonition_tip_color"       then theme.admonition_tip_color = value.as_s? || theme.admonition_tip_color
-        when "admonition_warning_color"   then theme.admonition_warning_color = value.as_s? || theme.admonition_warning_color
-        when "admonition_caution_color"   then theme.admonition_caution_color = value.as_s? || theme.admonition_caution_color
-        when "admonition_important_color" then theme.admonition_important_color = value.as_s? || theme.admonition_important_color
+        when "admonition_border_width"         then theme.admonition_border_width = parse_float(value, theme.admonition_border_width)
+        when "admonition_padding"              then theme.admonition_padding = parse_float(value, theme.admonition_padding)
+        when "admonition_note_color"           then theme.admonition_note_color = value.as_s? || theme.admonition_note_color
+        when "admonition_tip_color"            then theme.admonition_tip_color = value.as_s? || theme.admonition_tip_color
+        when "admonition_warning_color"        then theme.admonition_warning_color = value.as_s? || theme.admonition_warning_color
+        when "admonition_caution_color"        then theme.admonition_caution_color = value.as_s? || theme.admonition_caution_color
+        when "admonition_important_color"      then theme.admonition_important_color = value.as_s? || theme.admonition_important_color
+        when "admonition_boxed"                then theme.admonition_boxed = parse_bool(value, theme.admonition_boxed)
+        when "admonition_box_background_color" then theme.admonition_box_background_color = value.as_s? || theme.admonition_box_background_color
+        when "admonition_box_border_color"     then theme.admonition_box_border_color = value.as_s? || theme.admonition_box_border_color
+        when "admonition_box_border_width"     then theme.admonition_box_border_width = parse_float(value, theme.admonition_box_border_width)
+        when "admonition_box_shadow_enabled"   then theme.admonition_box_shadow_enabled = parse_bool(value, theme.admonition_box_shadow_enabled)
+        when "admonition_box_shadow_color"     then theme.admonition_box_shadow_color = value.as_s? || theme.admonition_box_shadow_color
+        when "admonition_box_shadow_offset"    then theme.admonition_box_shadow_offset = parse_float(value, theme.admonition_box_shadow_offset)
           # Sidebar
         when "sidebar_background_color" then theme.sidebar_background_color = value.as_s? || theme.sidebar_background_color
         when "sidebar_border_color"     then theme.sidebar_border_color = value.as_s? || theme.sidebar_border_color
@@ -165,16 +172,23 @@ module AsciidoctorPDF
         when "admonition_caution_label"   then theme.admonition_caution_label = value.as_s? || theme.admonition_caution_label
         when "admonition_important_label" then theme.admonition_important_label = value.as_s? || theme.admonition_important_label
           # Blocs de score (extension x-score-*)
-        when "x_score_excellent_color"   then theme.x_score_excellent_color = value.as_s? || theme.x_score_excellent_color
-        when "x_score_excellent_label"   then theme.x_score_excellent_label = value.as_s? || theme.x_score_excellent_label
-        when "x_score_tres_bien_color"   then theme.x_score_tres_bien_color = value.as_s? || theme.x_score_tres_bien_color
-        when "x_score_tres_bien_label"   then theme.x_score_tres_bien_label = value.as_s? || theme.x_score_tres_bien_label
-        when "x_score_bien_color"        then theme.x_score_bien_color = value.as_s? || theme.x_score_bien_color
-        when "x_score_bien_label"        then theme.x_score_bien_label = value.as_s? || theme.x_score_bien_label
-        when "x_score_insuffisant_color" then theme.x_score_insuffisant_color = value.as_s? || theme.x_score_insuffisant_color
-        when "x_score_insuffisant_label" then theme.x_score_insuffisant_label = value.as_s? || theme.x_score_insuffisant_label
-        when "x_score_a_revoir_color"    then theme.x_score_a_revoir_color = value.as_s? || theme.x_score_a_revoir_color
-        when "x_score_a_revoir_label"    then theme.x_score_a_revoir_label = value.as_s? || theme.x_score_a_revoir_label
+        when "x_score_excellent_color"      then theme.x_score_excellent_color = value.as_s? || theme.x_score_excellent_color
+        when "x_score_excellent_label"      then theme.x_score_excellent_label = value.as_s? || theme.x_score_excellent_label
+        when "x_score_tres_bien_color"      then theme.x_score_tres_bien_color = value.as_s? || theme.x_score_tres_bien_color
+        when "x_score_tres_bien_label"      then theme.x_score_tres_bien_label = value.as_s? || theme.x_score_tres_bien_label
+        when "x_score_bien_color"           then theme.x_score_bien_color = value.as_s? || theme.x_score_bien_color
+        when "x_score_bien_label"           then theme.x_score_bien_label = value.as_s? || theme.x_score_bien_label
+        when "x_score_insuffisant_color"    then theme.x_score_insuffisant_color = value.as_s? || theme.x_score_insuffisant_color
+        when "x_score_insuffisant_label"    then theme.x_score_insuffisant_label = value.as_s? || theme.x_score_insuffisant_label
+        when "x_score_a_revoir_color"       then theme.x_score_a_revoir_color = value.as_s? || theme.x_score_a_revoir_color
+        when "x_score_a_revoir_label"       then theme.x_score_a_revoir_label = value.as_s? || theme.x_score_a_revoir_label
+        when "x_score_boxed"                then theme.x_score_boxed = parse_bool(value, theme.x_score_boxed)
+        when "x_score_box_background_color" then theme.x_score_box_background_color = value.as_s? || theme.x_score_box_background_color
+        when "x_score_box_border_color"     then theme.x_score_box_border_color = value.as_s? || theme.x_score_box_border_color
+        when "x_score_box_border_width"     then theme.x_score_box_border_width = parse_float(value, theme.x_score_box_border_width)
+        when "x_score_box_shadow_enabled"   then theme.x_score_box_shadow_enabled = parse_bool(value, theme.x_score_box_shadow_enabled)
+        when "x_score_box_shadow_color"     then theme.x_score_box_shadow_color = value.as_s? || theme.x_score_box_shadow_color
+        when "x_score_box_shadow_offset"    then theme.x_score_box_shadow_offset = parse_float(value, theme.x_score_box_shadow_offset)
           # Tableaux
         when "table_border_color"            then theme.table_border_color = value.as_s? || theme.table_border_color
         when "table_border_width"            then theme.table_border_width = parse_float(value, theme.table_border_width)

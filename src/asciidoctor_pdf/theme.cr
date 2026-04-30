@@ -108,6 +108,21 @@ module AsciidoctorPDF
     property admonition_caution_color : String = "d9534f"
     property admonition_important_color : String = "d9534f"
 
+    # Mode encadré pour les admonitions. Quand `true`, le rendu ajoute
+    # un rectangle entourant (avec fond, bordure et ombre portée
+    # optionnelle). La bande verticale colorée et le label restent
+    # *à l'intérieur* du cadre. Activable globalement via le thème, ou
+    # ponctuellement via le rôle AsciiDoc `[NOTE,role=boxed]`.
+    property admonition_boxed : Bool = false
+    property admonition_box_background_color : String = "ffffff"
+    property admonition_box_border_color : String = "cccccc"
+    property admonition_box_border_width : Float64 = 0.5
+    # Ombre portée façon « card » : un rectangle gris décalé en
+    # bas-droite. Désactivable.
+    property admonition_box_shadow_enabled : Bool = true
+    property admonition_box_shadow_color : String = "dddddd"
+    property admonition_box_shadow_offset : Float64 = 2.5
+
     # Étiquettes des admonitions. Défauts en anglais (parité Ruby
     # asciidoctor-pdf). Pour traduire : soit redéfinir ici via le thème
     # YAML (`admonition_note_label: NOTE` etc.), soit per-document via
@@ -163,6 +178,17 @@ module AsciidoctorPDF
     property x_score_insuffisant_label : String = "INSUFFICIENT"
     property x_score_a_revoir_color : String = "d32f2f"
     property x_score_a_revoir_label : String = "NEEDS REVIEW"
+
+    # Mode encadré pour les blocs `[.x-score-*]` (mêmes options que
+    # les admonitions). Le cadre + l'ombre rendent la mise en valeur
+    # plus marquée pour un barème de quiz / fiche d'évaluation.
+    property x_score_boxed : Bool = false
+    property x_score_box_background_color : String = "ffffff"
+    property x_score_box_border_color : String = "cccccc"
+    property x_score_box_border_width : Float64 = 0.5
+    property x_score_box_shadow_enabled : Bool = true
+    property x_score_box_shadow_color : String = "dddddd"
+    property x_score_box_shadow_offset : Float64 = 2.5
 
     # --- Tableaux ---
     property table_border_color : String = "dddddd"

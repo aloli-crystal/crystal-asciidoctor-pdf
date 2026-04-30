@@ -747,32 +747,96 @@ module AsciidoctorPDF
       lines = wrap_segments(segments, content_w, font_size)
       lines = [[] of InlineSegment] if lines.empty?
       block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
-      total_h = block_h + @theme.admonition_margin_top + @theme.admonition_margin_bottom
+
+      # Mode encadré : option A (rôle `boxed` sur le bloc) OU option B
+      # (`theme.admonition_boxed: true`). L'ombre + le cadre + la
+      # bande gauche + le label sont tous *à l'intérieur* du
+      # rectangle entourant. `total_h` inclut alors l'offset d'ombre
+      # pour réserver l'espace.
+      boxed = node.has_role?("boxed") || @theme.admonition_boxed
+      shadow_offset = boxed && @theme.admonition_box_shadow_enabled ? @theme.admonition_box_shadow_offset : 0.0
+      total_h = block_h + @theme.admonition_margin_top + @theme.admonition_margin_bottom + shadow_offset
 
       check_page_break(total_h)
 
       page = @current_page.not_nil!
       @current_y -= @theme.admonition_margin_top
 
-      # Bande de couleur à gauche
+      # 1) Cadre (si boxed) : ombre puis fond puis bordure, dans cet
+      #    ordre pour que la bordure et le contenu se posent dessus.
+      if boxed
+        render_box_chrome(
+          page, @margin, @current_y - block_h, @content_width, block_h,
+          background: @theme.admonition_box_background_color,
+          border_color: @theme.admonition_box_border_color,
+          border_width: @theme.admonition_box_border_width,
+          shadow_enabled: @theme.admonition_box_shadow_enabled,
+          shadow_color: @theme.admonition_box_shadow_color,
+          shadow_offset: @theme.admonition_box_shadow_offset,
+        )
+      end
+
+      # 2) Bande de couleur à gauche (à l'intérieur du cadre quand boxed).
+      bar_x = boxed ? @margin + 1.0 : @margin
       page.fill_color(border_color)
-      page.rectangle(@margin, @current_y - block_h, @theme.admonition_border_width, block_h)
+      page.rectangle(bar_x, @current_y - block_h + (boxed ? 1.0 : 0.0),
+        @theme.admonition_border_width, block_h - (boxed ? 2.0 : 0.0))
       page.fill
 
-      # Label (NOTE, TIP, etc.)
+      # 3) Label
       set_font(page, @fn_body_bold, label_size)
       page.fill_color(border_color)
       page.text(label_text, at: {@margin + label_offset, @current_y - padding - font_size})
 
-      # Texte de l'admonition (segments inline avec leur typographie)
+      # 4) Texte de l'admonition (segments inline avec leur typographie)
       y = @current_y - padding - font_size
       lines.each do |line|
         render_segment_line(page, line, @margin + label_space, y, font_size)
         y -= line_h
       end
 
-      @current_y -= block_h + @theme.admonition_margin_bottom
+      @current_y -= block_h + @theme.admonition_margin_bottom + shadow_offset
       ""
+    end
+
+    # Dessine le chrome d'un bloc encadré : ombre portée (rectangle
+    # gris décalé en bas-droite), fond opaque, bordure. Appelé avant
+    # de tracer le contenu interne (qui se posera par-dessus).
+    private def render_box_chrome(
+      page : PDF::Page,
+      x : Float64, y_bottom : Float64, w : Float64, h : Float64,
+      *,
+      background : String,
+      border_color : String,
+      border_width : Float64,
+      shadow_enabled : Bool,
+      shadow_color : String,
+      shadow_offset : Float64,
+    ) : Nil
+      # Ombre : rectangle plein, couleur gris pâle, décalé de
+      # `shadow_offset` vers la droite et le bas. Pas de transparence
+      # (le shard pdf n'expose pas /CA dans une API publique pour le
+      # moment) — la couleur grise pâle suffit visuellement.
+      if shadow_enabled && shadow_offset > 0
+        page.fill_color(shadow_color)
+        page.rectangle(x + shadow_offset, y_bottom - shadow_offset, w, h)
+        page.fill
+      end
+
+      # Fond
+      unless background.empty?
+        page.fill_color(background)
+        page.rectangle(x, y_bottom, w, h)
+        page.fill
+      end
+
+      # Bordure
+      unless border_color.empty?
+        page.stroke_color(border_color)
+        page.line_width(border_width)
+        page.rectangle(x, y_bottom, w, h)
+        page.stroke
+      end
     end
 
     # Défauts injectés par crystal-asciidoctor (title-case, pour rendu
@@ -862,31 +926,51 @@ module AsciidoctorPDF
       lines = wrap_segments(segments, content_w, font_size)
       lines = [[] of InlineSegment] if lines.empty?
       block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
-      total_h = block_h + @theme.admonition_margin_top + @theme.admonition_margin_bottom
+
+      # Mode encadré : option A (rôle `boxed` cumulé avec `x-score-*`)
+      # OU option B (`theme.x_score_boxed: true`).
+      boxed = node.has_role?("boxed") || @theme.x_score_boxed
+      shadow_offset = boxed && @theme.x_score_box_shadow_enabled ? @theme.x_score_box_shadow_offset : 0.0
+      total_h = block_h + @theme.admonition_margin_top + @theme.admonition_margin_bottom + shadow_offset
 
       check_page_break(total_h)
 
       page = @current_page.not_nil!
       @current_y -= @theme.admonition_margin_top
 
-      # Bande de couleur à gauche
+      # 1) Cadre (si boxed)
+      if boxed
+        render_box_chrome(
+          page, @margin, @current_y - block_h, @content_width, block_h,
+          background: @theme.x_score_box_background_color,
+          border_color: @theme.x_score_box_border_color,
+          border_width: @theme.x_score_box_border_width,
+          shadow_enabled: @theme.x_score_box_shadow_enabled,
+          shadow_color: @theme.x_score_box_shadow_color,
+          shadow_offset: @theme.x_score_box_shadow_offset,
+        )
+      end
+
+      # 2) Bande de couleur à gauche (à l'intérieur du cadre quand boxed)
+      bar_x = boxed ? @margin + 1.0 : @margin
       page.fill_color(color)
-      page.rectangle(@margin, @current_y - block_h, @theme.admonition_border_width, block_h)
+      page.rectangle(bar_x, @current_y - block_h + (boxed ? 1.0 : 0.0),
+        @theme.admonition_border_width, block_h - (boxed ? 2.0 : 0.0))
       page.fill
 
-      # Label
+      # 3) Label
       set_font(page, @fn_body_bold, label_size)
       page.fill_color(color)
       page.text(label_text, at: {@margin + label_offset, @current_y - padding - font_size})
 
-      # Texte (segments inline avec leur typographie)
+      # 4) Texte (segments inline avec leur typographie)
       y = @current_y - padding - font_size
       lines.each do |line|
         render_segment_line(page, line, @margin + label_space, y, font_size)
         y -= line_h
       end
 
-      @current_y -= block_h + @theme.admonition_margin_bottom
+      @current_y -= block_h + @theme.admonition_margin_bottom + shadow_offset
       ""
     end
 
