@@ -30,6 +30,11 @@ module AsciidoctorPDF
     property heading_font_family : String = "Helvetica"
     property heading_font_color : String = "1a1a1a"
     property heading_line_height : Float64 = 1.2
+    # Transformation typographique appliquée au texte des titres
+    # (sections, doctitle, page de garde). Valeurs reconnues :
+    # `"uppercase"`, `"smallcaps"`, `"capitalize"`. nil ⇒ aucune.
+    property heading_text_transform : String? = nil
+    property title_page_text_transform : String? = nil
 
     # Niveau 0 = « part » en AsciiDoc (rare, mais valide quand le
     # doctitle a été redéfini en section de niveau 0 par défaut, ou

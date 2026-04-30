@@ -89,6 +89,8 @@ module AsciidoctorPDF
         when "heading_font_color"           then theme.heading_font_color = value.as_s? || theme.heading_font_color
         when "heading_line_height"          then theme.heading_line_height = parse_float(value, theme.heading_line_height)
         when "heading_chapter_break_before" then theme.heading_chapter_break_before = parse_int(value, theme.heading_chapter_break_before)
+        when "heading_text_transform"       then theme.heading_text_transform = value.as_s?
+        when "title_page_text_transform"    then theme.title_page_text_transform = value.as_s?
         when "h0_font_size"                 then theme.h0_font_size = parse_float(value, theme.h0_font_size)
         when "h1_font_size"                 then theme.h1_font_size = parse_float(value, theme.h1_font_size)
         when "h1_font_style"                then theme.h1_font_style = value.as_s? || theme.h1_font_style

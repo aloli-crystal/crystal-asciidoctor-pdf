@@ -378,6 +378,11 @@ module AsciidoctorPDF
         title = "#{node.sectnum} #{title}"
       end
 
+      # Transformation typographique (uppercase / smallcaps / capitalize)
+      # appliquée juste avant le wrap. Numéro de section inclus dans la
+      # transformation (ex: "1. INTRODUCTION" en mode uppercase).
+      title = TextTransformer.apply(title, @theme.heading_text_transform)
+
       @current_section_title = title
 
       # Forge un nom de destination PDF stable et unique pour cette
@@ -2271,7 +2276,8 @@ module AsciidoctorPDF
       # pour que le doctitle ait du poids visuel — c'est lui le
       # premier signal d'identité du document.
       title_font_size = @theme.title_font_size
-      title_lines = wrap_text(@document_title, @content_width, title_font_size, @fn_body_bold)
+      title_text = TextTransformer.apply(@document_title, @theme.title_page_text_transform)
+      title_lines = wrap_text(title_text, @content_width, title_font_size, @fn_body_bold)
       title_line_height = title_font_size * 1.2
 
       set_font(page, @fn_body_bold, title_font_size)
@@ -2362,7 +2368,7 @@ module AsciidoctorPDF
       # Titre principal — wrap long titles to fit within the page width.
       # Use `@document_title` (already decoded) so HTML entities like
       # `&#160;` don't leak through as literal text.
-      title = @document_title
+      title = TextTransformer.apply(@document_title, @theme.title_page_text_transform)
       title_font_size = @theme.title_font_size
       set_font(page, @fn_body_bold, title_font_size)
       page.fill_color(@theme.title_font_color)
