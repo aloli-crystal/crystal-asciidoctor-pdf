@@ -3098,10 +3098,15 @@ module AsciidoctorPDF
         .gsub(/\s+/, " ")
     end
 
-    # Supprime le markup inline HTML généré par asciidoctor
+    # Supprime le markup inline HTML généré par asciidoctor et résout
+    # les entités. Délègue au module `Sanitizer` (`sanitizer.cr`),
+    # portage 1:1 du `sanitizer.rb` upstream Ruby asciidoctor-pdf.
+    #
+    # ATTENTION : ce n'est PAS une protection contre XSS. Le shard
+    # destiné à la sanitisation de sécurité est `aloli-crystal/sanitizer-html`
+    # (voir CRYSTAL-SANITIZER-HTML-SPECS.adoc).
     private def strip_inline_markup(text : String) : String
-      decoded = text.gsub(/<[^>]+>/, "")
-      decode_html_entities(decoded).strip
+      Sanitizer.sanitize(text)
     end
 
     # Charge les polices TTF définies dans le thème.
