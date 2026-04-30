@@ -223,6 +223,12 @@ module AsciidoctorPDF
     # `X-*` dans HTTP/MIME.
     property x_title_page_with_toc : Bool = false
 
+    # Alignement horizontal du titre H1 sur les pages de garde et le
+    # doctitle inline. Valeurs reconnues : `"left"` (défaut),
+    # `"center"`, `"right"`. Override per-document via l'attribut
+    # AsciiDoc `:title-page-align: center`.
+    property title_page_align : String = "left"
+
     # --- Table des matières ---
     property toc_enabled : Bool = true
     property toc_title : String = "Table des matières"

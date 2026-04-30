@@ -2587,14 +2587,20 @@ module AsciidoctorPDF
       # premier signal d'identité du document.
       title_font_size = @theme.title_font_size
       title_text = TextTransformer.apply(@document_title, @theme.title_page_text_transform)
-      title_lines = wrap_text(title_text, @content_width, title_font_size, @fn_body_bold)
+      # IMPORTANT : forcer le gras *avant* le wrap, pour que la mesure
+      # de largeur utilise les métriques d'Helvetica-Bold (plus larges
+      # que regular) — sinon le wrap sous-estime et le titre déborde.
+      title_segments = force_bold(InlineRenderer.parse(title_text))
+      title_lines = wrap_segments(title_segments, @content_width, title_font_size)
+      title_lines = [[] of InlineSegment] if title_lines.empty?
       title_line_height = title_font_size * 1.2
 
-      set_font(page, @fn_body_bold, title_font_size)
       page.fill_color(@theme.title_font_color)
+      align = resolve_title_align(doc)
       title_lines.each_with_index do |line, i|
+        x = title_line_x(line, title_font_size, @fn_body_bold, align)
         y = @current_y - title_font_size - (i * title_line_height)
-        draw_text_run(page, line, @margin, y, @fn_body_bold, title_font_size)
+        render_segment_line(page, line, x, y, title_font_size)
       end
       @current_y -= title_lines.size * title_line_height + 4.0
 
@@ -2638,6 +2644,70 @@ module AsciidoctorPDF
     # Extension non standard du shard — préfixe `x-` à la mode des
     # extensions HTTP/MIME pour signaler explicitement l'absence
     # d'équivalent dans AsciiDoc / Ruby asciidoctor-pdf.
+    # Résout l'alignement horizontal du titre H1. Cascade :
+    #   1. attribut document `:title-page-align: <left|center|right>`
+    #   2. propriété de thème `title_page_align`
+    #   3. défaut "left"
+    private def resolve_title_align(doc : Asciidoctor::Document) : String
+      attr = doc.attr("title-page-align")
+      case attr.to_s.downcase
+      when "left", "center", "right" then attr.to_s.downcase
+      else
+        case @theme.title_page_align.downcase
+        when "center" then "center"
+        when "right"  then "right"
+        else               "left"
+        end
+      end
+    end
+
+    # Calcule la position x d'une ligne de titre selon l'alignement.
+    # Mesure la largeur totale via les métriques de police (les
+    # segments image inline sont peu fréquents dans un titre, mais
+    # gérés au passage). Pour `:left`, retourne directement `@margin`.
+    private def title_line_x(
+      line : Array(InlineSegment),
+      font_size : Float64,
+      font_name : String,
+      align : String,
+    ) : Float64
+      return @margin if align == "left"
+      font = get_font(font_name)
+      line_w = line.sum do |s|
+        if s.image_path
+          (s.image_width || (font_size * 1.2)) + 2.0
+        else
+          font.string_width(s.text, font_size)
+        end
+      end
+      case align
+      when "center" then @margin + (@content_width - line_w) / 2
+      when "right"  then @margin + @content_width - line_w
+      else               @margin
+      end
+    end
+
+    # Force le flag `bold` sur tous les segments d'une ligne de titre.
+    # Le doctitle parsé via `InlineRenderer.parse` peut contenir des
+    # segments non-gras (texte simple) ; on les met en gras pour
+    # respecter la typographie de titre — sans inverser un éventuel
+    # `<em>` (italique), `<code>` (mono), etc.
+    private def force_bold(line : Array(InlineSegment)) : Array(InlineSegment)
+      line.map do |s|
+        next s if s.bold || s.line_break
+        InlineSegment.new(
+          text: s.text, bold: true, italic: s.italic, mono: s.mono,
+          sup: s.sup, sub: s.sub, mark: s.mark, kbd: s.kbd,
+          button: s.button, menu: s.menu,
+          color: s.color, link: s.link,
+          image_path: s.image_path,
+          image_width: s.image_width,
+          image_height: s.image_height,
+          line_break: s.line_break,
+        )
+      end
+    end
+
     private def title_page_toc_enabled?(doc : Asciidoctor::Document) : Bool
       attr = doc.attr("x-title-page-toc")
       case attr
@@ -2675,20 +2745,24 @@ module AsciidoctorPDF
       # tant que le logo reste raisonnable (~150-250pt de hauteur).
       render_title_logo(doc, page, @page_height - @margin - 20.0)
 
-      # Titre principal — wrap long titles to fit within the page width.
-      # Use `@document_title` (already decoded) so HTML entities like
-      # `&#160;` don't leak through as literal text.
+      # Titre principal — wrap long titles + respect des `<br>` internes
+      # (`+\n` AsciiDoc → `<br>` HTML → saut de ligne forcé).
       title = TextTransformer.apply(@document_title, @theme.title_page_text_transform)
       title_font_size = @theme.title_font_size
-      set_font(page, @fn_body_bold, title_font_size)
       page.fill_color(@theme.title_font_color)
       title_y = @page_height * 0.55
 
-      # Wrap the title into multiple lines if it exceeds the content width
-      title_lines = wrap_text(title, @content_width, title_font_size, @fn_body_bold)
+      align = resolve_title_align(doc)
+      # Forcer le gras avant le wrap : sinon la mesure de largeur
+      # utilise Helvetica regular (sous-estime) et le titre déborde.
+      title_segments = force_bold(InlineRenderer.parse(title))
+      title_lines = wrap_segments(title_segments, @content_width, title_font_size)
+      title_lines = [[] of InlineSegment] if title_lines.empty?
       title_line_height = title_font_size * 1.3
+
       title_lines.each_with_index do |line, i|
-        draw_text_run(page, line, @margin, title_y - (i * title_line_height), @fn_body_bold, title_font_size)
+        x = title_line_x(line, title_font_size, @fn_body_bold, align)
+        render_segment_line(page, line, x, title_y - (i * title_line_height) - title_font_size, title_font_size)
       end
       title_total_height = title_lines.size * title_line_height
 
@@ -2744,16 +2818,21 @@ module AsciidoctorPDF
       cursor_y = logo_top - logo_h
       cursor_y -= 24.0 if logo_h > 0
 
-      # Titre — gauche, taille normale, plus de centrage vertical.
-      title = @document_title
+      # Titre — alignement configurable + support des `<br>` (`+\n`).
+      title = TextTransformer.apply(@document_title, @theme.title_page_text_transform)
       title_font_size = @theme.title_font_size
-      title_lines = wrap_text(title, @content_width, title_font_size, @fn_body_bold)
+      # Forcer gras avant wrap (cf. render_inline_doctitle pour le rationale).
+      title_segments = force_bold(InlineRenderer.parse(title))
+      title_lines = wrap_segments(title_segments, @content_width, title_font_size)
+      title_lines = [[] of InlineSegment] if title_lines.empty?
       title_line_height = title_font_size * 1.3
 
-      set_font(page, @fn_body_bold, title_font_size)
       page.fill_color(@theme.title_font_color)
+      align = resolve_title_align(doc)
       title_lines.each_with_index do |line, i|
-        draw_text_run(page, line, @margin, cursor_y - title_line_height + (title_line_height - title_font_size) - (i * title_line_height), @fn_body_bold, title_font_size)
+        x = title_line_x(line, title_font_size, @fn_body_bold, align)
+        y = cursor_y - title_line_height + (title_line_height - title_font_size) - (i * title_line_height)
+        render_segment_line(page, line, x, y, title_font_size)
       end
       cursor_y -= title_lines.size * title_line_height
 
@@ -3013,11 +3092,15 @@ module AsciidoctorPDF
       # absolu. `{page_number_pdf}` reste accessible pour les rares
       # cas où on veut l'index brut.
       displayed = format_page_number(meta)
+      # Le doctitle peut contenir des balises HTML inline issues du
+      # parser (ex. `<br>` pour `+\n`). Les stripper pour les
+      # header/footer où on n'a pas de mécanisme de saut de ligne.
+      doctitle_clean = @document_title.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
       template
         .gsub("{page_number}", displayed)
         .gsub("{page_number_pdf}", meta.number.to_s)
         .gsub("{section_title}", meta.section_title)
-        .gsub("{document_title}", @document_title)
+        .gsub("{document_title}", doctitle_clean)
         # Replace U+00A0 with ASCII space just before the string is
         # handed to `page.text` in header/footer rendering (those
         # paths don't go through `draw_text_run`).
@@ -3212,6 +3295,16 @@ module AsciidoctorPDF
       current_width = 0.0
 
       segments.each do |seg|
+        # Marqueur de saut de ligne forcé (`<br>` HTML, `+\n`
+        # AsciiDoc) : ferme la ligne courante quel que soit son état
+        # de remplissage et démarre une nouvelle ligne vide.
+        if seg.line_break
+          lines << current_line
+          current_line = [] of InlineSegment
+          current_width = 0.0
+          next
+        end
+
         # Image inline : occupe une largeur connue (pdfwidth / width
         # explicite, ou défaut basé sur la taille de police). Pas de
         # split par mots — on traite le segment comme un atome.

@@ -207,6 +207,7 @@ module AsciidoctorPDF
         when "author_font_size"      then theme.author_font_size = parse_float(value, theme.author_font_size)
         when "author_font_color"     then theme.author_font_color = value.as_s? || theme.author_font_color
         when "x_title_page_with_toc" then theme.x_title_page_with_toc = parse_bool(value, theme.x_title_page_with_toc)
+        when "title_page_align"      then theme.title_page_align = value.as_s? || theme.title_page_align
           # Table des matières
         when "toc_enabled"          then theme.toc_enabled = parse_bool(value, theme.toc_enabled)
         when "toc_title"            then theme.toc_title = value.as_s? || theme.toc_title

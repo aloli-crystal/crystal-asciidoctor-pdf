@@ -10,6 +10,8 @@ module AsciidoctorPDF
   # `kbd:[Ctrl+C]`, `btn:[OK]`, `menu:[Fichier > Quitter]`.
   # `image_path` (et width/height) basculent le segment en image
   # inline — le `text` sert alors d'alt-text de fallback.
+  # `line_break: true` est un *marqueur* (texte vide) qui force un
+  # saut de ligne lors du wrap — équivalent du `<br>` HTML.
   record InlineSegment,
     text : String,
     bold : Bool = false,
@@ -25,7 +27,8 @@ module AsciidoctorPDF
     link : String? = nil,
     image_path : String? = nil,
     image_width : Float64? = nil,
-    image_height : Float64? = nil
+    image_height : Float64? = nil,
+    line_break : Bool = false
 
   # Rend le markup inline HTML généré par crystal-asciidoctor sur une page PDF.
   # Gère les balises <strong>, <em>, <code>, <a href>, <span style="color:...">, etc.
@@ -250,10 +253,16 @@ module AsciidoctorPDF
                   image_height: img_h
                 )
               end
-            when "br" then buf += " " # hard line break — espace
-            # pour l'instant. Un vrai `<br>` exigerait un saut de ligne
-            # explicite dans la render pipeline ; un `\n` litéral
-            # afficherait un tofu (pas de glyphe newline en Type1).
+            when "br"
+              # Hard line break (`+\n` AsciiDoc, ou `pass:[<br>]`
+              # explicite). On flushe le texte courant puis on émet
+              # un *segment marqueur* (texte vide, `line_break: true`)
+              # que `wrap_segments` reconnaîtra pour fermer la ligne
+              # courante et passer à la suivante, indépendamment de la
+              # largeur disponible.
+              flush.call(buf)
+              buf = ""
+              segments << InlineSegment.new(text: "", line_break: true)
             when "span"
               # Extraire la couleur du style si présente, sinon ne rien
               # empiler (les `<span class="keyseq|menuseq">` n'apportent
