@@ -12,7 +12,7 @@ require "./asciidoctor_pdf/syntax_highlighter"
 require "./asciidoctor_pdf/converter"
 
 module AsciidoctorPDF
-  VERSION = "2.3.24.43"
+  VERSION = "2.3.24.44"
 
   # Version de la gem Ruby asciidoctor-pdf utilisée comme base du portage.
   UPSTREAM_VERSION = "2.3.24"

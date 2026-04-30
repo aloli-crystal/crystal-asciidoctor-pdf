@@ -200,10 +200,10 @@ module AsciidoctorPDF
       when "inline_kbd"       then convert_inline_kbd(node)
       when "inline_menu"      then convert_inline_menu(node)
       when "inline_quoted"    then convert_inline_quoted(node)
-      when "pass"             then ""
-      when "stem"             then ""
-      when "audio"            then ""
-      when "video"            then ""
+      when "pass"             then convert_pass(node)
+      when "stem"             then convert_stem(node)
+      when "audio"            then convert_audio(node)
+      when "video"            then convert_video(node)
       when "colist"           then convert_colist(node)
       when "outline"          then ""
       when "embedded"         then convert_embedded(node)
@@ -1351,6 +1351,126 @@ module AsciidoctorPDF
       page.stroke
       @current_y -= 8.0
       ""
+    end
+
+    # Audio inline : un PDF n'embarque pas d'audio lisible nativement.
+    # On rend un bandeau visuel « ▶ Audio : <target> » qui pointe vers
+    # l'URL en lien cliquable. Le caption éventuel est inclus.
+    def convert_audio(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Block)
+      target = node.attr("target") || ""
+      caption = node.title
+      render_media_placeholder("▶ Audio", target, caption)
+      ""
+    end
+
+    # Video inline : même idée — placeholder cliquable vers la source.
+    def convert_video(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Block)
+      target = node.attr("target") || ""
+      caption = node.title
+      render_media_placeholder("▶ Vidéo", target, caption)
+      ""
+    end
+
+    # STEM (mathématiques inline AsciiMath / LaTeX) : faute de moteur
+    # math intégré, on affiche le contenu source en monospace dans un
+    # encadré gris pâle (même style que les listings courts). Une vraie
+    # implémentation demanderait l'embed d'un sous-ensemble MathJax ou
+    # un rendu via katex-cli — reporté.
+    def convert_stem(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Block)
+      raw = node.content
+      content = raw.is_a?(Array) ? raw.join("\n") : (raw || "").to_s
+      render_media_placeholder("∑ Math", content, node.title, monospace: true)
+      ""
+    end
+
+    # Pass-through : contenu HTML brut sans interprétation. Comme on
+    # cible le PDF, on dégrade vers du texte plat : on strippe le HTML
+    # via Sanitizer et on l'inclut comme un paragraphe normal. Mieux
+    # que de tout perdre.
+    def convert_pass(node : Asciidoctor::AbstractNode) : String
+      return "" unless node.is_a?(Asciidoctor::Block)
+      raw = node.content
+      content = raw.is_a?(Array) ? raw.join("\n") : (raw || "").to_s
+      ensure_page
+      page = @current_page.not_nil!
+      font_size = @theme.base_font_size
+      line_h = font_size * @theme.base_line_height
+      stripped = Sanitizer.sanitize(content)
+      lines = wrap_text(stripped, @content_width, font_size)
+      check_page_break(lines.size * line_h + 4.0)
+      page = @current_page.not_nil!
+      set_font(page, @fn_body, font_size)
+      page.fill_color(@theme.base_font_color)
+      lines.each do |line|
+        draw_text_run(page, line, @margin, @current_y - font_size, @fn_body, font_size)
+        @current_y -= line_h
+      end
+      @current_y -= 4.0
+      ""
+    end
+
+    # Bandeau placeholder commun pour les médias non rendables en PDF
+    # (audio, video, stem). Affiche un label coloré + la source +
+    # éventuellement un caption, dans un cadre gris pâle.
+    private def render_media_placeholder(
+      label : String, target : String, caption : String?, monospace : Bool = false,
+    ) : Nil
+      ensure_page
+      font_size = @theme.base_font_size
+      line_h = font_size * @theme.base_line_height
+      padding = 6.0
+
+      target_font = monospace ? @fn_mono : @fn_body
+      target_lines = wrap_text(target, @content_width - 80.0, font_size, target_font)
+      caption_lines = caption ? wrap_text(caption, @content_width - 16.0, font_size - 1, @fn_body) : [] of String
+      content_lines = target_lines.size + caption_lines.size
+      block_h = content_lines * line_h + 2 * padding
+
+      check_page_break(block_h + 8.0)
+      page = @current_page.not_nil!
+      @current_y -= 4.0
+
+      # Fond + bordure
+      page.fill_color("f5f5f5")
+      page.rectangle(@margin, @current_y - block_h, @content_width, block_h)
+      page.fill
+      page.stroke_color("cccccc")
+      page.line_width(0.5)
+      page.rectangle(@margin, @current_y - block_h, @content_width, block_h)
+      page.stroke
+
+      # Label (à gauche, en bleu)
+      set_font(page, @fn_body_bold, font_size)
+      page.fill_color("3b9ddd")
+      page.text(label, at: {@margin + padding, @current_y - padding - font_size})
+
+      # Cible
+      x_target = @margin + 80.0
+      y = @current_y - padding - font_size
+      set_font(page, target_font, font_size)
+      page.fill_color(@theme.base_font_color)
+      target_lines.each do |line|
+        if target.starts_with?("http://") || target.starts_with?("https://")
+          # Link cliquable vers la source.
+          tw = text_width(line, target_font, font_size)
+          page.link_uri(rect: {x_target, y - 2, x_target + tw, y + font_size}, uri: target)
+        end
+        draw_text_run(page, line, x_target, y, target_font, font_size)
+        y -= line_h
+      end
+
+      # Caption (si présent)
+      caption_lines.each do |line|
+        set_font(page, @fn_body, font_size - 1)
+        page.fill_color("888888")
+        draw_text_run(page, line, @margin + padding, y, @fn_body, font_size - 1)
+        y -= line_h
+      end
+
+      @current_y -= block_h + 8.0
     end
 
     # =========================================================================
