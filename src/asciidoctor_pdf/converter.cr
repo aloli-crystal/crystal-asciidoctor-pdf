@@ -471,6 +471,15 @@ module AsciidoctorPDF
     def convert_paragraph(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Block)
 
+      # Style spécial `[abstract]` : présentation distincte d'un
+      # paragraphe d'introduction (résumé ISO, executive summary,
+      # accroche d'article). Italique, légèrement en retrait, couleur
+      # plus discrète. Le texte garde son markup inline et son wrap
+      # comme un paragraphe normal.
+      if node.responds_to?(:style) && node.style == "abstract"
+        return render_abstract_paragraph(node)
+      end
+
       ensure_page
       html = node.content || ""
       return "" if html.empty?
@@ -491,6 +500,54 @@ module AsciidoctorPDF
       # Rendre chaque ligne avec le markup inline
       render_inline_lines(page, html, @margin, @content_width, font_size, line_h)
       @current_y -= @theme.prose_margin_bottom
+      ""
+    end
+
+    # Rend un paragraphe en style abstract : indenté + italique + couleur
+    # plus discrète. Tous les segments inline forcés en italique (sauf
+    # ceux déjà italiques pour ne pas inverser).
+    private def render_abstract_paragraph(node : Asciidoctor::Block) : String
+      ensure_page
+      raw = node.content
+      html = raw.is_a?(Array) ? raw.join("\n") : raw.to_s
+      return "" if html.empty?
+
+      font_size = @theme.base_font_size + 1.0
+      line_h = font_size * @theme.base_line_height
+      side_indent = 24.0
+      content_w = @content_width - 2 * side_indent
+
+      segments = InlineRenderer.parse(html)
+      lines = wrap_segments(segments, content_w, font_size)
+      lines = [[] of InlineSegment] if lines.empty?
+
+      total_h = lines.size * line_h + @theme.prose_margin_bottom + 6.0
+      check_page_break(total_h)
+
+      page = @current_page.not_nil!
+      @current_y -= 4.0
+
+      y = @current_y - font_size
+      lines.each do |line|
+        # Italiciser sans écraser un segment déjà italique.
+        styled = line.map do |seg|
+          next seg if seg.italic
+          InlineSegment.new(
+            text: seg.text, bold: seg.bold, italic: true, mono: seg.mono,
+            sup: seg.sup, sub: seg.sub, mark: seg.mark, kbd: seg.kbd,
+            button: seg.button, menu: seg.menu,
+            color: seg.color || "555555",
+            link: seg.link,
+            image_path: seg.image_path,
+            image_width: seg.image_width,
+            image_height: seg.image_height
+          )
+        end
+        render_segment_line(page, styled, @margin + side_indent, y, font_size)
+        y -= line_h
+      end
+
+      @current_y -= lines.size * line_h + @theme.prose_margin_bottom + 4.0
       ""
     end
 
