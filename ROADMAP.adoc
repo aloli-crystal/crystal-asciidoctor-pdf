@@ -5,9 +5,10 @@ Suivi des écarts entre `crystal-asciidoctor-pdf` (portage Crystal) et la
 gem Ruby `asciidoctor-pdf` 2.3.24 (référence). Issu de l'audit du
 2026-04-29 + retours utilisateur.
 
-Mise à jour : 2026-04-29 (post v2.3.24.41).
-Deux sprints fermés. Tous les 🔴 critiques et 🟠 importants sont
-livrés. Reste 8 cosmétiques (🟡) à plus long terme.
+Mise à jour : 2026-04-30 (post v2.3.24.47).
+Trois sprints fermés. Tous les 🔴 critiques, 🟠 importants ET 🟡
+cosmétiques courts (« S ») sont livrés. Reste 5 🟡 cosmétiques
+moyens / longs (M) à plus long terme.
 
 == Légende
 
@@ -27,7 +28,7 @@ livrés. Reste 8 cosmétiques (🟡) à plus long terme.
 
 (Aucun bug ouvert connu au 2026-04-29 post v2.3.24.41.)
 
-== Gaps cosmétiques (long terme)
+== Gaps cosmétiques restants (long terme)
 
 [cols="2,1,1,4"]
 |===
@@ -45,40 +46,10 @@ livrés. Reste 8 cosmétiques (🟡) à plus long terme.
 | M
 | `optimizer.rb` non porté. Pas de linearization PDF.
 
-| Sanitizer dédié
-| 🟡
-| S
-| Strip simple par regex côté Crystal ; échappements partiels.
-
-| Text transformer (uppercase, smallcaps, capitalize)
-| 🟡
-| S
-| `text_transformer.rb` non porté. Impacte `text-transform` sur titres.
-
-| Audio / video / stem / pass
-| 🟡
-| S
-| Renvoient `""`. STEM (math) demande MathJax → effort majeur séparé.
-
-| Collapsible blocks
-| 🟡
-| S
-| Pas de dispatch dédié.
-
 | Cover page (face: front/back) + background
 | 🟡
 | M
 | Pas de cover face arrière, pas de page background, pas de watermark.
-
-| Abstract block
-| 🟡
-| S
-| Rendu via paragraphe générique, pas de style dédié.
-
-| Index pagenum sequence style
-| 🟡
-| S
-| Pas de range « 12-15 » groupé.
 
 | Table rowspan + autofit
 | 🟡
@@ -114,6 +85,25 @@ livrés. Reste 8 cosmétiques (🟡) à plus long terme.
 . ✅ **v2.3.24.32** — Chapter break + numérotation romaine front-matter
 . ✅ **v2.3.24.33** — Header / footer recto-verso
 
+=== Sprint 3 — v2.3.24.42 → v2.3.24.47 (les 🟡 « S »)
+
+. ✅ **v2.3.24.42** — Module `Sanitizer` interne (portage 1:1 du
+    `sanitizer.rb` Ruby asciidoctor-pdf — utilitaire texte, *pas*
+    sécurité). Le vrai sanitizer de sécurité est documenté dans
+    `CRYSTAL-SANITIZER-HTML-SPECS.adoc` à la racine
+    `/Users/philippe/prod-crystal/`, à publier sous le nom
+    `aloli-crystal/sanitizer-html` quand l'app ISO 27001 démarrera.
+. ✅ **v2.3.24.43** — `TextTransformer` (uppercase, smallcaps,
+    capitalize) + propriétés thème `heading_text_transform` /
+    `title_page_text_transform`.
+. ✅ **v2.3.24.44** — Audio / video / stem / pass : placeholders
+    visuels (bandeau gris + URL cliquable + caption).
+. ✅ **v2.3.24.45** — Collapsible blocks signalés par ▾ dans le titre.
+. ✅ **v2.3.24.46** — Abstract block : indenté, italique, gris
+    discret, taille +1pt.
+. ✅ **v2.3.24.47** — Index : ranges de pages (« 12-15 ») au lieu
+    de listes plates.
+
 === Sprint 2 — v2.3.24.34 → v2.3.24.41 (les 🟠 secondaires)
 
 . ✅ **v2.3.24.34** — Tables : colspan + valign + factorisation
@@ -135,14 +125,22 @@ livrés. Reste 8 cosmétiques (🟡) à plus long terme.
 == Bilan post sprints
 
 Le portage couvre maintenant **tous les cas d'usage courants**
-(quiz, fiches, rapports, livres, FAQ, doc technique). Reste
-uniquement le 🟡 cosmétique :
+(quiz, fiches, rapports, livres, FAQ, doc technique, abstract,
+text-transform, index avec ranges, audio/video placeholders,
+collapsible). Reste uniquement les 🟡 d'effort moyen :
 
-  * Iconographie complète (Font Awesome embarqué)
-  * Optimisation PDF (compression Ghostscript)
-  * Math (STEM/asciimath via MathJax)
-  * Cover page back + page background + watermark
-  * Quelques détails de typographie fine (text-transform, abstract)
+  * Iconographie complète (Font Awesome embarqué) — pertinent quand
+    on aura un cas d'usage concret avec icônes inline
+  * Optimisation PDF (compression Ghostscript) — pertinent quand
+    les PDF générés deviennent volumineux (rapports >500 pages)
+  * Cover page back + page background + watermark — pertinent pour
+    les rapports confidentiels (« usage interne »)
+  * Table rowspan + autofit — pertinent pour les grilles ISO
+    complexes
+  * Callouts dans le code source des listings — pertinent pour la
+    doc technique annotée (intégration crystal-rouge)
+  * `:lang:` et `/CreationDate` doc-level — extension shard `pdf`
+    nécessaire
 
 À reprendre lorsque les besoins concrets émergent — pas de
 priorité immédiate.
