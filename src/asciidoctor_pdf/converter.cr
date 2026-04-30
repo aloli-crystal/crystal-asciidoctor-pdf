@@ -2188,6 +2188,30 @@ module AsciidoctorPDF
     # =========================================================================
     # Rend la page d'index alphabétique à la fin du document.
     # Les entrées sont groupées par lettre initiale et affichées sur plusieurs colonnes.
+    # Compresse une liste triée de numéros de pages en chaîne lisible
+    # avec ranges : `[12, 13, 14, 15, 17, 20, 21]` → `"12-15, 17, 20-21"`.
+    # Comportement Ruby asciidoctor-pdf upstream (option
+    # `index_pagenum_sequence_style: range` qui est le défaut).
+    private def format_page_ranges(pages : Array(Int32)) : String
+      return "" if pages.empty?
+      ranges = [] of String
+      start_p = pages[0]
+      prev_p = pages[0]
+
+      (1...pages.size).each do |i|
+        p = pages[i]
+        if p == prev_p + 1
+          prev_p = p
+        else
+          ranges << (start_p == prev_p ? start_p.to_s : "#{start_p}-#{prev_p}")
+          start_p = p
+          prev_p = p
+        end
+      end
+      ranges << (start_p == prev_p ? start_p.to_s : "#{start_p}-#{prev_p}")
+      ranges.join(", ")
+    end
+
     private def render_index : Nil
       return if @index_entries.empty?
 
@@ -2284,7 +2308,7 @@ module AsciidoctorPDF
           page.fill_color(@theme.base_font_color)
           entry_text = text
           unless pages.empty?
-            page_str = pages.map(&.to_s).join(", ")
+            page_str = format_page_ranges(pages)
             page_str_w = text_width(page_str, @fn_body, font_size)
             # Texte du terme
             page.text(entry_text, at: {x, y - font_size})
@@ -2304,7 +2328,7 @@ module AsciidoctorPDF
           entry_text = text
           page.text(entry_text, at: {x + indent, y - (font_size - 0.5)})
           unless pages.empty?
-            page_str = pages.map(&.to_s).join(", ")
+            page_str = format_page_ranges(pages)
             page_str_w = text_width(page_str, @fn_body, font_size - 0.5)
             page.fill_color(@theme.index_page_number_color)
             page.text(page_str, at: {x + entry_w - page_str_w, y - (font_size - 0.5)})
