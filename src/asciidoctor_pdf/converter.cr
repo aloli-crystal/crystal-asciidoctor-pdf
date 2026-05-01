@@ -2607,15 +2607,23 @@ module AsciidoctorPDF
       # Sous-titre éventuel sous le titre. Aligné comme le titre :
       # quand le titre est centré, ses satellites (subtitle, manchette
       # auteur · date) suivent. Cohérence générique.
+      # Passage par InlineRenderer + wrap_segments pour que les
+      # `pass:[<br>]` injectés par l'utilisateur soient honorés
+      # comme sauts de ligne forcés (mêmes mécaniques que le titre).
       if (subtitle = doc.attr("subtitle"))
-        sub_text = decode_html_entities(subtitle)
         sub_size = @theme.subtitle_font_size
-        sub_segs = [InlineSegment.new(text: sub_text)]
-        sub_x = title_line_x(sub_segs, sub_size, @fn_body, align)
-        set_font(page, @fn_body, sub_size)
-        page.fill_color(@theme.subtitle_font_color)
-        draw_text_run(page, sub_text, sub_x, @current_y - sub_size, @fn_body, sub_size)
-        @current_y -= sub_size * 1.4
+        sub_segments = InlineRenderer.parse(subtitle)
+        # Injecter la couleur thème dans chaque segment qui n'en
+        # définit pas explicitement — sinon `render_segment_line`
+        # retombe sur `base_font_color`.
+        sub_segments = sub_segments.map { |s| force_color(s, @theme.subtitle_font_color) }
+        sub_lines = wrap_segments(sub_segments, @content_width, sub_size)
+        sub_lines = [[] of InlineSegment] if sub_lines.empty?
+        sub_lines.each do |line|
+          x = title_line_x(line, sub_size, @fn_body, align)
+          render_segment_line(page, line, x, @current_y - sub_size, sub_size)
+          @current_y -= sub_size * 1.4
+        end
       end
 
       # Bandeau auteur + date sur une ligne, en gris, façon « manchette ».
@@ -2693,6 +2701,24 @@ module AsciidoctorPDF
       when "right"  then @margin + @content_width - line_w
       else               @margin
       end
+    end
+
+    # Force la couleur d'un segment vers la valeur donnée s'il n'en
+    # définit pas explicitement. Permet d'appliquer la couleur thème
+    # (subtitle_font_color, etc.) à un segment issu de
+    # `InlineRenderer.parse` qui n'a pas de span couleur explicite.
+    private def force_color(seg : InlineSegment, color : String) : InlineSegment
+      return seg if seg.color
+      InlineSegment.new(
+        text: seg.text, bold: seg.bold, italic: seg.italic, mono: seg.mono,
+        sup: seg.sup, sub: seg.sub, mark: seg.mark, kbd: seg.kbd,
+        button: seg.button, menu: seg.menu,
+        color: color, link: seg.link,
+        image_path: seg.image_path,
+        image_width: seg.image_width,
+        image_height: seg.image_height,
+        line_break: seg.line_break,
+      )
     end
 
     # Force le flag `bold` sur tous les segments d'une ligne de titre.
