@@ -2604,16 +2604,22 @@ module AsciidoctorPDF
       end
       @current_y -= title_lines.size * title_line_height + 4.0
 
-      # Sous-titre éventuel sous le titre.
+      # Sous-titre éventuel sous le titre. Aligné comme le titre :
+      # quand le titre est centré, ses satellites (subtitle, manchette
+      # auteur · date) suivent. Cohérence générique.
       if (subtitle = doc.attr("subtitle"))
-        set_font(page, @fn_body, @theme.subtitle_font_size)
+        sub_text = decode_html_entities(subtitle)
+        sub_size = @theme.subtitle_font_size
+        sub_segs = [InlineSegment.new(text: sub_text)]
+        sub_x = title_line_x(sub_segs, sub_size, @fn_body, align)
+        set_font(page, @fn_body, sub_size)
         page.fill_color(@theme.subtitle_font_color)
-        draw_text_run(page, decode_html_entities(subtitle), @margin,
-          @current_y - @theme.subtitle_font_size, @fn_body, @theme.subtitle_font_size)
-        @current_y -= @theme.subtitle_font_size * 1.4
+        draw_text_run(page, sub_text, sub_x, @current_y - sub_size, @fn_body, sub_size)
+        @current_y -= sub_size * 1.4
       end
 
       # Bandeau auteur + date sur une ligne, en gris, façon « manchette ».
+      # Aligné comme le titre.
       author = doc.attr("author")
       revdate = doc.attr("revdate")
       if author || revdate
@@ -2622,9 +2628,11 @@ module AsciidoctorPDF
         parts << decode_html_entities(revdate.to_s) if revdate
         bandeau = parts.join("  ·  ")
         small = @theme.base_font_size
+        bandeau_segs = [InlineSegment.new(text: bandeau)]
+        bandeau_x = title_line_x(bandeau_segs, small, @fn_body, align)
         set_font(page, @fn_body, small)
         page.fill_color("888888")
-        draw_text_run(page, bandeau, @margin, @current_y - small, @fn_body, small)
+        draw_text_run(page, bandeau, bandeau_x, @current_y - small, @fn_body, small)
         @current_y -= small * 1.4
       end
 
