@@ -2604,16 +2604,28 @@ module AsciidoctorPDF
       end
       @current_y -= title_lines.size * title_line_height + 4.0
 
-      # Sous-titre éventuel sous le titre.
+      # Sous-titre éventuel sous le titre. Aligné comme le titre.
+      # Si le sous-titre déborde et contient un séparateur tiret
+      # entouré d'espaces (` — ` em-dash ou ` – ` en-dash), on tente
+      # de casser à cet endroit en priorité — typique pour
+      # « Personne — JJ/MM/AAAA HH:MM » où on veut nom sur une ligne
+      # et date sur l'autre. À défaut, wrap normal au prochain espace.
       if (subtitle = doc.attr("subtitle"))
-        set_font(page, @fn_body, @theme.subtitle_font_size)
+        sub_text = decode_html_entities(subtitle)
+        sub_size = @theme.subtitle_font_size
+        sub_lines = smart_subtitle_lines(sub_text, @content_width, sub_size, @fn_body)
         page.fill_color(@theme.subtitle_font_color)
-        draw_text_run(page, decode_html_entities(subtitle), @margin,
-          @current_y - @theme.subtitle_font_size, @fn_body, @theme.subtitle_font_size)
-        @current_y -= @theme.subtitle_font_size * 1.4
+        sub_lines.each do |line|
+          line_segs = [InlineSegment.new(text: line)]
+          x = title_line_x(line_segs, sub_size, @fn_body, align)
+          set_font(page, @fn_body, sub_size)
+          draw_text_run(page, line, x, @current_y - sub_size, @fn_body, sub_size)
+          @current_y -= sub_size * 1.4
+        end
       end
 
       # Bandeau auteur + date sur une ligne, en gris, façon « manchette ».
+      # Aligné comme le titre lui aussi.
       author = doc.attr("author")
       revdate = doc.attr("revdate")
       if author || revdate
@@ -2622,9 +2634,11 @@ module AsciidoctorPDF
         parts << decode_html_entities(revdate.to_s) if revdate
         bandeau = parts.join("  ·  ")
         small = @theme.base_font_size
+        bandeau_segs = [InlineSegment.new(text: bandeau)]
+        x = title_line_x(bandeau_segs, small, @fn_body, align)
         set_font(page, @fn_body, small)
         page.fill_color("888888")
-        draw_text_run(page, bandeau, @margin, @current_y - small, @fn_body, small)
+        draw_text_run(page, bandeau, x, @current_y - small, @fn_body, small)
         @current_y -= small * 1.4
       end
 
@@ -2685,6 +2699,39 @@ module AsciidoctorPDF
       when "right"  then @margin + @content_width - line_w
       else               @margin
       end
+    end
+
+    # Découpe le sous-titre en lignes selon une stratégie « smart » :
+    #
+    #   * Si le sous-titre tient en 1 ligne → une seule ligne.
+    #   * Sinon, s'il contient un séparateur tiret entouré d'espaces
+    #     (` — ` em-dash ou ` – ` en-dash) ET que les deux moitiés
+    #     tiennent chacune en 1 ligne → on coupe à cet endroit.
+    #   * Sinon → wrap au mot, comportement standard de `wrap_text`.
+    #
+    # Cas typique : « Marie Dupont — 01/05/2026 10:50 » → si trop long,
+    # devient « Marie Dupont » + « 01/05/2026 10:50 » au lieu d'un
+    # break ailleurs au milieu d'un mot ou entre prénom et nom.
+    private SUBTITLE_FOLD_SEPARATORS = [" — ", " – "]
+
+    private def smart_subtitle_lines(text : String, width : Float64, font_size : Float64, font_name : String) : Array(String)
+      font = get_font(font_name)
+      total_w = font.string_width(text, font_size)
+      return [text] if total_w <= width
+
+      SUBTITLE_FOLD_SEPARATORS.each do |sep|
+        idx = text.index(sep)
+        next unless idx
+        left = text[0...idx]
+        right = text[(idx + sep.size)..]
+        left_w = font.string_width(left, font_size)
+        right_w = font.string_width(right, font_size)
+        if left_w <= width && right_w <= width
+          return [left, right]
+        end
+      end
+
+      wrap_text(text, width, font_size, font_name)
     end
 
     # Force le flag `bold` sur tous les segments d'une ligne de titre.
