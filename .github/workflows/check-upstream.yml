@@ -59,7 +59,9 @@ jobs:
           EOF
           )
 
-          gh issue create \
-            --title "Upstream asciidoctor-pdf gem updated to ${UPSTREAM_VERSION}" \
-            --body "$body" \
-            --label "upstream"
+          # API REST plutôt que GraphQL (`gh issue create`) qui renvoie
+          # `Resource not accessible by integration` sur GITHUB_TOKEN.
+          gh api "repos/${GITHUB_REPOSITORY}/issues" \
+            -f title="Upstream asciidoctor-pdf gem updated to ${UPSTREAM_VERSION}" \
+            -f body="$body" \
+            -f "labels[]=upstream"
