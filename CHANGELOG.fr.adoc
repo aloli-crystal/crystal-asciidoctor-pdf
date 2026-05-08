@@ -3,6 +3,32 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.57 — 2026-05-08
+
+=== Ajouté
+
+* **Configuration utilisateur (XDG Base Directory)** : le CLI lit
+  désormais `${XDG_CONFIG_HOME:-~/.config}/crystal-asciidoctor-pdf/config.yml`
+  pour fixer une fois pour toutes les préférences récurrentes :
+** `theme:` — thème par défaut (nom embarqué, fichier dans
+   `themes/`, ou chemin absolu)
+** `attributes:` — attributs AsciiDoc injectés systématiquement
+   (`title-page-toc`, `toc`, `pdf-page-size`, ...)
+** `author:`, `email:`, `organization:` — méta auteur par défaut
+* Cascade de priorité documentée : flags CLI > attributs du
+  document `.adoc` > user config > defaults compilés. Le document
+  garde toujours le dernier mot.
+* Nouveau flag `-N` / `--no-user-config` pour reproduire le
+  comportement « vanilla » (CI, debug).
+* Sous-répertoire `themes/` au sein du répertoire XDG : permet de
+  référencer un thème utilisateur par simple nom (ex : `theme: aloli`
+  → `~/.config/crystal-asciidoctor-pdf/themes/aloli.yml`).
+* `data/config.example.yml` : modèle prêt à copier.
+* Section _Configuration utilisateur_ dans le README.
+* Convention XDG à généraliser à tous les autres shards
+  aloli-crystal qui stockent une configuration (crystal-beryl
+  notamment).
+
 == v2.3.24.16 — 2026-04-29
 
 === Modifié

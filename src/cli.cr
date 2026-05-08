@@ -5,6 +5,7 @@ input_file = ""
 output_file = ""
 theme_file = ""
 sample_mode = false
+no_user_config = false
 attributes = {} of String => String
 
 OptionParser.parse do |parser|
@@ -15,11 +16,16 @@ OptionParser.parse do |parser|
     parts = a.split("=", 2)
     attributes[parts[0]] = parts.size > 1 ? parts[1] : ""
   end
+  parser.on("-N", "--no-user-config", "Ignorer la configuration utilisateur (#{AsciidoctorPDF::UserConfig.expected_dir}/config.yml)") { no_user_config = true }
   parser.on("--sample", "Générer le document de référence (reference.adoc + PDF)") { sample_mode = true }
   parser.on("-h", "--help", "Afficher l'aide") { puts parser; exit 0 }
   parser.on("-v", "--version", "Afficher la version") { puts "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"; exit 0 }
   parser.unknown_args { |args| input_file = args.first? || "" }
 end
+
+# Chargement de la configuration utilisateur (XDG).
+# Court-circuité par `--no-user-config`.
+user_config = no_user_config ? AsciidoctorPDF::UserConfig.empty : AsciidoctorPDF::UserConfig.load
 
 if sample_mode
   # Le fichier de référence est dans crystal-asciidoctor (le shard cœur)
@@ -62,19 +68,28 @@ if output_file.empty?
 end
 
 options = {"docfile" => input_file, "outfile" => output_file} of String => String
+
+# Fusion des attributs CLI puis user config dans `options`.
+# Ordre important : les attributs CLI ont la priorité sur le user
+# config ; le document AsciiDoc lui-même peut encore écraser tout ça
+# via `:attribut: valeur` (gestion par Asciidoctor.load).
 attributes.each { |k, v| options[k] = v }
+user_config.merge_into(options)
 
 doc = Asciidoctor.load_file(input_file, options)
 
 # Résolution du thème, par ordre de priorité décroissante :
 #   1. argument CLI `--theme` (nom embarqué OU chemin YAML)
 #   2. attribut document `:pdf-theme:` dans le source AsciiDoc
-#   3. thème par défaut intégré
+#   3. user config `theme:` (XDG)
+#   4. thème par défaut intégré
 theme =
   if !theme_file.empty?
     AsciidoctorPDF::ThemeLoader.resolve(theme_file)
   elsif (pdf_theme = doc.attr("pdf-theme")) && !pdf_theme.to_s.empty?
     AsciidoctorPDF::ThemeLoader.resolve(pdf_theme.to_s)
+  elsif (user_theme = user_config.resolve_theme)
+    user_theme
   else
     AsciidoctorPDF::Theme.new
   end

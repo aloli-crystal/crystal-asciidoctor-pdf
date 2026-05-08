@@ -3,6 +3,7 @@ require "pdf"
 
 require "./asciidoctor_pdf/theme"
 require "./asciidoctor_pdf/theme_loader"
+require "./asciidoctor_pdf/user_config"
 require "./asciidoctor_pdf/roman_numeral"
 require "./asciidoctor_pdf/win_ansi"
 require "./asciidoctor_pdf/sanitizer"

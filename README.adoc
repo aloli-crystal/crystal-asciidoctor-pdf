@@ -491,6 +491,9 @@ Options disponibles :
 | `-a ATTR`, `--attribute ATTR`
 | Attribut AsciiDoc au format `nom=valeur`
 
+| `-N`, `--no-user-config`
+| Ignorer la configuration utilisateur XDG (cf. _Configuration utilisateur_)
+
 | `--sample`
 | Générer le document de référence AsciiDoc (`reference.adoc` + `reference.adoc.pdf`)
 
@@ -500,6 +503,77 @@ Options disponibles :
 | `-h`, `--help`
 | Afficher l'aide
 |===
+
+=== Configuration utilisateur
+
+Le CLI lit automatiquement un fichier de configuration personnel pour fixer les
+préférences récurrentes (thème par défaut, attributs AsciiDoc systématiques,
+identité auteur) sans avoir à les répéter dans chaque document.
+
+==== Emplacement (XDG Base Directory)
+
+[source]
+----
+${XDG_CONFIG_HOME:-~/.config}/crystal-asciidoctor-pdf/
+├── config.yml          ← préférences principales
+└── themes/             ← thèmes utilisateur (optionnel)
+    └── aloli.yml
+----
+
+Le shard suit la
+https://specifications.freedesktop.org/basedir-spec/[XDG Base Directory Specification].
+Si `$XDG_CONFIG_HOME` est définie, elle est utilisée ; sinon le défaut
+`~/.config/` s'applique.
+
+==== Format de `config.yml`
+
+[source,yaml]
+----
+# Thème par défaut. Trois formes acceptées :
+#   - nom embarqué (« fr », « english », ...)
+#   - nom de fichier dans ./themes/ (« aloli » → ./themes/aloli.yml)
+#   - chemin absolu vers un .yml
+theme: fr
+
+# Attributs AsciiDoc injectés par défaut dans tout document
+# (équivalent à `:nom: valeur` ajouté en tête)
+attributes:
+  x-title-page-toc: "true"
+  toc: macro
+  toclevels: 3
+  sectnums: "true"
+  pdf-page-size: A4
+  source-highlighter: rouge
+
+# Méta auteur par défaut (renseignées si non déjà fournies par
+# le document)
+author: Philippe Nénert
+email: philippe@aloli.fr
+organization: ALOLI sas
+----
+
+==== Cascade de priorité
+
+Les préférences sont appliquées dans cet ordre, de la plus forte à la plus
+faible :
+
+. Flags CLI (`-T`, `-a`, ...)
+. Attributs déclarés dans le document `.adoc` (`:pdf-theme:`,
+  `:title-page-toc:`, ...)
+. *Configuration utilisateur* (`config.yml`)
+. Defaults compilés dans le shard
+
+Autrement dit : le document peut toujours écraser le user config, et le user
+config est toujours écrasé par le CLI.
+
+==== Désactivation
+
+Pour reproduire le comportement « vanilla » (CI, debug, tests) :
+
+[source,bash]
+----
+crystal-asciidoctor-pdf --no-user-config mon_document.adoc
+----
 
 === Document de référence
 

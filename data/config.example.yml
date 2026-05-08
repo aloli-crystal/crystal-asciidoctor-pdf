@@ -1,0 +1,40 @@
+# Configuration utilisateur pour crystal-asciidoctor-pdf.
+#
+# Copier vers : ${XDG_CONFIG_HOME:-~/.config}/crystal-asciidoctor-pdf/config.yml
+#
+# Cascade de priorité (du plus fort au plus faible) :
+#   1. Flags CLI (-T, -a, ...)
+#   2. Attributs du document .adoc (:pdf-theme:, ...)
+#   3. Ce fichier (user config XDG)
+#   4. Defaults compilés dans le shard
+#
+# Pour ignorer ponctuellement ce fichier : crystal-asciidoctor-pdf --no-user-config
+# ----------------------------------------------------------------
+
+# Thème par défaut. Trois formes possibles :
+#   - nom embarqué : "fr", "francais", "french", ...
+#   - nom de fichier dans <ce-répertoire>/themes/ (ex: "aloli" → ./themes/aloli.yml)
+#   - chemin absolu vers un .yml
+theme: fr
+
+# Attributs AsciiDoc injectés par défaut dans chaque document.
+# Équivalent à `:nom: valeur` en tête du source — mais le document
+# garde la priorité s'il déclare le même attribut.
+attributes:
+  # Titre + sommaire sur la première page (extension `x-`)
+  x-title-page-toc: "true"
+  # Sommaire généré
+  toc: macro
+  toclevels: 3
+  # Numérotation automatique des sections
+  sectnums: "true"
+  # Format de page
+  pdf-page-size: A4
+  # Coloration syntaxique
+  source-highlighter: rouge
+
+# Méta auteur par défaut. Renseignées dans les attributs `author`,
+# `email`, `organization` si non déjà fournies par le document.
+author: Philippe Nénert
+email: philippe@aloli.fr
+organization: ALOLI sas
