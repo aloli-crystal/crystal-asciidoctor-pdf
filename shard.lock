@@ -6,19 +6,19 @@ shards:
 
   country-flags:
     git: https://github.com/aloli-crystal/country-flags.git
-    version: 0.1.4
+    version: 0.1.5
 
   crystal-asciidoctor:
     git: https://github.com/aloli-crystal/crystal-asciidoctor.git
-    version: 2.0.26.2
+    version: 2.0.26.3
 
   crystal-rouge:
     git: https://github.com/aloli-crystal/crystal-rouge.git
-    version: 4.7.0
+    version: 4.7.0.2
 
   emojis:
     git: https://github.com/aloli-crystal/emojis.git
-    version: 0.2.2
+    version: 0.2.3
 
   matrix:
     git: https://github.com/exilor/matrix.git
@@ -26,11 +26,11 @@ shards:
 
   noto-cjk:
     git: https://github.com/aloli-crystal/noto-cjk.git
-    version: 0.1.2
+    version: 0.1.3
 
   pdf:
     git: https://github.com/aloli-crystal/pdf.git
-    version: 0.3.7
+    version: 0.5.5
 
   stumpy_core:
     git: https://github.com/stumpycr/stumpy_core.git
