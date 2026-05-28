@@ -24,7 +24,7 @@ Run `shards install`.
 git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
 cd crystal-asciidoctor-pdf
 shards build --release
-sudo cp bin/crystal-asciidoctor-pdf /usr/local/bin/
+ln -s "$PWD/bin/crystal-asciidoctor-pdf" ~/bin/
 ----
 
 == Dependencies
