@@ -460,12 +460,14 @@ cd crystal-asciidoctor-pdf
 shards build --release
 ----
 
-Le binaire est généré dans `bin/crystal-asciidoctor-pdf`. Vous pouvez le copier dans votre PATH :
+Le binaire est généré dans `bin/crystal-asciidoctor-pdf`. Plutôt que de le copier dans un répertoire système, créez un lien symbolique dans `~/bin/` (qui doit être dans votre `PATH`) :
 
 [source,bash]
 ----
-sudo cp bin/crystal-asciidoctor-pdf /usr/local/bin/
+ln -s "$PWD/bin/crystal-asciidoctor-pdf" ~/bin/
 ----
+
+Ainsi, chaque `shards build --release` met automatiquement à jour le binaire pointé — pas besoin de réinstaller.
 
 === Utilisation
 
