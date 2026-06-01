@@ -1,0 +1,676 @@
+= crystal-asciidoctor-pdf
+
+Un convertisseur AsciiDoc vers PDF pour Crystal, basé sur `crystal-asciidoctor` pour le parsing et `pdf` pour la génération du PDF.
+
+NOTE: Une version anglaise de ce README est disponible — voir link:README.adoc[README.adoc].
+
+== Versions
+
+[cols="2,2,2"]
+|===
+| | Version | Date
+
+| *Gem Ruby asciidoctor-pdf (source du portage)*
+| 2.3.24
+| 2025-11-15
+
+| *Gem Ruby asciidoctor (parser, via crystal-asciidoctor)*
+| 2.0.26
+| 2025-10-24
+
+| *Shard Crystal crystal-asciidoctor-pdf*
+| 2.3.24
+| 2026-04-10
+|===
+
+NOTE: Ce shard est un portage de la gem Ruby asciidoctor-pdf **2.3.24** et repose sur crystal-asciidoctor, lui-même porté depuis asciidoctor **2.0.26**.
+Vérifier les versions sur RubyGems : https://rubygems.org/gems/asciidoctor-pdf/versions[asciidoctor-pdf] | https://rubygems.org/gems/asciidoctor/versions[asciidoctor].
+
+== Fonctionnalités
+
+=== Conversion AsciiDoc
+
+* Paragraphes, sections (niveaux 1-6), listes (ordonnées, non ordonnées, description)
+* Tableaux avec en-têtes, pieds de page et alternance de couleurs
+* Blocs de code avec coloration syntaxique (Crystal, Ruby, Python, JavaScript, TypeScript, Go, Java, C, C++, Bash, SQL)
+* Admonitions (NOTE, TIP, WARNING, CAUTION, IMPORTANT)
+* Citations, vers, sidebars, exemples
+* Images (JPEG, PNG avec transparence)
+* Page de titre, en-têtes et pieds de page configurables
+* Table des matières (TOC)
+* Index alphabétique multi-colonnes
+* Notes de bas de page
+
+=== Fonctionnalités PDF
+
+* **Bookmarks** : les sections du document génèrent automatiquement une arborescence de signets dans le panneau de navigation PDF
+* **Liens cliquables** : les URLs dans le document produisent des annotations PDF cliquables
+* **Métadonnées** : titre, auteur et producteur renseignés dans les propriétés du PDF
+* **Mesures de texte exactes** : utilisation des métriques de police Type1/TrueType (pas d'approximation)
+
+=== Polices personnalisées
+
+Le converter supporte les polices TrueType/OpenType via le système de thèmes.
+Si des chemins de polices sont définis dans le thème, elles sont automatiquement chargées, embarquées et sous-ensemblées dans le PDF.
+
+[source,yaml]
+----
+# Exemple de thème avec polices TTF
+base_font_path: "fonts/OpenSans-Regular.ttf"
+base_font_bold_path: "fonts/OpenSans-Bold.ttf"
+base_font_italic_path: "fonts/OpenSans-Italic.ttf"
+mono_font_path: "fonts/JetBrainsMono-Regular.ttf"
+----
+
+Sans polices TTF, les polices standard PDF (Helvetica, Courier) sont utilisées.
+
+=== Thèmes
+
+Le rendu PDF est entièrement personnalisable via un fichier YAML (~60 propriétés) :
+taille et couleur des polices, marges, couleurs des admonitions, style des tableaux, en-têtes/pieds de page, etc.
+
+[source,crystal]
+----
+theme = AsciidoctorPDF::ThemeLoader.load("mon-theme.yml")
+converter = AsciidoctorPDF::Converter.new("pdf", theme)
+----
+
+=== Page de garde — comportement et options
+
+Par défaut le shard rend une page de garde dédiée (titre, sous-titre, auteur, date)
+sans en-tête ni pied de page, suivie du contenu sur la page suivante.
+
+Trois leviers contrôlent ce comportement :
+
+* `:title-page:` (attribut document) — force la page de garde dédiée même si
+  le thème la désactive. Standard AsciiDoc.
+
+* `:title-page: false` (attribut document) — désactive la page de garde.
+  Le doctitle est alors rendu comme un grand titre (28 pt) en haut de la
+  première page de contenu, précédé du logo `:title-logo-image:` s'il est
+  défini, suivi d'une manchette « auteur · date » en gris, d'un séparateur,
+  puis du préambule. Équivalent fonctionnel du standard `:!title-page:`
+  (qui n'est pas détectable côté crystal-asciidoctor — la négation ne laisse
+  pas de trace lisible via `attr?` / `attr`).
+
+* `theme.title_page_enabled: false` (thème YAML) — défaut sans page de garde,
+  les attributs document peuvent toujours réactiver pour un doc précis.
+
+==== Logo de garde — `:title-logo-image:`
+
+Standard AsciiDoc / Ruby asciidoctor-pdf 2.3 :
+
+[source,asciidoc]
+----
+:title-logo-image: image::path/to/logo.svg[align=center, pdfwidth=200]
+----
+
+Format accepté à l'identique :
+
+* `image::PATH[OPTS]` (forme canonique) — `OPTS` sépare par virgules :
+  `align=left|center|right`, `pdfwidth=<points>`, `width=<points>` (alias),
+  `alt=...` (descriptif positionnel).
+* `PATH` nu (sans `image::` ni `[]`) — défauts : centré, 200 pt de large.
+
+Le SVG comme le bitmap (PNG/JPEG) sont supportés. Pour un SVG, le shard
+parse le viewBox pour préserver le ratio.
+
+CAUTION : ne pas insérer une macro `image::PATH[]` *au-dessus* de la ligne
+`= Doctitle`. Cela démote le doctitle en section niveau 0 (« part » dans
+la terminologie AsciiDoc) — le titre apparaît alors typographié en taille
+de heading, pas en taille de couverture, et les attributs `:title-*:`
+ne s'appliquent plus correctement. Toujours utiliser `:title-logo-image:`
+pour le logo de garde / d'entête.
+
+=== Recettes — modèles de documents
+
+==== Quiz / fiche courte avec page de garde compacte (logo + titre + sommaire)
+
+Une seule page de garde qui combine logo, titre, sommaire intégré, auteur, date.
+Idéal pour les quiz et les fiches courtes (1-2 pages de contenu).
+
+[source,asciidoc]
+----
+= Quizz : Charte du télétravail
+:author: Philippe Nénert
+:revdate: 29 avril 2026
+:toc:
+:title-logo-image: image::assets/logo.svg[align=center, pdfwidth=150]
+:x-title-page-toc:
+
+Préambule du quiz.
+
+== Question 1 — Sur quelles valeurs ?
+
+* A. …
+----
+
+==== Document court sans page de garde — bandeau d'entête
+
+Pas de page de garde dédiée. Le doctitle, le logo et la manchette auteur/date
+forment un bandeau d'entête sur la page 1, suivi directement du contenu.
+
+[source,asciidoc]
+----
+= Quizz : Charte du télétravail
+:author: Philippe Nénert
+:revdate: 29 avril 2026
+:title-page: false
+:title-logo-image: image::assets/logo.svg[align=center, pdfwidth=150]
+
+== Identité
+
+Contenu de la section…
+----
+
+==== Document long avec page de garde + TOC séparée (défaut)
+
+Comportement par défaut. La page 1 est la page de garde (titre centré-bas,
+auteur, date), la page 2 est la table des matières, le contenu démarre
+page 3.
+
+[source,asciidoc]
+----
+= Manuel de procédures ISO 27001
+:author: ALOLI sas
+:revdate: 29 avril 2026
+:toc:
+
+== Introduction
+
+…
+----
+
+==== Garder un groupe d'éléments soudés à la pagination
+
+Voir <<unbreakable, `[%unbreakable]`>>.
+
+=== Garder un groupe d'éléments ensemble — `[%unbreakable]`
+
+Pour empêcher qu'un texte soit orphelin de son tableau (ou qu'un groupe
+quelconque se retrouve coupé par un saut de page), regrouper les
+éléments dans un *open block* (`--`) et y ajouter l'option
+`[%unbreakable]` :
+
+[source,asciidoc]
+----
+[%unbreakable]
+--
+[options="header"]
+|===
+| # | Équipement | Salarié | Employeur
+| 1 | Ordinateur portable | | ✓
+| 2 | Connexion Internet | ✓ |
+|===
+
+_Statut : Bonne réponse._
+--
+----
+
+Comportement : avant de commencer le rendu du bloc, le shard estime sa
+hauteur cumulée (paragraphes + tableaux + listes + listings +
+admonitions). Si l'espace restant sur la page courante est insuffisant
+mais que le bloc tient sur une page entière, on saute à la page
+suivante avant de commencer. Si le bloc dépasse la hauteur d'une page,
+on accepte la pagination normale (« if possible » du standard).
+
+NOTE : l'estimation est volontairement pessimiste. Mieux vaut sauter
+trop tôt que se retrouver avec un orphelin.
+
+=== Thèmes embarqués — appel par nom
+
+Le shard livre des thèmes prêts à l'emploi, embarqués dans le binaire
+au moment de la compilation (pas de dépendance fichier à l'exécution).
+Sélectionnables via trois canaux qui se comportent à l'identique :
+
+[cols="1,3"]
+|===
+| Canal | Syntaxe
+
+| CLI
+| `crystal-asciidoctor-pdf --theme fr mon-doc.adoc`
+
+| Source AsciiDoc
+| `:pdf-theme: fr` dans l'entête du document
+
+| API Crystal
+| `theme = AsciidoctorPDF::ThemeLoader.builtin("fr")`
+|===
+
+L'argument `--theme` accepte indifféremment un *nom embarqué* ou un
+*chemin de fichier YAML* (méthode `ThemeLoader.resolve`).
+
+==== Thèmes disponibles
+
+[cols="1,3"]
+|===
+| Nom (alias) | Description
+
+| `fr` (`francais`, `french`)
+| Français : labels d'admonitions traduits (NOTE / ASTUCE /
+  AVERTISSEMENT / ATTENTION / IMPORTANT), titre TOC « Table des
+  matières », titre Index « Index ». 5 niveaux de score
+  `[.x-score-*]` activés.
+|===
+
+==== Ordre de priorité
+
+. Argument CLI `--theme` (s'il est présent)
+. Attribut document `:pdf-theme:` (s'il est présent)
+. Thème par défaut intégré (anglais, défauts standard)
+
+=== Blocs de score — `[.x-score-<niveau>]` (extension)
+
+Pour les barèmes de quiz, fiches d'évaluation, classements, le shard
+fournit cinq niveaux qualitatifs prédéfinis avec couleurs et libellés
+configurables. Activés via le rôle AsciiDoc `[.x-score-<niveau>]`
+sur un bloc *example* (`====`) ou *open* (`--`) :
+
+[source,asciidoc]
+----
+[.x-score-excellent]
+====
+*12/12* — Charte parfaitement assimilée.
+====
+
+[.x-score-tres-bien]
+====
+*10-11/12* — Quelques détails à revoir.
+====
+
+[.x-score-bien]
+====
+*7-9/12* — Une relecture de certaines sections est conseillée.
+====
+
+[.x-score-insuffisant]
+====
+*4-6/12* — Une relecture complète de la charte est nécessaire.
+====
+
+[.x-score-a-revoir]
+====
+*0-3/12* — Veuillez relire attentivement l'ensemble de la charte.
+====
+----
+
+Rendu : bande verticale colorée à gauche + label en gras + texte
+indenté. Même mécanique que les admonitions standard, avec une
+palette dédiée au feedback de score (vert foncé → vert clair →
+jaune → orange → rouge).
+
+==== Personnalisation
+
+Couleurs et libellés modifiables via le thème YAML :
+
+[source,yaml]
+----
+x_score_excellent_color:   "2e7d32"
+x_score_excellent_label:   "EXCELLENT"
+x_score_tres_bien_color:   "66bb6a"
+x_score_tres_bien_label:   "TRÈS BIEN"
+x_score_bien_color:        "fbc02d"
+x_score_bien_label:        "BIEN"
+x_score_insuffisant_color: "ff9800"
+x_score_insuffisant_label: "INSUFFISANT"
+x_score_a_revoir_color:    "d32f2f"
+x_score_a_revoir_label:    "À REVOIR"
+----
+
+NOTE : extension non standard (préfixe `x-`). Sans équivalent dans
+AsciiDoc / Ruby asciidoctor-pdf — voir <<convention-x>>.
+
+=== Traduction des admonitions
+
+Les étiquettes des admonitions (`NOTE`, `TIP`, `WARNING`, `CAUTION`,
+`IMPORTANT`) sont en anglais par défaut, comme dans Ruby
+asciidoctor-pdf. Deux mécanismes pour les traduire, qui se cumulent
+en cascade (la première qui matche gagne) :
+
+==== 1. Per-document via les attributs `:<name>-caption:`
+
+Le standard AsciiDoc. Mettre dans l'entête du document :
+
+[source,asciidoc]
+----
+:note-caption: NOTE
+:tip-caption: ASTUCE
+:warning-caption: AVERTISSEMENT
+:caution-caption: ATTENTION
+:important-caption: IMPORTANT
+----
+
+Idéal pour traduire un document particulier. Pour traduire tous les
+quiz d'un même projet sans répéter à chaque fois, factoriser ces
+lignes dans un fichier inclus :
+
+[source,asciidoc]
+----
+include::../config/admonitions-fr.adoc[]
+----
+
+==== 2. Pour tout un thème via le YAML
+
+Quand on veut un défaut côté thème (et que tous les docs qui
+chargent ce thème en bénéficient sans rien dire) :
+
+[source,yaml]
+----
+admonition_note_label: NOTE
+admonition_tip_label: ASTUCE
+admonition_warning_label: AVERTISSEMENT
+admonition_caution_label: ATTENTION
+admonition_important_label: IMPORTANT
+----
+
+==== Cascade de résolution
+
+. Attribut document `:<name>-caption:` (s'il diffère du défaut
+  *Note* / *Tip* / *Warning* / *Caution* / *Important* injecté par le
+  parser crystal-asciidoctor — sinon il est ignoré comme « non
+  surchargé »).
+. Propriété de thème `admonition_<name>_label`.
+. Fallback ultime : `name.upcase`.
+
+==== Convention `x-` pour les extensions non standard
+
+Tout attribut AsciiDoc préfixé `x-` (et toute propriété de thème
+préfixée `x_` côté YAML) est une *extension propre* à
+`crystal-asciidoctor-pdf`, sans équivalent natif dans AsciiDoc
+standard ni dans Ruby `asciidoctor-pdf`. À utiliser en connaissance de
+cause si la portabilité du source vers d'autres convertisseurs vous
+importe.
+
+Convention héritée de `X-*` dans HTTP/MIME — explicite, court,
+universellement compris comme « extension hors standard ».
+
+==== `:x-title-page-toc:` — page de garde + sommaire intégré
+
+Activée per-document :
+
+[source,asciidoc]
+----
+= Mon document
+:author: Auteur
+:revdate: 2026-04-29
+:toc:
+:x-title-page-toc:
+
+Préambule…
+
+== Section 1
+----
+
+Ou activée pour tout un thème via `theme.x_title_page_with_toc: true`.
+
+Effet : la page de garde n'a plus le titre centré-bas mais le titre tout en
+haut, suivi d'une ligne de séparation, du sommaire (table des matières
+cliquable, alimentée par `:toc:`), puis de l'auteur et de la date en bas
+de page. Le contenu démarre sur la page suivante.
+
+Cas d'usage typique : quiz, fiches de poste, notes courtes destinées à
+tenir sur 1-2 pages avec une mini-couverture compacte.
+
+== Installation
+
+. Ajoutez cette dépendance à votre fichier `shard.yml` :
++
+[source,yaml]
+----
+dependencies:
+  crystal-asciidoctor-pdf:
+    github: aloli-crystal/crystal-asciidoctor-pdf
+----
+. Exécutez `shards install`
+
+== Utilisation
+
+[source,crystal]
+----
+require "crystal-asciidoctor-pdf"
+
+input = <<-ADOC
+= Mon Document
+Auteur
+
+== Introduction
+
+Un paragraphe avec *gras* et _italique_.
+
+== Code
+
+[source,crystal]
+\----
+puts "Bonjour !"
+\----
+ADOC
+
+doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => "document.pdf"})
+AsciidoctorPDF::Converter.new.convert(doc)
+----
+
+== Ligne de commande
+
+Ce shard fournit également un exécutable `crystal-asciidoctor-pdf`.
+
+=== Construire le binaire
+
+[source,bash]
+----
+git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
+cd crystal-asciidoctor-pdf
+shards build --release
+----
+
+Le binaire est généré dans `bin/crystal-asciidoctor-pdf`. Plutôt que de le copier dans un répertoire système, créez un lien symbolique dans `~/bin/` (qui doit être dans votre `PATH`) :
+
+[source,bash]
+----
+ln -s "$PWD/bin/crystal-asciidoctor-pdf" ~/bin/
+----
+
+Ainsi, chaque `shards build --release` met automatiquement à jour le binaire pointé — pas besoin de réinstaller.
+
+=== Utilisation
+
+[source,bash]
+----
+crystal-asciidoctor-pdf mon_document.adoc
+----
+
+Par défaut, la commande génère un fichier `mon_document.adoc.pdf`.
+
+Options disponibles :
+
+[cols="1,3"]
+|===
+| Option | Description
+
+| `-o FILE`, `--out-file FILE`
+| Fichier PDF de sortie (par défaut : `<fichier>.adoc.pdf`)
+
+| `-T FILE`, `--theme FILE`
+| Fichier de thème YAML personnalisé
+
+| `-a ATTR`, `--attribute ATTR`
+| Attribut AsciiDoc au format `nom=valeur`
+
+| `-N`, `--no-user-config`
+| Ignorer la configuration utilisateur XDG (cf. _Configuration utilisateur_)
+
+| `--sample`
+| Générer le document de référence AsciiDoc (`reference.adoc` + `reference.adoc.pdf`)
+
+| `-v`, `--version`
+| Afficher la version
+
+| `-h`, `--help`
+| Afficher l'aide
+|===
+
+=== Configuration utilisateur
+
+Le CLI lit automatiquement un fichier de configuration personnel pour fixer les
+préférences récurrentes (thème par défaut, attributs AsciiDoc systématiques,
+identité auteur) sans avoir à les répéter dans chaque document.
+
+==== Emplacement (XDG Base Directory)
+
+[source]
+----
+${XDG_CONFIG_HOME:-~/.config}/crystal-asciidoctor-pdf/
+├── config.yml          ← préférences principales
+└── themes/             ← thèmes utilisateur (optionnel)
+    └── aloli.yml
+----
+
+Le shard suit la
+https://specifications.freedesktop.org/basedir-spec/[XDG Base Directory Specification].
+Si `$XDG_CONFIG_HOME` est définie, elle est utilisée ; sinon le défaut
+`~/.config/` s'applique.
+
+==== Format de `config.yml`
+
+[source,yaml]
+----
+# Thème par défaut. Trois formes acceptées :
+#   - nom embarqué (« fr », « english », ...)
+#   - nom de fichier dans ./themes/ (« aloli » → ./themes/aloli.yml)
+#   - chemin absolu vers un .yml
+theme: fr
+
+# Attributs AsciiDoc injectés par défaut dans tout document
+# (équivalent à `:nom: valeur` ajouté en tête)
+attributes:
+  x-title-page-toc: "true"
+  toc: macro
+  toclevels: 3
+  sectnums: "true"
+  pdf-page-size: A4
+  source-highlighter: rouge
+
+# Méta auteur par défaut (renseignées si non déjà fournies par
+# le document)
+author: Philippe Nénert
+email: philippe@aloli.fr
+organization: ALOLI sas
+----
+
+==== Cascade de priorité
+
+Les préférences sont appliquées dans cet ordre, de la plus forte à la plus
+faible :
+
+. Flags CLI (`-T`, `-a`, ...)
+. Attributs déclarés dans le document `.adoc` (`:pdf-theme:`,
+  `:title-page-toc:`, ...)
+. *Configuration utilisateur* (`config.yml`)
+. Defaults compilés dans le shard
+
+Autrement dit : le document peut toujours écraser le user config, et le user
+config est toujours écrasé par le CLI.
+
+==== Désactivation
+
+Pour reproduire le comportement « vanilla » (CI, debug, tests) :
+
+[source,bash]
+----
+crystal-asciidoctor-pdf --no-user-config mon_document.adoc
+----
+
+=== Document de référence
+
+L'option `--sample` génère un document AsciiDoc exhaustif et son PDF, couvrant tous les éléments AsciiDoc (formatage, listes, tableaux, code, admonitions, formules, diagrammes, etc.) :
+
+[source,bash]
+----
+crystal-asciidoctor-pdf --sample
+# → reference.adoc + reference.adoc.pdf
+----
+
+Ce document sert de test de conformité pour valider le rendu PDF.
+
+== Formulaires PDF interactifs — extension `[x-form]`
+
+Depuis la v2.3.24.58, vous pouvez décrire un formulaire PDF interactif
+(champs remplissables, cases à cocher, boutons radio, listes déroulantes,
+listbox multi-sélection) directement dans votre source AsciiDoc. Le rendu
+PDF crée des widgets AcroForm conformes ISO 32000-1 §12.7 qui sont
+remplissables dans n'importe quel lecteur PDF (Acrobat, Preview, Foxit,
+Firefox, Chrome).
+
+=== Exemple minimal
+
+[source,adoc]
+----
+[x-form, id=inscription, action=mailto:contact@example.com]
+\----
+fields:
+  - id: nom
+    type: text
+    label: Nom complet
+    required: true
+  - id: email
+    type: email
+    label: Courriel
+    required: true
+  - id: consent
+    type: checkbox
+    label: J'accepte le traitement de mes données (RGPD)
+    required: true
+submit:
+  label: Envoyer
+\----
+----
+
+=== Grammaire complète
+
+Voir `doc/x-form-spec.adoc` pour la spec de référence : 10 types de
+champs supportés, organisation en sections, layout multi-colonnes,
+options en liste simple ou hash `{code: label}`, validation atomique
+(regex, min/max), boutons de soumission/reset, etc.
+
+=== Cas d'usage typiques
+
+* **Audits ISO 27001** — questionnaires de conformité auto-complétables
+  avec sections par contrôle de l'Annexe A.
+* **Quiz Quiméo** distribués en PDF pour usage offline (au lieu d'une
+  appli web).
+* **Formulaires d'inscription** ou **déclarations de consentement RGPD**
+  signables localement.
+
+=== Convention `x-`
+
+Le préfixe `x-` (comme `x-title-page-toc`, `x-score-*`) signale une
+*extension non standard* qui ne fonctionne qu'avec
+`crystal-asciidoctor-pdf` — pas avec la gem Ruby `asciidoctor-pdf` ni
+les autres convertisseurs AsciiDoc.
+
+== Développement
+
+Pour contribuer, clonez les trois dépôts au même niveau :
+
+[source,bash]
+----
+git clone https://github.com/aloli-crystal/crystal-asciidoctor.git
+git clone https://github.com/aloli-crystal/pdf.git
+git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
+cd crystal-asciidoctor-pdf
+shards install
+crystal spec
+----
+
+Les dépendances locales (`path: ../crystal-asciidoctor` et `path: ../pdf`) sont utilisées pour le développement.
+
+== Contribuer
+
+. Forkez le projet ( https://github.com/aloli-crystal/crystal-asciidoctor-pdf/fork )
+. Créez votre branche de fonctionnalité (`git checkout -b ma-nouvelle-fonctionnalite`)
+. Commitez vos changements (`git commit -am 'Ajouter une nouvelle fonctionnalité'`)
+. Poussez vers la branche (`git push origin ma-nouvelle-fonctionnalite`)
+. Créez une nouvelle Pull Request
+
+== Contributeurs
+
+-   https://github.com/papilip[papilip] - créateur et mainteneur
