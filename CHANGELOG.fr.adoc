@@ -3,6 +3,47 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.58 — 2026-06-01
+
+=== Ajouté
+
+* **Extension `[x-form]`** — formulaires PDF interactifs (AcroForm,
+  ISO 32000-1 §12.7) décrits en YAML embarqué dans un bloc literal
+  AsciiDoc. Conformes aux exigences ALOLI : audits ISO 27001, quiz
+  Quiméo offline, formulaires RGPD/consentement.
+* Grammaire complète documentée dans `doc/x-form-spec.adoc` :
+** 10 types de champs : `text`, `email`, `url`, `tel`, `password`,
+   `textarea`, `number`, `date`, `checkbox`, `radio`, `select`,
+   `select-multi` (le type `signature` est *refusé* en v1, attend
+   `pdf-signature`).
+** Organisation : `fields:` à plat *OU* `sections:` titrées
+   (mutuellement exclusifs).
+** Options : liste simple `[A, B, C]` ou Hash `{code: label}`
+   (Hash YAML natif, ordre préservé, /Opt en paires `[export, display]`).
+** *Layout multi-colonnes* : `columns: N` au niveau form ou
+   section, `cols: M` (span) au niveau champ, flow auto
+   gauche → droite.
+** Validation atomique : regex, intervalle min/max (`required_if`
+   et `visible_if` reportés en v2 avec JavaScript PDF).
+** Boutons : `submit:` (un seul), `reset:`, `buttons:` custom
+   (refusés en v1 — Btn pushbutton attend pdf v0.6+).
+* Implémentation : modules `AsciidoctorPDF::FormBuilder` (parser
+  YAML + validation), `AsciidoctorPDF::FormRenderer` (helpers de
+  layout), intégration dans `convert_listing` (détecte
+  `attributes["style"]? == "x-form"`).
+* Couverture : 92 specs ajoutées (66 FormBuilder + 13 FormRenderer
+  + 13 end-to-end PDF avec /AcroForm validé).
+
+=== Modifié
+
+* Dépendance `pdf` épinglée sur **`~> 0.5.7`** (apporte AcroForm
+  + rejet propre des fontes OpenType/CFF, prérequis pour `[x-form]`).
+* Police CJK (`noto-cjk`) tolère désormais les fontes OpenType/CFF
+  (`.otf`) qui ne sont pas encore subsettables : un avertissement
+  est émis et `@font_cjk` reste nil — le converter retombe sur le
+  fallback `?` pour les CJK. Cf. note mémoire ALOLI
+  `roadmap_pdf_cff_subsetting.md` (subsetting CFF prévu).
+
 == v2.3.24.57 — 2026-05-08
 
 === Ajouté

@@ -3,6 +3,48 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.58 — 2026-06-01
+
+=== Added
+
+* **`[x-form]` extension** — interactive PDF forms (AcroForm,
+  ISO 32000-1 §12.7) described in YAML inside an AsciiDoc literal
+  block. Built for the ALOLI use cases : ISO 27001 audits, offline
+  Quiméo quizzes, RGPD / consent forms.
+* Full grammar documented in `doc/x-form-spec.adoc` :
+** 10 field types : `text`, `email`, `url`, `tel`, `password`,
+   `textarea`, `number`, `date`, `checkbox`, `radio`, `select`,
+   `select-multi` (the `signature` type is *rejected* in v1,
+   pending `pdf-signature`).
+** Layout : `fields:` flat *OR* `sections:` titled (mutually
+   exclusive).
+** Options : simple list `[A, B, C]` or Hash `{code: label}`
+   (native YAML Hash, order preserved, /Opt as `[export, display]`
+   pairs).
+** *Multi-column layout* : `columns: N` at form or section level,
+   `cols: M` (span) at field level, auto-flow left → right.
+** Atomic validation : regex, min/max range (`required_if` and
+   `visible_if` postponed to v2 — require PDF JavaScript).
+** Buttons : `submit:` (single), `reset:`, custom `buttons:`
+   (rejected in v1 — pushbutton support needs pdf v0.6+).
+* Implementation : modules `AsciidoctorPDF::FormBuilder` (YAML
+  parser + validation), `AsciidoctorPDF::FormRenderer` (layout
+  helpers), integrated in `convert_listing` (detects
+  `attributes["style"]? == "x-form"`).
+* Coverage : 92 specs added (66 FormBuilder + 13 FormRenderer +
+  13 end-to-end PDF with /AcroForm validated).
+
+=== Changed
+
+* Dependency `pdf` pinned to **`~> 0.5.7`** (provides AcroForm +
+  clean rejection of OpenType/CFF fonts, prerequisite for
+  `[x-form]`).
+* CJK font (`noto-cjk`) now tolerates OpenType/CFF (`.otf`)
+  fonts that aren't yet subsettable : a warning is emitted and
+  `@font_cjk` stays nil — the converter falls back to `?` for CJK
+  characters. See ALOLI memo `roadmap_pdf_cff_subsetting.md` (CFF
+  subsetting planned).
+
 == v2.3.24.57 — 2026-05-08
 
 === Added

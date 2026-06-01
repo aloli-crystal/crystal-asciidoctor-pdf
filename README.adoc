@@ -589,6 +589,62 @@ crystal-asciidoctor-pdf --sample
 
 Ce document sert de test de conformité pour valider le rendu PDF.
 
+== Formulaires PDF interactifs — extension `[x-form]`
+
+Depuis la v2.3.24.58, vous pouvez décrire un formulaire PDF interactif
+(champs remplissables, cases à cocher, boutons radio, listes déroulantes,
+listbox multi-sélection) directement dans votre source AsciiDoc. Le rendu
+PDF crée des widgets AcroForm conformes ISO 32000-1 §12.7 qui sont
+remplissables dans n'importe quel lecteur PDF (Acrobat, Preview, Foxit,
+Firefox, Chrome).
+
+=== Exemple minimal
+
+[source,adoc]
+----
+[x-form, id=inscription, action=mailto:contact@example.com]
+\----
+fields:
+  - id: nom
+    type: text
+    label: Nom complet
+    required: true
+  - id: email
+    type: email
+    label: Courriel
+    required: true
+  - id: consent
+    type: checkbox
+    label: J'accepte le traitement de mes données (RGPD)
+    required: true
+submit:
+  label: Envoyer
+\----
+----
+
+=== Grammaire complète
+
+Voir `doc/x-form-spec.adoc` pour la spec de référence : 10 types de
+champs supportés, organisation en sections, layout multi-colonnes,
+options en liste simple ou hash `{code: label}`, validation atomique
+(regex, min/max), boutons de soumission/reset, etc.
+
+=== Cas d'usage typiques
+
+* **Audits ISO 27001** — questionnaires de conformité auto-complétables
+  avec sections par contrôle de l'Annexe A.
+* **Quiz Quiméo** distribués en PDF pour usage offline (au lieu d'une
+  appli web).
+* **Formulaires d'inscription** ou **déclarations de consentement RGPD**
+  signables localement.
+
+=== Convention `x-`
+
+Le préfixe `x-` (comme `x-title-page-toc`, `x-score-*`) signale une
+*extension non standard* qui ne fonctionne qu'avec
+`crystal-asciidoctor-pdf` — pas avec la gem Ruby `asciidoctor-pdf` ni
+les autres convertisseurs AsciiDoc.
+
 == Développement
 
 Pour contribuer, clonez les trois dépôts au même niveau :

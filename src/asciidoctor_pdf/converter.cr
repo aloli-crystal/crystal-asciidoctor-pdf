@@ -577,6 +577,14 @@ module AsciidoctorPDF
 
     def convert_listing(node : Asciidoctor::AbstractNode) : String
       return "" unless node.is_a?(Asciidoctor::Block)
+
+      # Extension : bloc `[x-form, id=..., action=...]` — formulaire
+      # PDF interactif décrit en YAML (cf. doc/x-form-spec.adoc).
+      # Asciidoctor laisse `node.style` à "listing" pour un bloc
+      # délimité par `----`, mais conserve "x-form" dans
+      # `attributes["style"]` (1er attribut positional).
+      return render_x_form_block(node) if node.attributes["style"]? == "x-form"
+
       render_code_block(node)
     end
 
@@ -1002,6 +1010,229 @@ module AsciidoctorPDF
       when "insuffisant" then {@theme.x_score_insuffisant_label, @theme.x_score_insuffisant_color}
       when "a-revoir"    then {@theme.x_score_a_revoir_label, @theme.x_score_a_revoir_color}
       else                    {level.upcase, @theme.admonition_note_color}
+      end
+    end
+
+    # =========================================================================
+    # Extension `[x-form]` — formulaires PDF interactifs (AcroForm)
+    # Cf. doc/x-form-spec.adoc et src/asciidoctor_pdf/form_builder.cr
+    # =========================================================================
+
+    private def collect_x_form_block_attrs(node : Asciidoctor::Block) : Hash(String, String)
+      attrs = {} of String => String
+      {"id", "action", "method", "read-only"}.each do |key|
+        v = node.attr(key)
+        attrs[key] = v.to_s if v
+      end
+      attrs
+    end
+
+    # Point d'entrée du rendu : parse le YAML, dessine titre +
+    # sections/champs en flow auto, attache les widgets AcroForm
+    # via le shard `pdf`.
+    private def render_x_form_block(node : Asciidoctor::Block) : String
+      ensure_page
+      page = @current_page.not_nil!
+
+      block_attrs = collect_x_form_block_attrs(node)
+      begin
+        form = AsciidoctorPDF::FormBuilder.parse(node.source, block_attrs)
+      rescue ex : AsciidoctorPDF::FormError
+        STDERR.puts ex.message
+        render_x_form_error_text(page, ex.message.to_s)
+        return ""
+      end
+
+      acroform = @doc.acroform
+
+      if title = form.title
+        render_x_form_inline_label(page, title, font_size: AsciidoctorPDF::FormRenderer::FORM_TITLE_FONT_SIZE, gap_below: 6.0)
+      end
+      if desc = form.description
+        render_x_form_inline_label(page, desc, font_size: AsciidoctorPDF::FormRenderer::FORM_DESC_FONT_SIZE, gap_below: 8.0)
+      end
+
+      if form.sectioned?
+        form.sections.each_with_index do |sec, i|
+          render_x_form_section(sec, page, acroform, first: i == 0)
+        end
+      else
+        render_x_form_field_group(form.fields, form.columns, page, acroform)
+      end
+
+      ""
+    end
+
+    private def render_x_form_error_text(page : PDF::Page, message : String) : Nil
+      @current_y -= 14.0
+      page.font("Helvetica", size: 9)
+      page.text(message, at: {@margin, @current_y})
+      @current_y -= 10.0
+    end
+
+    private def render_x_form_inline_label(page : PDF::Page, text : String, *, font_size : Float64, gap_below : Float64) : Nil
+      @current_y -= font_size + 2.0
+      page.font("Helvetica", size: font_size)
+      page.text(text, at: {@margin, @current_y})
+      @current_y -= gap_below
+    end
+
+    private def render_x_form_section(sec : AsciidoctorPDF::Section, page : PDF::Page, acroform : PDF::AcroForm::Form, *, first : Bool) : Nil
+      @current_y -= 8.0 unless first
+      if title = sec.title
+        render_x_form_inline_label(page, title,
+          font_size: AsciidoctorPDF::FormRenderer::SECTION_TITLE_FONT_SIZE,
+          gap_below: 4.0)
+      end
+      if desc = sec.description
+        render_x_form_inline_label(page, desc,
+          font_size: AsciidoctorPDF::FormRenderer::SECTION_DESC_FONT_SIZE,
+          gap_below: 6.0)
+      end
+      render_x_form_field_group(sec.fields, sec.columns, page, acroform)
+    end
+
+    # Flow auto multi-colonnes. Avance cursor_y rangée par rangée ;
+    # à l'intérieur d'une rangée, les colonnes partagent le même y
+    # de départ. Quand un champ avec `cols: N` ne tient pas, on
+    # ferme la rangée courante avant de l'émettre.
+    private def render_x_form_field_group(fields : Array(AsciidoctorPDF::FormField), columns : Int32, page : PDF::Page, acroform : PDF::AcroForm::Form) : Nil
+      gutter = AsciidoctorPDF::FormRenderer::DEFAULT_GUTTER
+      col_w = AsciidoctorPDF::FormRenderer.column_width(columns, @content_width, gutter)
+
+      current_col = 0
+      row_top_y = @current_y
+      row_max_h = 0.0
+
+      fields.each do |field|
+        span = AsciidoctorPDF::FormRenderer.clamped_span(field, columns)
+
+        if current_col + span > columns && current_col > 0
+          @current_y = row_top_y - row_max_h
+          row_top_y = @current_y
+          row_max_h = 0.0
+          current_col = 0
+        end
+
+        x = @margin + current_col * (col_w + gutter)
+        width = col_w * span + gutter * (span - 1)
+
+        @current_y = row_top_y
+        consumed = render_x_form_one_field(field, x, width, page, acroform)
+        row_max_h = consumed if consumed > row_max_h
+
+        current_col += span
+        if current_col >= columns
+          @current_y = row_top_y - row_max_h
+          row_top_y = @current_y
+          row_max_h = 0.0
+          current_col = 0
+        end
+      end
+
+      if current_col > 0
+        @current_y = row_top_y - row_max_h
+      end
+    end
+
+    # Rend un champ unique dans la zone `(x..x+width)` à partir du
+    # `@current_y` courant. Retourne la hauteur totale consommée
+    # par le bloc (label + widget + help + spacing) — utilisée pour
+    # synchroniser la hauteur de la rangée multi-colonnes.
+    private def render_x_form_one_field(field : AsciidoctorPDF::FormField, x : Float64, width : Float64, page : PDF::Page, acroform : PDF::AcroForm::Form) : Float64
+      start_y = @current_y
+
+      if label = field.label
+        label_text = field.required ? "#{label} *" : label
+        @current_y -= AsciidoctorPDF::FormRenderer::LABEL_FONT_SIZE + 1.0
+        page.font("Helvetica", size: AsciidoctorPDF::FormRenderer::LABEL_FONT_SIZE)
+        page.text(label_text, at: {x, @current_y})
+        @current_y -= AsciidoctorPDF::FormRenderer::LABEL_GAP
+      end
+
+      widget_h = AsciidoctorPDF::FormRenderer.widget_height(field)
+      widget_y = @current_y - widget_h
+
+      begin
+        place_x_form_widget(field, x, widget_y, width, widget_h, page, acroform)
+      rescue ex : ArgumentError
+        STDERR.puts "[x-form] champ '#{field.id}' : #{ex.message}"
+        page.font("Helvetica", size: 8)
+        page.text("[#{field.id}: #{ex.message}]", at: {x, widget_y + 4.0})
+      end
+
+      @current_y -= widget_h + 4.0
+
+      if help = field.help
+        @current_y -= AsciidoctorPDF::FormRenderer::HELP_FONT_SIZE
+        page.font("Helvetica", size: AsciidoctorPDF::FormRenderer::HELP_FONT_SIZE)
+        page.text(help, at: {x, @current_y})
+        @current_y -= AsciidoctorPDF::FormRenderer::HELP_GAP
+      end
+
+      @current_y -= 6.0
+
+      start_y - @current_y
+    end
+
+    # Place le widget AcroForm correspondant au type. Lève
+    # ArgumentError si options/valeurs invalides (capturé en amont).
+    private def place_x_form_widget(field : AsciidoctorPDF::FormField, x : Float64, y : Float64, width : Float64, height : Float64, page : PDF::Page, acroform : PDF::AcroForm::Form) : Nil
+      case field.type
+      when "text", "email", "url", "tel"
+        acroform.text_field(field.id, page: page, x: x, y: y,
+          width: width, height: height,
+          value: field.value_string,
+          required: field.required, read_only: field.read_only)
+      when "password"
+        acroform.text_field(field.id, page: page, x: x, y: y,
+          width: width, height: height,
+          value: field.value_string, password: true,
+          required: field.required, read_only: field.read_only)
+      when "number", "date"
+        # min/max/step ne sont pas natifs AcroForm ; un /JS /AA action
+        # sera ajouté plus tard pour valider. Pour l'instant : champ
+        # texte simple.
+        acroform.text_field(field.id, page: page, x: x, y: y,
+          width: width, height: height,
+          value: field.value_string,
+          required: field.required, read_only: field.read_only)
+      when "textarea"
+        acroform.text_field(field.id, page: page, x: x, y: y,
+          width: width, height: height,
+          value: field.value_string, multiline: true,
+          required: field.required, read_only: field.read_only)
+      when "checkbox"
+        checked = field.value.try(&.as_bool?) || false
+        size = Math.min(width, AsciidoctorPDF::FormRenderer::DEFAULT_FIELD_H)
+        acroform.checkbox(field.id, page: page, x: x, y: y,
+          size: size, checked: checked,
+          required: field.required, read_only: field.read_only)
+      when "radio"
+        options = field.options
+        raise ArgumentError.new("options requis pour radio") if options.nil?
+        # `radio_group` prend l'origine au coin haut-gauche du
+        # premier bouton : on passe (x, y + height) car notre y
+        # est le coin bas-gauche du bloc complet.
+        acroform.radio_group(field.id, page: page, options: options,
+          x: x, y: y + height,
+          spacing: AsciidoctorPDF::FormRenderer::RADIO_OPTION_SPACING,
+          selected: field.value_string,
+          required: field.required, read_only: field.read_only)
+      when "select"
+        options = field.options
+        raise ArgumentError.new("options requis pour select") if options.nil?
+        acroform.dropdown(field.id, page: page, options: options,
+          x: x, y: y, width: width, height: height,
+          value: field.value_string,
+          required: field.required, read_only: field.read_only)
+      when "select-multi"
+        options = field.options
+        raise ArgumentError.new("options requis pour select-multi") if options.nil?
+        acroform.listbox(field.id, page: page, options: options,
+          x: x, y: y, width: width, height: height,
+          value: field.value_array,
+          required: field.required, read_only: field.read_only)
       end
     end
 
@@ -3593,10 +3824,22 @@ module AsciidoctorPDF
       # variante installée et on l'utilise automatiquement pour les
       # codepoints CJK que DejaVu ne couvre pas. Sans ça, les CJK
       # tombent sur le fallback `?` + warning du sanitize WinAnsi.
+      #
+      # Cas spécial : depuis pdf 0.5.6, les fontes OpenType/CFF (.otf —
+      # format natif de Noto Sans CJK distribué par Google) lèvent
+      # `PDF::Fonts::TrueTypeFont::UnsupportedFontFormat` au chargement
+      # car le subsetter CFF n'est pas encore implémenté. On laisse
+      # @font_cjk à nil et le converter retombe sur le fallback `?` +
+      # warning WinAnsi. Le subsetting CFF est planifié (cf. memo
+      # `roadmap_pdf_cff_subsetting.md`).
       if (cjk_path = NotoCjk.font_path) && File.exists?(cjk_path)
-        ttf = @doc.load_font(cjk_path)
-        @font_cjk = ttf
-        @fn_cjk = ttf.name
+        begin
+          ttf = @doc.load_font(cjk_path)
+          @font_cjk = ttf
+          @fn_cjk = ttf.name
+        rescue ex : PDF::Fonts::TrueTypeFont::UnsupportedFontFormat
+          STDERR.puts "Avertissement : police CJK '#{File.basename(cjk_path)}' non chargeable (#{ex.message.try(&.lines.first)}). Les caractères CJK seront substitués par '?'."
+        end
       end
     end
 

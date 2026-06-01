@@ -1,0 +1,647 @@
+= Extension `[x-form]` — formulaires PDF interactifs
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+Cette spec décrit l'extension *non standard* `x-form` de
+`crystal-asciidoctor-pdf` qui permet de décrire dans le source
+AsciiDoc un formulaire qui sera transformé en *formulaire PDF
+interactif* (champs remplissables, cases à cocher, listes
+déroulantes, signatures) au moment du rendu.
+
+Le rendu PDF est délégué au module `PDF::AcroForm` du shard
+https://github.com/aloli-crystal/pdf[pdf] (conforme ISO 32000-1
+§12.7).
+
+== Convention `x-`
+
+Le préfixe `x-` signale une extension *non standard* (n'existe pas
+dans la spec AsciiDoc upstream ni dans `asciidoctor-pdf` Ruby) ;
+elle ne marchera donc qu'avec `crystal-asciidoctor-pdf`. Convention
+empruntée à HTTP/MIME (`X-Custom-Header`, `application/x-...`).
+
+== Syntaxe
+
+Un formulaire est un *bloc literal* AsciiDoc (délimité par `----`)
+dont le rôle est `x-form`. Son contenu est du *YAML structuré*.
+
+[source,adoc]
+----
+[x-form, id=audit-iso27001, action=mailto:audit@aloli.fr]
+----
+fields:
+  - id: nom
+    type: text
+    label: Nom complet
+    required: true
+  - id: email
+    type: email
+    label: Courriel
+    required: true
+submit:
+  label: Envoyer
+----
+----
+
+=== Attributs du bloc
+
+[cols="1,3,1"]
+|===
+| Attribut | Description | Obligatoire
+
+| `id`
+| Identifiant unique du formulaire dans le PDF.
+| oui
+
+| `action`
+| URL de soumission : `https://...`, `mailto:...`, ou nom de script
+  JavaScript embarqué (avancé). Si omis, le formulaire ne sert qu'à
+  recueillir des données localement (l'utilisateur sauvegarde le
+  PDF rempli).
+| non
+
+| `method`
+| `post` (défaut), `get`, ou `mailto`.
+| non
+
+| `read-only`
+| Si `true`, tous les champs sont en lecture seule. Utile pour
+  archiver un formulaire rempli.
+| non
+|===
+
+== Structure YAML
+
+[source,yaml]
+----
+# Optionnel — métadonnées du formulaire
+title: "Titre affiché en tête (sinon absent)"
+description: "Description courte"
+
+# Formulaire organisé en sections (titrées)
+#   OU
+# Formulaire à plat (sans sections)
+#
+# **Mutuellement exclusifs** : une erreur est levée si `sections:`
+# et `fields:` sont tous deux présents au niveau racine.
+
+sections:
+  - title: "A.5 Politiques de sécurité"
+    description: "Politique formelle de sécurité de l'information"
+    fields:
+      - id: a51
+        type: radio
+        ...
+
+# OU (jamais les deux)
+fields:
+  - id: ...
+    ...
+
+# Optionnel — bouton de soumission
+submit:
+  label: Envoyer
+  action: mailto:audit@aloli.fr
+
+# Optionnel — bouton de remise à zéro
+reset:
+  label: Effacer
+
+# Optionnel — boutons d'action personnalisés (avancé)
+buttons:
+  - label: Imprimer
+    action: print
+  - label: Sauvegarder
+    action: save
+----
+
+=== Champ — attributs communs
+
+Chaque champ (élément de `fields:`) accepte ces attributs communs,
+indépendamment de son `type` :
+
+[cols="1,3,1"]
+|===
+| Attribut | Description | Obligatoire
+
+| `id`
+| Identifiant unique du champ dans le formulaire. Servira de clé
+  dans la donnée extraite.
+| oui
+
+| `type`
+| Type de champ (cf. _Types de champs_ ci-dessous).
+| oui
+
+| `label`
+| Étiquette affichée à côté ou au-dessus du champ.
+| non, recommandé
+
+| `required`
+| `true` / `false` (défaut `false`). Marqué visuellement et imposé
+  à la soumission.
+| non
+
+| `value`
+| Valeur par défaut pré-remplie.
+| non
+
+| `placeholder`
+| Texte d'aide affiché dans le champ vide.
+| non
+
+| `help`
+| Texte d'aide affiché sous le champ.
+| non
+
+| `validation`
+| Expression de validation (regex pour `text`/`email`, intervalle
+  pour `number`/`date`). Cf. _Validation_.
+| non
+
+| `read-only`
+| Si `true`, ce champ est en lecture seule.
+| non
+
+| `width`
+| Largeur du widget en `pt` (par défaut : pleine largeur du flux).
+| non
+
+| `height`
+| Hauteur du widget en `pt` (par défaut : 1 ligne pour les types
+  single-line, 4 lignes pour `textarea`).
+| non
+|===
+
+=== Types de champs
+
+==== `text`
+
+Champ texte sur une seule ligne.
+
+[source,yaml]
+----
+- id: nom
+  type: text
+  label: Nom complet
+  required: true
+  placeholder: "Ex : Jean Dupont"
+  validation: "^[A-Za-zÀ-ÿ '-]{2,50}$"
+----
+
+Variantes obtenues par `type:` :
+
+* `email` — validation email automatique
+* `password` — saisie masquée
+* `url` — validation URL
+* `tel` — téléphone
+
+==== `number`
+
+Champ numérique.
+
+[source,yaml]
+----
+- id: age
+  type: number
+  label: Âge
+  min: 18
+  max: 99
+  step: 1
+----
+
+==== `date`
+
+Sélecteur de date.
+
+[source,yaml]
+----
+- id: date_audit
+  type: date
+  label: Date de l'audit
+  value: "2026-05-28"
+  min: "2020-01-01"
+  max: "2030-12-31"
+----
+
+==== `textarea`
+
+Champ texte multiligne.
+
+[source,yaml]
+----
+- id: remarques
+  type: textarea
+  label: Remarques
+  rows: 4
+  cols: 60
+  placeholder: "Remarques libres..."
+----
+
+==== `checkbox`
+
+Case à cocher unique (booléen).
+
+[source,yaml]
+----
+- id: consent
+  type: checkbox
+  label: J'accepte le traitement de mes données (RGPD)
+  required: true
+----
+
+==== `radio`
+
+Groupe de boutons radio (choix unique). Voir _Format des
+`options`_ ci-dessous pour les deux formes acceptées.
+
+[source,yaml]
+----
+# Forme 1 — liste simple (valeur stockée = label affiché)
+- id: niveau
+  type: radio
+  label: Niveau de conformité
+  options: [Conforme, Partiel, Non conforme, Non applicable]
+  value: Conforme       # option pré-sélectionnée (optionnel)
+  layout: vertical      # vertical (défaut) | horizontal
+
+# Forme 2 — Hash (code stocké ≠ label affiché)
+- id: niveau_code
+  type: radio
+  label: Niveau de conformité
+  options:
+    C: Conforme
+    P: Partiel
+    NC: Non conforme
+    NA: Non applicable
+  value: C              # ← la clé du Hash
+----
+
+==== `select`
+
+Liste déroulante (choix unique). Voir _Format des `options`_
+ci-dessous pour les deux formes acceptées.
+
+[source,yaml]
+----
+# Forme 1 — liste simple (valeur stockée = label affiché)
+- id: niveau
+  type: select
+  label: Niveau de conformité
+  options: [Conforme, Partiel, Non conforme, Non applicable]
+  value: Conforme
+
+# Forme 2 — Hash (code stocké ≠ label affiché)
+- id: pays
+  type: select
+  label: Pays
+  options:
+    FR: France
+    BE: Belgique
+    CH: Suisse
+    LU: Luxembourg
+  value: FR    # ← la clé du Hash, pas le label
+----
+
+==== `select-multi`
+
+Liste déroulante multi-sélection. Même format pour `options:` que
+`select`.
+
+[source,yaml]
+----
+# Forme 1 — liste simple
+- id: langues_iso
+  type: select-multi
+  label: Langues parlées (codes ISO)
+  options: [FR, EN, DE, IT, ES]
+  value: [FR, EN]
+
+# Forme 2 — Hash (recommandé pour des codes ISO + libellés)
+- id: langues
+  type: select-multi
+  label: Langues parlées
+  options:
+    fr: Français
+    en: English
+    de: Deutsch
+    it: Italiano
+    es: Español
+  value: [fr, en]
+----
+
+==== Format des `options` (commun à `radio`, `select`, `select-multi`)
+
+Deux formes mutuellement exclusives, choisies selon le type YAML
+détecté (liste vs. hash) :
+
+[cols="1,3"]
+|===
+| Forme | Sémantique
+
+| **Liste simple** `[A, B, C]`
+| Valeur stockée dans le PDF *identique* au label affiché. À
+  utiliser quand vous n'avez pas besoin de séparer code et libellé
+  (ex : `[Conforme, Partiel, Non conforme]`).
+
+| **Hash** `{code: label}`
+| Valeur stockée *différente* du label affiché. La clé est la
+  valeur, la valeur est le libellé. À utiliser pour des codes ISO,
+  des IDs, des énumérations métier. L'ordre est préservé (Crystal
+  `Hash` est insertion-ordered par contrat).
+|===
+
+[NOTE]
+====
+Pour la forme Hash, le champ `value:` (valeur par défaut) doit
+référer à la *clé* du Hash, pas au label affiché.
+====
+
+==== `signature`
+
+Champ de signature électronique. Le rendu final est délégué au
+shard https://github.com/aloli-crystal/pdf-signature[pdf-signature]
+(PAdES).
+
+[NOTE]
+.Statut en v1 — *stub*
+====
+En v1, le champ `signature` est *accepté à la parse et au rendu* :
+le PDF émet un widget `/Sig` vide cliquable. Mais le workflow
+signature réel (sélection certificat, PAdES B-LT, horodatage,
+révocation) attend la livraison de `pdf-signature`. Cela vous
+permet d'écrire vos formulaires d'audit/RGPD dès maintenant sans
+attendre. Le widget sera fonctionnel automatiquement au moment où
+`pdf-signature` sera connecté (v2).
+====
+
+[source,yaml]
+----
+- id: signature_auditeur
+  type: signature
+  label: Signature de l'auditeur
+  signer: auditeur  # rôle attendu, validé à la signature
+  reason: "Validation de l'audit ISO 27001"
+  location: "Laguiole, France"
+----
+
+== Boutons
+
+=== `submit` (un seul)
+
+[source,yaml]
+----
+submit:
+  label: Envoyer
+  action: mailto:audit@aloli.fr  # ou https://...
+  method: post
+----
+
+=== `reset` (un seul)
+
+[source,yaml]
+----
+reset:
+  label: Effacer le formulaire
+----
+
+=== `buttons` (boutons d'action personnalisés)
+
+[source,yaml]
+----
+buttons:
+  - label: Imprimer
+    action: print     # action JavaScript PDF standard
+  - label: Sauvegarder
+    action: save
+  - label: Exporter en CSV
+    action: javascript:exportCSV()  # JavaScript custom (avancé)
+----
+
+== Validation
+
+Le bloc `validation:` au niveau d'un champ accepte les formes
+atomiques suivantes en *v1* :
+
+[source,yaml]
+----
+# Regex (text, email, url, tel)
+validation: "^[A-Z]{2}\\d{6}$"
+
+# Intervalle numérique (number)
+validation: { min: 0, max: 100 }
+
+# Intervalle de date (date)
+validation: { min: "2020-01-01", max: "2030-12-31" }
+----
+
+[NOTE]
+.Validation conditionnelle — reportée en *v2*
+====
+La validation conditionnelle (`required_if`, `visible_if`) nécessite
+de générer du JavaScript PDF (Adobe Acrobat JS dialect) et d'attacher
+des actions `/AA` sur les champs sources. Cette mécanique sera
+livrée en v2.
+
+Syntaxe prévue (à titre indicatif, non supportée en v1) :
+
+[source,yaml]
+----
+validation:
+  required_if: { field: type_audit, equals: complet }
+  visible_if:  { field: souhait_signature, equals: true }
+----
+
+En v1, si vous écrivez `required_if:` ou `visible_if:`, un
+avertissement est émis et la clé est ignorée.
+====
+
+== Exemple complet — quiz Quiméo
+
+[source,adoc]
+----
+[x-form, id=quiz-rgpd, action=mailto:quizz@quimeo.fr]
+----
+title: "Quizz — Bases du RGPD"
+description: "Évaluation des connaissances RGPD (10 questions)"
+
+sections:
+  - title: "Section 1 — Définitions"
+    fields:
+      - id: q1
+        type: radio
+        label: "Que signifie RGPD ?"
+        options:
+          - "Règlement Général sur la Protection des Données"
+          - "Régulation Globale des Pratiques Digitales"
+          - "Réseau Général de Protection Documentaire"
+        required: true
+
+      - id: q2
+        type: select
+        label: "Année d'entrée en application du RGPD ?"
+        options: [2016, 2017, 2018, 2019, 2020]
+        required: true
+
+  - title: "Section 2 — Identité"
+    fields:
+      - id: nom
+        type: text
+        label: Nom
+        required: true
+
+      - id: email
+        type: email
+        label: Courriel
+        required: true
+
+submit:
+  label: Soumettre le quizz
+  action: mailto:quizz@quimeo.fr
+
+reset:
+  label: Recommencer
+----
+----
+
+== Exemple complet — audit ISO 27001
+
+[source,adoc]
+----
+[x-form, id=audit-iso27001-annexe-a, action=mailto:audit@aloli.fr]
+----
+title: "Audit ISO 27001 — Annexe A"
+description: "Évaluation des contrôles de l'Annexe A (114 contrôles)"
+
+sections:
+  - title: "A.5 Politiques de sécurité de l'information"
+    fields:
+      - id: a51
+        type: radio
+        label: "A.5.1 Politiques de sécurité de l'information définies ?"
+        options: [Conforme, Partiel, Non conforme, Non applicable]
+        required: true
+
+      - id: a51_justification
+        type: textarea
+        label: "Justification / preuves"
+        rows: 3
+        help: "Lister les documents de référence, dates de revue, etc."
+
+  - title: "A.6 Organisation de la sécurité"
+    fields:
+      - id: a611
+        type: radio
+        label: "A.6.1.1 Rôles et responsabilités définis ?"
+        options: [Conforme, Partiel, Non conforme]
+        required: true
+
+submit:
+  label: Soumettre l'audit
+  action: https://audits.aloli.fr/iso27001/submit
+
+buttons:
+  - label: Sauvegarder le brouillon
+    action: save
+  - label: Imprimer
+    action: print
+----
+----
+
+== Erreurs et avertissements
+
+Le converter émet ces messages sur `STDERR` à la génération :
+
+|===
+| Message | Cause | Action
+
+| `[x-form] YAML invalide : <erreur>`
+| Le contenu du bloc n'est pas du YAML parsable.
+| Corriger la syntaxe YAML.
+
+| `[x-form] champ '<id>' : type '<x>' inconnu`
+| Type non supporté (cf. _Types de champs_).
+| Utiliser un type listé.
+
+| `[x-form] champ '<id>' : 'options' requis pour type 'radio'`
+| Champ radio/select sans options.
+| Ajouter `options: [...]`.
+
+| `[x-form] id '<x>' dupliqué`
+| Deux champs partagent le même `id`.
+| Renommer.
+
+| `[x-form] hauteur du formulaire dépasse la page restante`
+| Le formulaire ne tient pas sur la page courante.
+| Forcer un saut de page avec `<<<` avant le bloc, ou réduire le
+  nombre de champs / sections par page.
+|===
+
+== Limites connues (v1)
+
+* Pas de *champs conditionnels dynamiques* (afficher/masquer un
+  champ selon la valeur d'un autre) — prévu en v2 avec JavaScript
+  PDF.
+* Pas de *validation conditionnelle* (`required_if`, `visible_if`)
+  — prévu en v2 avec JavaScript PDF.
+* Pas de *fichier joint* (`type=file`) — non supporté par AcroForm
+  standard, nécessite XFA (déprécié) ou pièce jointe PDF séparée.
+* Pas de *signature multi-signataire* — prévu en v2 via
+  `pdf-signature`. En v1, un seul `signature:` par formulaire.
+* Pas de *thèmes de formulaire* spécifiques (couleurs/polices) —
+  hérite du thème PDF courant.
+* Pas de *layout multi-colonnes* dans une section — tous les
+  champs en colonne unique.
+* Pas de *calculs entre champs* (`/JS` action pour `total = qty *
+  price`) — prévu en v2.
+
+== Mappage AcroForm (ISO 32000-1 §12.7)
+
+Pour information, voici comment chaque type est mappé vers le
+dictionnaire de champ AcroForm :
+
+[cols="1,1,3"]
+|===
+| Type x-form | `/FT` AcroForm | Notes
+
+| `text`, `email`, `url`, `tel`, `password`
+| `/Tx`
+| `/Ff` flag `Password` pour `password`
+
+| `textarea`
+| `/Tx`
+| `/Ff` flag `Multiline`
+
+| `number`
+| `/Tx`
+| Validation JavaScript pour `min`/`max`/`step`
+
+| `date`
+| `/Tx`
+| Format Adobe `D:YYYYMMDD`
+
+| `checkbox`
+| `/Btn`
+| `/Ff` sans flag `Pushbutton` ni `Radio`
+
+| `radio`
+| `/Btn`
+| `/Ff` flag `Radio`, `/Kids` pour les options
+
+| `select`
+| `/Ch`
+| `/Ff` flag `Combo`
+
+| `select-multi`
+| `/Ch`
+| `/Ff` flag `MultiSelect`
+
+| `signature`
+| `/Sig`
+| Délégué à pdf-signature pour la valeur
+
+| `submit`, `reset`, `button`
+| `/Btn`
+| `/Ff` flag `Pushbutton`, `/A` action dictionary
+|===
