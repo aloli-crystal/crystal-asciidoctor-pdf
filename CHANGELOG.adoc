@@ -3,6 +3,24 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.61 — 2026-06-01
+
+=== Changed
+
+* `crystal-asciidoctor` dependency bumped to **`~> 2.0.26.4`** —
+  parser warnings on ordered lists now include the source line
+  number where they were detected :
++
+[source]
+----
+asciidoctor: WARNING: list item index: expected 2, got 1 (line 6)
+asciidoctor: WARNING: list item index: expected 3, got 1 (line 7)
+----
++
+Previously these warnings were anonymous and the author had to
+hunt manually through the document for the offending list —
+painful on long documents (READMEs, audit manuals, etc.).
+
 == v2.3.24.60 — 2026-06-01
 
 === Fixed

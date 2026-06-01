@@ -3,6 +3,24 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.61 — 2026-06-01
+
+=== Modifié
+
+* Dépendance `crystal-asciidoctor` bumpée à **`~> 2.0.26.4`** — les
+  warnings du parser sur les listes ordonnées affichent désormais
+  le numéro de ligne du source où ils ont été détectés :
++
+[source]
+----
+asciidoctor: WARNING: list item index: expected 2, got 1 (line 6)
+asciidoctor: WARNING: list item index: expected 3, got 1 (line 7)
+----
++
+Auparavant, ces warnings étaient anonymes et l'auteur devait
+fouiller à la main pour identifier la liste fautive — pénible
+sur les documents longs (README, manuels d'audit, etc.).
+
 == v2.3.24.60 — 2026-06-01
 
 === Corrigé
