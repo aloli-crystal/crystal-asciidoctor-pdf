@@ -365,15 +365,20 @@ shard https://github.com/aloli-crystal/pdf-signature[pdf-signature]
 (PAdES).
 
 [NOTE]
-.Statut en v1 — *stub*
+.Statut en v1.0.1 (crystal-asciidoctor-pdf 2.3.24.59 + pdf 0.5.9)
 ====
-En v1, le champ `signature` est *accepté à la parse et au rendu* :
-le PDF émet un widget `/Sig` vide cliquable. Mais le workflow
-signature réel (sélection certificat, PAdES B-LT, horodatage,
-révocation) attend la livraison de `pdf-signature`. Cela vous
-permet d'écrire vos formulaires d'audit/RGPD dès maintenant sans
-attendre. Le widget sera fonctionnel automatiquement au moment où
-`pdf-signature` sera connecté (v2).
+Le champ `signature` est *pleinement fonctionnel côté PDF* depuis
+crystal-asciidoctor-pdf 2.3.24.59 + pdf 0.5.9 : le converter émet
+un widget `/Sig` AcroForm valide avec `/SigFlags 3` sur le
+formulaire racine. Le slot est cliquable dans Acrobat, Preview,
+Foxit — l'utilisateur peut y déposer une signature.
+
+Ce qui reste à `aloli-crystal/pdf-signature` (chantier en cours) :
+la signature électronique elle-même (sélection certificat, calcul
+PKCS#7 / CMS, niveaux PAdES B-B/B-T/B-LT/B-LTA, horodatage TSA,
+révocation). Tant que pdf-signature n'est pas livré, le slot reste
+vide et la signature peut être apposée à la main dans un lecteur
+PDF disposant de cette fonction.
 ====
 
 [source,yaml]
@@ -588,7 +593,9 @@ Le converter émet ces messages sur `STDERR` à la génération :
 * Pas de *fichier joint* (`type=file`) — non supporté par AcroForm
   standard, nécessite XFA (déprécié) ou pièce jointe PDF séparée.
 * Pas de *signature multi-signataire* — prévu en v2 via
-  `pdf-signature`. En v1, un seul `signature:` par formulaire.
+  `pdf-signature`. En v1, plusieurs `signature` peuvent exister
+  dans un même formulaire, mais sans cinématique de signature
+  séquentielle ni rôles distincts.
 * Pas de *thèmes de formulaire* spécifiques (couleurs/polices) —
   hérite du thème PDF courant.
 * Pas de *layout multi-colonnes* dans une section — tous les

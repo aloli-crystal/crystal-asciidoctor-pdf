@@ -33,6 +33,9 @@ module AsciidoctorPDF
     # Hauteur du widget select-multi (listbox).
     DEFAULT_LISTBOX_H = 60.0
 
+    # Hauteur du champ signature (slot visible, typique 40-60pt).
+    DEFAULT_SIGNATURE_H = 50.0
+
     # Couleurs des libellés (n'apparaissent qu'en monochrome — le
     # converter actuel gère le noir uniquement).
     LABEL_FONT_SIZE         =  9.0
@@ -61,6 +64,8 @@ module AsciidoctorPDF
         (field.option_codes.size * RADIO_OPTION_SPACING).to_f
       when "select-multi"
         DEFAULT_LISTBOX_H
+      when "signature"
+        DEFAULT_SIGNATURE_H
       else
         DEFAULT_FIELD_H
       end

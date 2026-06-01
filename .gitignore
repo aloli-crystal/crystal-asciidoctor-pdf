@@ -16,3 +16,7 @@ spec/output/
 *.tmp
 *.bak
 *~
+
+# PDFs générés à partir des exemples (le source .adoc suffit ;
+# l'utilisateur régénère le PDF avec `crystal-asciidoctor-pdf`)
+examples/*.pdf

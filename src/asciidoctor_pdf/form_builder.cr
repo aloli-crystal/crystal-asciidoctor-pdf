@@ -34,14 +34,16 @@ module AsciidoctorPDF
   # form.fields[0].label # => "Nom"
   # ```
   module FormBuilder
-    # Types de champs supportés en v1. Le type `signature` est
-    # *refusé* en v1 (dépend de `pdf-signature` non livré).
+    # Types de champs supportés. `signature` émet un widget /Sig
+    # AcroForm vide (depuis pdf 0.5.9) ; le contenu signé PAdES sera
+    # rempli plus tard par `aloli-crystal/pdf-signature` (non livré).
     SUPPORTED_TYPES = %w[
       text email url tel password
       textarea
       number date
       checkbox
       radio select select-multi
+      signature
     ]
 
     # Types qui demandent un attribut `options` (radio, select,
@@ -174,11 +176,6 @@ module AsciidoctorPDF
 
       type = h[YAML::Any.new("type")]?.try(&.as_s?)
       raise FormError.new("[x-form] champ '#{id}' : `type` requis") if type.nil? || type.empty?
-
-      # Q3 — signature explicitement refusé en v1.
-      if type == "signature"
-        raise FormError.new("[x-form] champ '#{id}' : type `signature` indisponible en v1 (attend pdf-signature). Cf. doc/x-form-spec.adoc.")
-      end
 
       unless SUPPORTED_TYPES.includes?(type)
         raise FormError.new("[x-form] champ '#{id}' : type `#{type}` inconnu. Disponibles : #{SUPPORTED_TYPES.join(", ")}")

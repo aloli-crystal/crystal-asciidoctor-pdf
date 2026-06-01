@@ -168,10 +168,11 @@ describe AsciidoctorPDF::FormBuilder do
       end
     end
 
-    it "rejette explicitement type `signature` en v1" do
-      expect_raises(AsciidoctorPDF::FormError, /signature.*indisponible en v1/) do
-        parse("fields: [{id: sig, type: signature}]")
-      end
+    it "accepte type `signature` (depuis pdf 0.5.9 + crystal-asciidoctor-pdf 2.3.24.59)" do
+      form = parse("fields: [{id: sig, type: signature, label: Signature}]")
+      f = form.fields.first
+      f.type.should eq("signature")
+      f.label.should eq("Signature")
     end
 
     it "rejette les ids dupliqués" do

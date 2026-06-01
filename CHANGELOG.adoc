@@ -3,6 +3,33 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.59 — 2026-06-01
+
+=== Added
+
+* **`signature` field type** in `[x-form]` — now fully functional
+  on the PDF side. Emits a valid AcroForm `/Sig` widget with
+  `/SigFlags 3` on the root form. The slot is clickable in PDF
+  viewers (Acrobat, Preview, Foxit). The digital signature itself
+  (PKCS#7, PAdES) remains the responsibility of
+  `aloli-crystal/pdf-signature` (in progress).
+* **ISO 27001 audit demo** : `examples/x-form-audit-iso27001.adoc`
+  + its interactive PDF rendering (`.pdf`). Covers text, email,
+  date, radio (Hash options), textarea, checkbox, select,
+  select-multi types, plus multi-column layout on the summary
+  section.
+
+=== Changed
+
+* `pdf` dependency bumped to **`~> 0.5.9`** (brings AcroForm
+  `signature_field` + Dropdown/RadioGroup custom appearances +
+  OutputIntent ICCBased — J1 ISO PDF roadmap).
+* **Lazy CJK font loading** : `noto-cjk` is now loaded only on the
+  first CJK character encountered in the document. Benefits : zero
+  cost for CJK-free documents (99 % of ALOLI use cases), avoids
+  the immediate `UnsupportedFontFormat` raise for `.otf` files
+  (CFF not yet subsettable — see memo `roadmap_pdf_cff_subsetting.md`).
+
 == v2.3.24.58 — 2026-06-01
 
 === Added

@@ -59,6 +59,15 @@ module AsciidoctorPDF
     @font_cjk : PDF::Fonts::TrueTypeFont?
     @fn_cjk : String = ""
 
+    # Chargement paresseux de la police CJK : on mémorise juste le
+    # chemin au démarrage et on charge effectivement la fonte au
+    # premier caractère CJK rencontré dans le document. Cela évite
+    # d'allouer la fonte (et de lever `UnsupportedFontFormat` pour
+    # les `.otf`) quand le document n'a aucun caractère CJK. Cf.
+    # note mémoire ALOLI `roadmap_pdf_cff_subsetting.md`.
+    @cjk_font_path : String? = nil
+    @cjk_load_attempted : Bool = false
+
     # Noms de polices utilisés dans les appels page.font()
     @fn_body : String = "Helvetica"
     @fn_body_bold : String = "Helvetica-Bold"
@@ -1232,6 +1241,13 @@ module AsciidoctorPDF
         acroform.listbox(field.id, page: page, options: options,
           x: x, y: y, width: width, height: height,
           value: field.value_array,
+          required: field.required, read_only: field.read_only)
+      when "signature"
+        # Widget /Sig (pdf 0.5.9+). Le slot est vide ; le contenu
+        # PAdES sera rempli par pdf-signature (non livré). Le widget
+        # est cliquable dans les visualiseurs PDF.
+        acroform.signature_field(field.id, page: page,
+          x: x, y: y, width: width, height: height,
           required: field.required, read_only: field.read_only)
       end
     end
@@ -3819,27 +3835,41 @@ module AsciidoctorPDF
       end
 
       # Police CJK optionnelle. Si l'utilisateur a peuplé le cache
-      # noto-cjk (via `noto-cjk pull` ou
-      # `NotoCjk::Cache.pull`), on charge la première
-      # variante installée et on l'utilise automatiquement pour les
-      # codepoints CJK que DejaVu ne couvre pas. Sans ça, les CJK
-      # tombent sur le fallback `?` + warning du sanitize WinAnsi.
+      # noto-cjk (via `noto-cjk pull` ou `NotoCjk::Cache.pull`), on
+      # mémorise le chemin de la première variante installée. La
+      # fonte sera *chargée paresseusement* au premier caractère CJK
+      # rencontré dans le document (cf. `font_cjk` plus bas).
       #
-      # Cas spécial : depuis pdf 0.5.6, les fontes OpenType/CFF (.otf —
-      # format natif de Noto Sans CJK distribué par Google) lèvent
-      # `PDF::Fonts::TrueTypeFont::UnsupportedFontFormat` au chargement
-      # car le subsetter CFF n'est pas encore implémenté. On laisse
-      # @font_cjk à nil et le converter retombe sur le fallback `?` +
-      # warning WinAnsi. Le subsetting CFF est planifié (cf. memo
-      # `roadmap_pdf_cff_subsetting.md`).
+      # Bénéfice : un document sans CJK ne paye pas le coût du
+      # chargement, et surtout ne plante pas si la fonte est en
+      # format `.otf` (CFF) non subsettable par pdf actuellement.
       if (cjk_path = NotoCjk.font_path) && File.exists?(cjk_path)
-        begin
-          ttf = @doc.load_font(cjk_path)
-          @font_cjk = ttf
-          @fn_cjk = ttf.name
-        rescue ex : PDF::Fonts::TrueTypeFont::UnsupportedFontFormat
-          STDERR.puts "Avertissement : police CJK '#{File.basename(cjk_path)}' non chargeable (#{ex.message.try(&.lines.first)}). Les caractères CJK seront substitués par '?'."
-        end
+        @cjk_font_path = cjk_path
+      end
+    end
+
+    # Accesseur paresseux à la police CJK. Charge la fonte au
+    # premier appel ; retourne `nil` si aucune fonte n'est dispo
+    # (cache vide) ou si la fonte est en format non supporté
+    # (`.otf`/CFF — `UnsupportedFontFormat` levée par pdf 0.5.6+).
+    # Les appels suivants retournent la valeur cachée.
+    private def font_cjk : PDF::Fonts::TrueTypeFont?
+      cached = @font_cjk
+      return cached if cached
+      return nil if @cjk_load_attempted
+      @cjk_load_attempted = true
+
+      path = @cjk_font_path
+      return nil unless path && File.exists?(path)
+
+      begin
+        ttf = @doc.load_font(path)
+        @font_cjk = ttf
+        @fn_cjk = ttf.name
+        ttf
+      rescue ex : PDF::Fonts::TrueTypeFont::UnsupportedFontFormat
+        STDERR.puts "Avertissement : police CJK '#{File.basename(path)}' non chargeable (#{ex.message.try(&.lines.first)}). Les caractères CJK seront substitués par '?'."
+        nil
       end
     end
 
@@ -4060,7 +4090,7 @@ module AsciidoctorPDF
               # pour les segments suivants. Le sanitize WinAnsi
               # n'intervient pas — la police CJK couvre par
               # définition les caractères concernés.
-              cjk_font = @font_cjk.not_nil!
+              cjk_font = font_cjk.not_nil!
               page.font(cjk_font, size: font_size)
               page.text(value2, at: {cursor, y})
               cursor += cjk_font.string_width(value2, font_size)
@@ -4109,7 +4139,7 @@ module AsciidoctorPDF
         end
       }
 
-      cjk_font = @font_cjk
+      cjk_font = font_cjk
       text.each_char do |char|
         if Emojis.includes?(char)
           flush_text.call

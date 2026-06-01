@@ -65,6 +65,10 @@ describe AsciidoctorPDF::FormRenderer do
     it "retourne 60.0 pour select-multi" do
       AsciidoctorPDF::FormRenderer.widget_height(field_of("select-multi", options: ["A"])).should eq(60.0)
     end
+
+    it "retourne 50.0 pour signature" do
+      AsciidoctorPDF::FormRenderer.widget_height(field_of("signature")).should eq(50.0)
+    end
   end
 
   describe ".clamped_span" do

@@ -1,0 +1,201 @@
+= Audit ISO/IEC 27001 — Annexe A
+:doctype: article
+:pdf-page-size: A4
+:sectnums:
+:toc: macro
+:toclevels: 2
+:x-title-page-toc:
+:lang: fr
+
+[.lead]
+Document de démonstration de l'extension `[x-form]` du shard
+https://github.com/aloli-crystal/crystal-asciidoctor-pdf[crystal-asciidoctor-pdf].
+Ce PDF est *interactif* : ouvrez-le dans Acrobat, Preview, Firefox
+ou Chrome — les champs sont remplissables et la case à cocher
+fonctionne, le tout sans serveur.
+
+toc::[]
+
+== Préambule
+
+Cet audit couvre un sous-ensemble réduit de l'Annexe A de la norme
+ISO/IEC 27001:2022 à des fins de démonstration. Pour un audit réel,
+référez-vous à la liste complète des 93 contrôles répartis dans les
+4 thèmes :
+
+* *A.5 Organizational controls* (37 contrôles)
+* *A.6 People controls* (8 contrôles)
+* *A.7 Physical controls* (14 contrôles)
+* *A.8 Technological controls* (34 contrôles)
+
+Chaque contrôle est évalué selon quatre niveaux :
+
+[cols="1,4"]
+|===
+| Niveau | Signification
+
+| *Conforme* | Le contrôle est effectif, documenté, et tracé.
+| *Partiel*  | Le contrôle existe mais n'est pas pleinement effectif (ex : pas de revue annuelle).
+| *Non conforme* | Le contrôle est absent ou non documenté.
+| *Non applicable* | Le contrôle ne s'applique pas au périmètre.
+|===
+
+== Formulaire d'audit
+
+[x-form, id=audit-iso27001-extrait, action=mailto:audit@aloli.fr]
+----
+title: Audit ISO/IEC 27001 — Annexe A (extrait)
+description: Évaluation des contrôles de sécurité — section représentative pour la démo.
+
+sections:
+  - title: "A.5 Identité de l'auditeur"
+    fields:
+      - id: auditeur_nom
+        type: text
+        label: Nom complet de l'auditeur
+        required: true
+      - id: auditeur_email
+        type: email
+        label: Courriel professionnel
+        required: true
+      - id: audit_date
+        type: date
+        label: Date de l'audit
+        required: true
+      - id: organisation
+        type: text
+        label: Organisation auditée
+        required: true
+
+  - title: "A.5.1 Politiques de sécurité de l'information"
+    description: "Une politique de sécurité de l'information formelle est définie, approuvée et communiquée."
+    fields:
+      - id: a51_niveau
+        type: radio
+        label: Niveau de conformité
+        options:
+          C: Conforme
+          P: Partiel
+          NC: Non conforme
+          NA: Non applicable
+        required: true
+      - id: a51_preuves
+        type: textarea
+        label: Documents de référence / preuves
+        rows: 3
+        help: "Lister les politiques (PSSI, charte), date de revue, comité d'approbation, mode de diffusion."
+
+  - title: "A.5.2 Rôles et responsabilités en matière de sécurité"
+    description: "Les rôles et responsabilités sont définis et attribués selon les besoins de l'organisation."
+    fields:
+      - id: a52_niveau
+        type: radio
+        label: Niveau de conformité
+        options:
+          C: Conforme
+          P: Partiel
+          NC: Non conforme
+          NA: Non applicable
+        required: true
+      - id: a52_rssi_nomme
+        type: checkbox
+        label: Un RSSI (ou équivalent) est formellement nommé
+      - id: a52_preuves
+        type: textarea
+        label: Justification / preuves
+        rows: 3
+
+  - title: "A.8.2 Droits d'accès privilégiés"
+    description: "L'attribution et l'utilisation des droits d'accès privilégiés sont restreintes et gérées."
+    fields:
+      - id: a82_niveau
+        type: radio
+        label: Niveau de conformité
+        options:
+          C: Conforme
+          P: Partiel
+          NC: Non conforme
+          NA: Non applicable
+        required: true
+      - id: a82_revue_freq
+        type: select
+        label: Fréquence de revue des comptes privilégiés
+        options:
+          mensuelle: Mensuelle
+          trimestrielle: Trimestrielle
+          semestrielle: Semestrielle
+          annuelle: Annuelle
+          jamais: Jamais
+      - id: a82_outils
+        type: select-multi
+        label: Outils de gestion (PAM, IAM, MFA, ...)
+        options:
+          pam: PAM (Privileged Access Management)
+          iam: IAM (Identity & Access Management)
+          mfa: MFA (Multi-Factor Authentication)
+          sso: SSO (Single Sign-On)
+          ldap: LDAP / AD
+          vault: Coffre-fort à mots de passe
+      - id: a82_preuves
+        type: textarea
+        label: Description du dispositif
+        rows: 4
+
+  - title: "Synthèse et conclusion"
+    columns: 2
+    fields:
+      - id: score_global
+        type: select
+        label: Score global de maturité
+        options:
+          niveau1: "Niveau 1 — Initial"
+          niveau2: "Niveau 2 — Reproductible"
+          niveau3: "Niveau 3 — Défini"
+          niveau4: "Niveau 4 — Géré"
+          niveau5: "Niveau 5 — Optimisé"
+        required: true
+      - id: date_prochain_audit
+        type: date
+        label: Prochain audit prévu
+      - id: synthese
+        type: textarea
+        label: Synthèse globale et recommandations prioritaires
+        cols: 2
+        rows: 6
+        required: true
+      - id: signature_auditeur
+        type: signature
+        label: Signature de l'auditeur
+        cols: 2
+        required: true
+
+submit:
+  label: Transmettre à audit@aloli.fr
+  action: mailto:audit@aloli.fr
+
+reset:
+  label: Réinitialiser le formulaire
+----
+
+== Comment ce PDF a été généré
+
+À partir du source `.adoc` ci-joint, exécutez :
+
+[source,shell]
+----
+crystal-asciidoctor-pdf examples/x-form-audit-iso27001.adoc
+# → examples/x-form-audit-iso27001.adoc.pdf
+----
+
+L'extension `[x-form]` détecte le bloc YAML, parse les champs, et
+émet des widgets AcroForm conformes ISO 32000-1 §12.7. Ouvrez le
+PDF dans n'importe quel lecteur récent — les champs sont
+remplissables, la signature électronique est possible (champ
+`type: signature` en v2 quand `pdf-signature` sera connecté).
+
+== Pour aller plus loin
+
+* Spec complète : `doc/x-form-spec.adoc`
+* README du shard : `README.adoc` § « Formulaires PDF interactifs »
+* Trajectoire ISO PDF (mémoire ALOLI) : projet pdf signé PAdES,
+  validation PDF/A, accessibilité PDF/UA.

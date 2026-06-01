@@ -101,6 +101,22 @@ describe "Integration · [x-form]" do
       n.should be > 0
       File.delete(pdf) if File.exists?(pdf)
     end
+
+    it "génère un widget /Sig pour signature (pdf 0.5.9+)" do
+      pdf = convert_and_read(<<-YAML)
+        fields:
+          - id: sig
+            type: signature
+            label: Signature de l'auditeur
+      YAML
+      n = IntegrationHelper.count_byte_pattern(pdf, "/FT /Sig") +
+          IntegrationHelper.count_byte_pattern(pdf, "/FT/Sig")
+      n.should be > 0
+      # /SigFlags doit être présent dans le /AcroForm dict (pdf 0.5.9
+      # le pose à 3 dès qu'un signature_field est ajouté).
+      IntegrationHelper.count_byte_pattern(pdf, "/SigFlags").should be > 0
+      File.delete(pdf) if File.exists?(pdf)
+    end
   end
 
   describe "labels visibles dans le PDF" do
