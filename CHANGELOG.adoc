@@ -3,6 +3,26 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.62 — 2026-06-01
+
+=== Changed
+
+* `crystal-asciidoctor` dependency bumped to **`~> 2.0.26.5`** —
+  now accepts the ALOLI `0.`-repeated convention for auto-numbered
+  ordered lists :
++
+[source,asciidoc]
+----
+0. First item
+0. Second item
+0. Third item
+----
++
+Renders as "1. First item", "2. Second item", "3. Third item".
+The author can reorder items without renumbering each line, and
+the `0.` marker stays visible in the editor (unlike the canonical
+`.` repeated form, which is more discreet).
+
 == v2.3.24.61 — 2026-06-01
 
 === Changed

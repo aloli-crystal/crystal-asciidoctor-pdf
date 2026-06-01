@@ -3,6 +3,26 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.62 — 2026-06-01
+
+=== Modifié
+
+* Dépendance `crystal-asciidoctor` bumpée à **`~> 2.0.26.5`** —
+  accepte désormais la convention ALOLI `0.` répété pour les
+  listes ordonnées auto-numérotées :
++
+[source,asciidoc]
+----
+0. Premier item
+0. Deuxième item
+0. Troisième item
+----
++
+Rendu : « 1. Premier item », « 2. Deuxième item », « 3. Troisième
+item ». L'auteur peut réorganiser ses items sans renuméroter
+chaque ligne, et le marqueur `0.` reste visible dans l'éditeur
+(contrairement à `.` répété, canonique mais plus discret).
+
 == v2.3.24.61 — 2026-06-01
 
 === Modifié
