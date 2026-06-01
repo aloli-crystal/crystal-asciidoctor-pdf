@@ -3,6 +3,26 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.60 — 2026-06-01
+
+=== Fixed
+
+* **Truly lazy CJK font loading.** In v2.3.24.59 the `font_cjk`
+  accessor was lazy, but `text_with_emoji_segments` called it on
+  the very first text run of the document — which triggered the
+  `UnsupportedFontFormat` warning (`.otf` CFF unsupported) for
+  *every* document, including those with no CJK character at all.
+* Now `font_cjk` is only consulted for *plausibly CJK* characters
+  (`ord >= 0x3000` — start of the CJK Symbols and Punctuation
+  block). Below that we are on Latin or European typographic
+  punctuation (curly apostrophe `'`, em dash `—`, ellipsis `…`,
+  etc.) which the CJK font would not cover anyway — no point
+  loading it just to find that out. As a result, European
+  CJK-free documents no longer emit the warning.
+* The warning is still emitted **once** when an actual CJK
+  character (Japanese, Chinese, Korean, ...) is encountered in
+  the document.
+
 == v2.3.24.59 — 2026-06-01
 
 === Added

@@ -4139,18 +4139,25 @@ module AsciidoctorPDF
         end
       }
 
-      cjk_font = font_cjk
+      # `font_cjk` est chargée paresseusement (cf. accesseur) — on
+      # ne tente le chargement que pour un caractère *plausiblement
+      # CJK* (ord >= 0x3000 = début de l'espace « CJK Symbols and
+      # Punctuation »). En-dessous, on est sur du Latin / typographique
+      # européen / ponctuation générique que la fonte CJK ne couvre
+      # pas de toute façon — inutile de la charger juste pour s'en
+      # rendre compte (et inutile de lever l'avertissement
+      # `UnsupportedFontFormat` quand la fonte est un `.otf` CFF).
       text.each_char do |char|
         if Emojis.includes?(char)
           flush_text.call
           flush_cjk.call
           result << {:emoji, char.to_s}
-        elsif cjk_font && cjk_font.has_glyph?(char) && !WinAnsi.representable?(char)
-          # Le CJK est défini comme : char hors WinAnsi mais que la
-          # police CJK sait rendre. Le test WinAnsi évite de
-          # « voler » les caractères Latin que les deux polices
-          # connaissent (DejaVu reste la police par défaut pour
-          # ceux-là, plus cohérent stylistiquement).
+        elsif char.ord >= 0x3000 && !WinAnsi.representable?(char) && (cjk_font = font_cjk) && cjk_font.has_glyph?(char)
+          # Le CJK est défini comme : char hors WinAnsi, dans la zone
+          # CJK Unicode, et que la police CJK sait rendre. Le test
+          # WinAnsi évite de « voler » les caractères Latin que les
+          # deux polices connaissent (DejaVu reste la police par
+          # défaut pour ceux-là, plus cohérent stylistiquement).
           flush_text.call
           cjk_buf << char
         else

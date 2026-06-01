@@ -3,6 +3,28 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.60 — 2026-06-01
+
+=== Corrigé
+
+* **Chargement de la police CJK véritablement paresseux.** En
+  v2.3.24.59, l'accesseur `font_cjk` était paresseux, mais
+  `text_with_emoji_segments` l'appelait **dès le premier run de
+  texte** du document — ce qui déclenchait l'avertissement
+  `UnsupportedFontFormat` (.otf CFF non supporté) pour *tout*
+  document, y compris ceux n'ayant aucun caractère CJK.
+* Désormais, `font_cjk` n'est sollicitée que pour un caractère
+  *plausiblement CJK* (`ord >= 0x3000` — début de l'espace
+  CJK Symbols and Punctuation). En-dessous, on est sur du Latin
+  ou de la ponctuation typographique européenne (apostrophe
+  courbe `'`, tiret cadratin `—`, points de suspension `…`, etc.)
+  que la fonte CJK ne couvre pas — inutile de la charger pour
+  s'en rendre compte. Conséquence : les documents européens
+  sans CJK ne déclenchent plus l'avertissement.
+* L'avertissement reste émis **une seule fois** quand un vrai
+  caractère CJK (japonais, chinois, coréen, etc.) est rencontré
+  dans le document.
+
 == v2.3.24.59 — 2026-06-01
 
 === Ajouté
