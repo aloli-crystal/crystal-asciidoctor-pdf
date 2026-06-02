@@ -78,6 +78,14 @@ module AsciidoctorPDF
         when "base_font_size"             then theme.base_font_size = parse_float(value, theme.base_font_size)
         when "base_line_height"           then theme.base_line_height = parse_float(value, theme.base_line_height)
         when "base_font_color"            then theme.base_font_color = value.as_s? || theme.base_font_color
+        when "base_text_align"            then theme.base_text_align = value.as_s? || theme.base_text_align
+        when "x_french_typography"        then theme.x_french_typography = parse_bool(value, theme.x_french_typography)
+        when "codespan_background_color"  then theme.codespan_background_color = value.as_s? || theme.codespan_background_color
+        when "codespan_border_color"      then theme.codespan_border_color = value.as_s? || theme.codespan_border_color
+        when "codespan_border_width"      then theme.codespan_border_width = parse_float(value, theme.codespan_border_width)
+        when "codespan_font_color"        then theme.codespan_font_color = value.as_s? || theme.codespan_font_color
+        when "codespan_padding_x"         then theme.codespan_padding_x = parse_float(value, theme.codespan_padding_x)
+        when "codespan_padding_y"         then theme.codespan_padding_y = parse_float(value, theme.codespan_padding_y)
         when "base_font_path"             then theme.base_font_path = value.as_s?
         when "base_font_bold_path"        then theme.base_font_bold_path = value.as_s?
         when "base_font_italic_path"      then theme.base_font_italic_path = value.as_s?

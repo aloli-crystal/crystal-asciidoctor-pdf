@@ -16,6 +16,30 @@ module AsciidoctorPDF
     property base_font_size : Float64 = 10.0
     property base_line_height : Float64 = 1.5
     property base_font_color : String = "333333"
+    # Alignement par défaut du texte des paragraphes.
+    # Valeurs : "left", "center", "right", "justify".
+    # Défaut conforme à la spec asciidoctor-pdf Ruby (base_align: justify).
+    property base_text_align : String = "justify"
+
+    # --- Typographie française (extension `x-`) ---
+    # Si vrai, le converter remplace l'espace ordinaire devant les
+    # signes de ponctuation à deux parties (`:`, `;`, `!`, `?`, `»`)
+    # et après le guillemet ouvrant `«` par un espace insécable
+    # (U+00A0). Respecte la règle de l'Imprimerie nationale. Activé
+    # par défaut dans le thème `fr`, désactivé dans les autres pour
+    # ne pas surprendre les documents non-francophones.
+    property x_french_typography : Bool = false
+
+    # --- Code inline (codespan) ---
+    # Spec asciidoctor-pdf Ruby — catégorie `codespan` du thème :
+    # rendu HTML `<code>` (issu de `` `text` ``) avec fond grisé,
+    # bordure optionnelle, padding et couleur de texte.
+    property codespan_background_color : String = "f5f5f5"
+    property codespan_border_color : String = ""
+    property codespan_border_width : Float64 = 0.0
+    property codespan_font_color : String = ""
+    property codespan_padding_x : Float64 = 2.0
+    property codespan_padding_y : Float64 = 1.0
 
     # Polices TrueType — par défaut DejaVu Sans (Unicode complet).
     # Mettre à nil pour revenir aux polices Type1 intégrées (pas d'Unicode étendu).

@@ -546,7 +546,7 @@ module AsciidoctorPDF
       side_indent = 24.0
       content_w = @content_width - 2 * side_indent
 
-      segments = InlineRenderer.parse(html)
+      segments = parse_inline(html)
       lines = wrap_segments(segments, content_w, font_size)
       lines = [[] of InlineSegment] if lines.empty?
 
@@ -780,7 +780,7 @@ module AsciidoctorPDF
       label_space = [60.0, label_offset + text_width(label_text, @fn_body_bold, label_size) + label_gap].max
       content_w = @content_width - label_space - padding
 
-      segments = InlineRenderer.parse(html)
+      segments = parse_inline(html)
       lines = wrap_segments(segments, content_w, font_size)
       lines = [[] of InlineSegment] if lines.empty?
       block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
@@ -959,7 +959,7 @@ module AsciidoctorPDF
       label_space = [60.0, label_offset + text_width(label_text, @fn_body_bold, label_size) + label_gap].max
       content_w = @content_width - label_space - padding
 
-      segments = InlineRenderer.parse(html)
+      segments = parse_inline(html)
       lines = wrap_segments(segments, content_w, font_size)
       lines = [[] of InlineSegment] if lines.empty?
       block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
@@ -1370,7 +1370,7 @@ module AsciidoctorPDF
           end
         end.reject(&.empty?).join("\n") : ""
 
-        def_segments = InlineRenderer.parse(def_html)
+        def_segments = parse_inline(def_html)
         def_lines = wrap_segments(def_segments, def_col_w, font_size)
         def_lines = [[] of InlineSegment] if def_lines.empty?
 
@@ -1402,12 +1402,21 @@ module AsciidoctorPDF
         next unless item.is_a?(Asciidoctor::ListItem)
         ensure_page
 
-        text = strip_inline_markup(item.text || "")
+        # Le markup inline de l'item (gras, italique, code inline,
+        # liens, etc.) doit être préservé : on parse les segments via
+        # `InlineRenderer.parse` et on les rend via `render_segment_line`
+        # — même pipeline que pour les paragraphes ordinaires. Avant,
+        # `strip_inline_markup` + `draw_text_run` réduisaient l'item à
+        # du texte plat, ce qui faisait disparaître la police mono, le
+        # fond grisé du codespan, l'italique, le gras, etc.
+        html = item.text || ""
         font_size = @theme.base_font_size
         line_h = font_size * @theme.base_line_height
         content_w = @content_width - @theme.list_indent - indent
 
-        lines = wrap_text(text, content_w, font_size)
+        segments = parse_inline(html)
+        lines = wrap_segments(segments, content_w, font_size)
+        lines = [[] of InlineSegment] if lines.empty?
         total_h = lines.size * line_h + @theme.list_item_spacing
         check_page_break(total_h)
 
@@ -1420,9 +1429,12 @@ module AsciidoctorPDF
         page.fill_color(@theme.list_marker_color)
         page.text(marker, at: {x_marker, @current_y - font_size})
 
-        page.fill_color(@theme.base_font_color)
-        lines.each do |line|
-          draw_text_run(page, line, x_text, @current_y - font_size, @fn_body, font_size)
+        # Rendu des lignes avec markup complet + justify de paragraphe.
+        last_idx = lines.size - 1
+        lines.each_with_index do |line, i|
+          line_align = i == last_idx ? "left" : @theme.base_text_align
+          render_segment_line(page, line, x_text, @current_y - font_size, font_size,
+            target_w: content_w, align: line_align)
           @current_y -= line_h
         end
         @current_y -= @theme.list_item_spacing
@@ -2221,7 +2233,7 @@ module AsciidoctorPDF
           text = itext.is_a?(Array) ? itext.join(" ") : (itext || "").to_s
         end
 
-        segments = InlineRenderer.parse(text)
+        segments = parse_inline(text)
         lines = wrap_segments(segments, @content_width - marker_w, font_size)
         lines = [[] of InlineSegment] if lines.empty?
 
@@ -2470,10 +2482,10 @@ module AsciidoctorPDF
       # n'est appliqué qu'aux lignes qui débordent vraiment.
       # Quote : flow continu, retours à la ligne traités comme espaces.
       lines = if kind == :verse
-                segs_per_line = html.split('\n').map { |para| InlineRenderer.parse(para) }
+                segs_per_line = html.split('\n').map { |para| parse_inline(para) }
                 segs_per_line.flat_map { |segments| wrap_segments(segments, content_w, font_size) }
               else
-                wrap_segments(InlineRenderer.parse(html), content_w, font_size)
+                wrap_segments(parse_inline(html), content_w, font_size)
               end
       lines = [[] of InlineSegment] if lines.empty?
 
@@ -2845,7 +2857,7 @@ module AsciidoctorPDF
       # IMPORTANT : forcer le gras *avant* le wrap, pour que la mesure
       # de largeur utilise les métriques d'Helvetica-Bold (plus larges
       # que regular) — sinon le wrap sous-estime et le titre déborde.
-      title_segments = force_bold(InlineRenderer.parse(title_text))
+      title_segments = force_bold(parse_inline(title_text))
       title_lines = wrap_segments(title_segments, @content_width, title_font_size)
       title_lines = [[] of InlineSegment] if title_lines.empty?
       title_line_height = title_font_size * 1.2
@@ -2867,7 +2879,7 @@ module AsciidoctorPDF
       # comme sauts de ligne forcés (mêmes mécaniques que le titre).
       if (subtitle = doc.attr("subtitle"))
         sub_size = @theme.subtitle_font_size
-        sub_segments = InlineRenderer.parse(subtitle)
+        sub_segments = parse_inline(subtitle)
         # Injecter la couleur thème dans chaque segment qui n'en
         # définit pas explicitement — sinon `render_segment_line`
         # retombe sur `base_font_color`.
@@ -3044,7 +3056,7 @@ module AsciidoctorPDF
       align = resolve_title_align(doc)
       # Forcer le gras avant le wrap : sinon la mesure de largeur
       # utilise Helvetica regular (sous-estime) et le titre déborde.
-      title_segments = force_bold(InlineRenderer.parse(title))
+      title_segments = force_bold(parse_inline(title))
       title_lines = wrap_segments(title_segments, @content_width, title_font_size)
       title_lines = [[] of InlineSegment] if title_lines.empty?
       title_line_height = title_font_size * 1.3
@@ -3111,7 +3123,7 @@ module AsciidoctorPDF
       title = TextTransformer.apply(@document_title, @theme.title_page_text_transform)
       title_font_size = @theme.title_font_size
       # Forcer gras avant wrap (cf. render_inline_doctitle pour le rationale).
-      title_segments = force_bold(InlineRenderer.parse(title))
+      title_segments = force_bold(parse_inline(title))
       title_lines = wrap_segments(title_segments, @content_width, title_font_size)
       title_lines = [[] of InlineSegment] if title_lines.empty?
       title_line_height = title_font_size * 1.3
@@ -3519,10 +3531,16 @@ module AsciidoctorPDF
       font_size : Float64,
       line_h : Float64,
     ) : Nil
-      segments = InlineRenderer.parse(html)
+      segments = parse_inline(html)
       lines = wrap_segments(segments, width, font_size)
-      lines.each do |line|
-        render_segment_line(page, line, x, @current_y - font_size, font_size)
+      # Pour justify : on alimente `target_w` (largeur cible) sur
+      # toutes les lignes sauf la dernière (la dernière reste
+      # alignée à gauche pour ne pas étirer un texte court orphelin).
+      last_idx = lines.size - 1
+      lines.each_with_index do |line, idx|
+        line_align = idx == last_idx ? "left" : @theme.base_text_align
+        render_segment_line(page, line, x, @current_y - font_size, font_size,
+          target_w: width, align: line_align)
         @current_y -= line_h
       end
     end
@@ -3613,7 +3631,13 @@ module AsciidoctorPDF
         font = get_font(font_name)
         space_w = font.string_width(" ", font_size)
 
-        words = seg.text.split(" ")
+        # En début de ligne (current_line vide), on strip les
+        # whitespace de tête — notamment le `\n` qui suit un `<br>`
+        # injecté par crystal-asciidoctor pour un hard break ` +`
+        # AsciiDoc. Sans ce strip, le 1er mot apparaissait précédé
+        # d'un blanc parasite (« Licence » avec espace devant).
+        effective_text = current_line.empty? ? seg.text.lstrip : seg.text
+        words = effective_text.split(" ")
         words.each_with_index do |word, idx|
           word_w = font.string_width(word, font_size)
           sep_w = (idx > 0 || !current_line.empty?) ? space_w : 0.0
@@ -3661,7 +3685,49 @@ module AsciidoctorPDF
       x : Float64,
       y : Float64,
       font_size : Float64,
+      target_w : Float64? = nil,
+      align : String = "left",
     ) : Nil
+      # Justify : calcule l'espace inutilisé sur la ligne et le
+      # distribue entre les espaces inter-mots. On dessine chaque
+      # mot individuellement en élargissant les espaces ASCII. Les
+      # espaces insécables (U+00A0 — typographie française) ne sont
+      # PAS comptés (split sur ' ' seulement), donc le NBSP reste
+      # de largeur normale.
+      #
+      # Garde-fou : si l'extra par espace dépasse `max_extra_factor`
+      # fois la largeur d'un espace normal (= ligne « trop étalée »
+      # qui blesserait visuellement), on abandonne le justify et on
+      # aligne à gauche. Typique : ligne courte (« Version : 1.0.0 »)
+      # qui se retrouve seule sur une largeur de page entière.
+      max_extra_factor = 1.5
+      extra_per_space = 0.0
+      if align == "justify" && (tw = target_w)
+        natural_w = 0.0
+        n_spaces = 0
+        segments.each do |seg|
+          if seg.image_path
+            natural_w += seg.image_width || (font_size * 1.2)
+          elsif !seg.text.empty?
+            font_name = resolve_inline_font(seg)
+            font = get_font(font_name)
+            eff_size = seg.sup || seg.sub ? font_size * 0.75 : (seg.kbd ? font_size * 0.9 : font_size)
+            natural_w += font.string_width(seg.text, eff_size)
+            n_spaces += seg.text.count(' ')
+          end
+        end
+        if n_spaces > 0 && tw > natural_w
+          candidate = (tw - natural_w) / n_spaces
+          # Mesure la largeur d'un espace ordinaire dans la police
+          # de base pour calibrer le seuil.
+          normal_space_w = get_font(@fn_body).string_width(" ", font_size)
+          if candidate <= normal_space_w * max_extra_factor
+            extra_per_space = candidate
+          end
+          # else : la ligne serait trop étirée — on tombe sur left.
+        end
+      end
+
       current_x = x
       segments.each do |seg|
         # Image inline (raster ou SVG) : route vers `page.svg` ou
@@ -3706,6 +3772,24 @@ module AsciidoctorPDF
           page.rectangle(before - mark_pad, eff_y - 2, seg_w + 2 * mark_pad, eff_font_size + 4)
           page.fill
         end
+        # Code inline (codespan) : fond grisé optionnel +
+        # bordure optionnelle, à la manière du rendu HTML `<code>`.
+        # Conforme à la spec asciidoctor-pdf Ruby — catégorie de
+        # thème `codespan_*`. Le badge `kbd` (touche de clavier) est
+        # un cas dédié juste en dessous, prioritaire sur codespan.
+        if seg.mono && !seg.kbd && !@theme.codespan_background_color.empty?
+          px = @theme.codespan_padding_x
+          py = @theme.codespan_padding_y
+          page.fill_color(@theme.codespan_background_color)
+          page.rectangle(before - px, eff_y - py, seg_w + 2 * px, eff_font_size + 2 * py)
+          page.fill
+          if !@theme.codespan_border_color.empty? && @theme.codespan_border_width > 0.0
+            page.stroke_color(@theme.codespan_border_color)
+            page.line_width(@theme.codespan_border_width)
+            page.rectangle(before - px, eff_y - py, seg_w + 2 * px, eff_font_size + 2 * py)
+            page.stroke
+          end
+        end
         # Kbd : encadré gris clair façon « touche de clavier ».
         if seg.kbd
           kbd_pad_x = 3.0
@@ -3727,17 +3811,48 @@ module AsciidoctorPDF
           page.fill
         end
 
-        page.fill_color(seg.color || @theme.base_font_color)
+        # Choix de la couleur du texte : un codespan peut imposer
+        # sa propre couleur (`codespan_font_color`) ; sinon on garde
+        # la couleur explicite du segment puis le fallback du thème.
+        text_color = if seg.mono && !seg.kbd && !@theme.codespan_font_color.empty?
+                       @theme.codespan_font_color
+                     else
+                       seg.color || @theme.base_font_color
+                     end
+        page.fill_color(text_color)
 
-        # Route through `draw_text_run` so emojis & unrenderable chars
-        # get the same treatment as the rest of the engine.
-        draw_text_run(page, seg.text, current_x, eff_y, font_name, eff_font_size)
-        # Avancement horizontal : la mesure est faite à `eff_font_size`,
-        # plus une petite réserve pour kbd/button/mark afin que les
-        # encadrés ne se touchent pas.
-        current_x = before + seg_w
-        current_x += 4.0 if seg.kbd || seg.button
-        current_x += 2.0 if seg.mark
+        # Justify : pour un segment de texte régulier (sans badge
+        # mark/kbd/button/mono), on dessine *mot par mot* en élargissant
+        # chaque espace de `extra_per_space`. Les segments avec badge
+        # conservent leur dessin compact (le badge a une taille fixe)
+        # et l'extra est juste comptabilisé pour `current_x`.
+        has_badge = seg.mark || seg.kbd || seg.button || seg.mono
+        if extra_per_space > 0.0 && !has_badge && seg.text.includes?(' ')
+          parts = seg.text.split(' ')
+          space_w = font.string_width(" ", eff_font_size)
+          parts.each_with_index do |part, i|
+            if i > 0
+              current_x += space_w + extra_per_space
+            end
+            next if part.empty?
+            draw_text_run(page, part, current_x, eff_y, font_name, eff_font_size)
+            current_x += font.string_width(part, eff_font_size)
+          end
+        else
+          # Route through `draw_text_run` so emojis & unrenderable chars
+          # get the same treatment as the rest of the engine.
+          draw_text_run(page, seg.text, current_x, eff_y, font_name, eff_font_size)
+          # Avancement horizontal : la mesure est faite à `eff_font_size`,
+          # plus une petite réserve pour kbd/button/mark/mono afin que
+          # les encadrés ne se touchent pas du segment suivant.
+          current_x = before + seg_w
+          current_x += 4.0 if seg.kbd || seg.button
+          current_x += 2.0 if seg.mark
+          current_x += @theme.codespan_padding_x if seg.mono && !seg.kbd
+          # Pour les segments avec badge : on compte juste l'extra
+          # *après* (le badge reste de largeur fixe).
+          current_x += extra_per_space * seg.text.count(' ') if extra_per_space > 0.0
+        end
 
         # Annotation lien
         if (link = seg.link) && !link.empty?
@@ -3747,6 +3862,27 @@ module AsciidoctorPDF
           )
         end
       end
+    end
+
+    # Applique la convention typographique française au texte
+    # *avant* parsing inline : un espace ordinaire devant `:`, `;`,
+    # `!`, `?`, `»` ou après `«` devient un espace insécable (U+00A0).
+    # Activé par la propriété de thème `x_french_typography` (true
+    # dans `themes/fr.yml`, false dans le thème par défaut).
+    # Empêche les sauts de ligne inopportuns (« 12 :30 » →
+    # « 12<NBSP>:30 ») et respecte la règle de l'Imprimerie nationale.
+    # Hors-spec asciidoctor-pdf Ruby — extension ALOLI, préfixe `x-`.
+    private def apply_french_typography(text : String) : String
+      return text unless @theme.x_french_typography
+      text
+        .gsub(/ ([:;!?»])/, " \\1")
+        .gsub(/(«) /, "« ")
+    end
+
+    # Wrapper autour de `InlineRenderer.parse` qui applique
+    # `apply_french_typography` si la propriété de thème est active.
+    private def parse_inline(html : String) : Array(InlineSegment)
+      InlineRenderer.parse(apply_french_typography(html))
     end
 
     # Résout le nom de la police à partir des attributs d'un segment inline.

@@ -46,9 +46,6 @@ module AsciidoctorPDF
       # remplacés par un espace ASCII juste avant chaque `page.text`
       # pour éviter un tofu quand la police n'a pas de glyphe NBSP.
       text = html
-        .gsub(/&amp;/, "&")
-        .gsub(/&lt;/, "<")
-        .gsub(/&gt;/, ">")
         .gsub(/&quot;/, "\"")
         .gsub(/&#8220;/, "\u201C")
         .gsub(/&#8221;/, "\u201D")
@@ -68,6 +65,33 @@ module AsciidoctorPDF
 
       # Parcourir le HTML avec un état de style courant
       parse_html(text, segments)
+
+      # Décode `&lt;` / `&gt;` / `&amp;` *après* le parsing des tags
+      # HTML, dans le contenu texte de chaque segment. Décoder ces
+      # entités *avant* `parse_html` ferait que `&lt;société&gt;`
+      # (issu du source AsciiDoc `<société>`) deviendrait littéralement
+      # `<société>` et serait interprété comme une balise inconnue —
+      # le mot serait alors consommé par le parser.
+      #
+      # `InlineSegment` est un record immutable : on reconstruit la
+      # liste avec le texte décodé.
+      segments.map! do |seg|
+        next seg if seg.text.empty?
+        decoded = seg.text
+          .gsub(/&lt;/, "<")
+          .gsub(/&gt;/, ">")
+          .gsub(/&amp;/, "&")
+        next seg if decoded == seg.text
+        InlineSegment.new(
+          text: decoded, bold: seg.bold, italic: seg.italic, mono: seg.mono,
+          sup: seg.sup, sub: seg.sub, mark: seg.mark, kbd: seg.kbd,
+          button: seg.button, menu: seg.menu, color: seg.color,
+          link: seg.link, line_break: seg.line_break,
+          image_path: seg.image_path,
+          image_width: seg.image_width,
+          image_height: seg.image_height,
+        )
+      end
       segments
     end
 

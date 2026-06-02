@@ -3,6 +3,93 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.65 — 2026-06-02
+
+=== Ajouté
+
+* **Rendu du code inline (codespan).** Nouvelle catégorie de
+  thème `codespan_*` portée de la spec `asciidoctor-pdf` Ruby
+  2.3.24 : fond grisé + bordure optionnelle + couleur de texte +
+  padding configurable derrière les segments inline en `` `text` ``.
+  Avant ce port, le code inline était rendu en police mono mais
+  sans aucun habillage visuel — `_default.yml` ressemblait à du
+  texte ordinaire.
+
+* **Typographie française (extension `x-`).** Nouvelle propriété
+  de thème `x_french_typography` (`true` par défaut dans le thème
+  `fr`, `false` ailleurs). Quand active, le converter remplace
+  l'espace ordinaire devant `:`, `;`, `!`, `?`, `»` et après `«`
+  par un espace insécable U+00A0 — respecte la règle de
+  l'Imprimerie nationale et évite les retours à la ligne
+  inappropriés au milieu d'une ponctuation à deux parties.
++
+Les blocs de code (`[source,...]`, ` ```), les blocs literal et
+les attributs (style, language) sont **préservés** car ils ne
+passent pas par le pipeline inline parser.
+
+* **Markup inline préservé dans les items de liste.** Auparavant
+  `render_list` passait le texte de chaque item par
+  `strip_inline_markup` + `draw_text_run` brut — résultat : tous
+  les italiques, gras, code inline, liens, etc. étaient *strippés*
+  et rendus comme du texte plat. Désormais le pipeline complet
+  (`InlineRenderer.parse` + `wrap_segments` + `render_segment_line`)
+  est utilisé, identique à celui des paragraphes. Le justify
+  s'applique aussi aux items longs (lignes non-terminales).
++
+Propriétés exposées dans le thème (defaults conformes au défaut
+asciidoctor-pdf upstream) :
++
+[cols="2,2,3"]
+|===
+| Propriété | Défaut | Effet
+
+| `codespan_background_color`
+| `f5f5f5`
+| Fond gris très clair derrière le code
+
+| `codespan_border_color`
+| _vide_
+| Bordure désactivée par défaut
+
+| `codespan_border_width`
+| `0.0`
+| Idem
+
+| `codespan_font_color`
+| _vide_
+| Hérite de la couleur de texte courante
+
+| `codespan_padding_x`, `codespan_padding_y`
+| `2.0`, `1.0`
+| Espace autour du texte (points)
+|===
+
+* **Paragraphes justifiés par défaut** (`base_text_align: "justify"`).
+  Le rendu distribue l'espace inutilisé d'une ligne entre les
+  espaces inter-mots ; la dernière ligne d'un paragraphe reste
+  alignée à gauche pour ne pas étirer un orphelin. Configurable
+  via la propriété `base_text_align` du thème (valeurs : `"left"`,
+  `"center"`, `"right"`, `"justify"`). Conforme à
+  l'asciidoctor-pdf Ruby où `base_align: justify` est le défaut.
++
+Algorithme : pour chaque ligne sauf la dernière, on calcule la
+largeur naturelle des segments, on compte les espaces internes,
+puis on répartit `(cible − naturelle) / n_espaces` après chaque
+segment proportionnellement au nombre d'espaces qu'il contient.
+Approximation simple (les espaces *entre* segments sont étirés,
+ceux internes à un seul segment restent fixes) — suffisante pour
+les paragraphes ordinaires avec markup léger (italique, code
+inline, etc.).
+
+=== Modifié
+
+* Dépendance `crystal-asciidoctor` bumpée à **`~> 2.0.26.6`** —
+  les blocs hybrides `[source,LANG]` + `\`\`\`` (forme acceptée par
+  Asciidoctor Ruby en mode de compatibilité Markdown) reçoivent
+  désormais correctement leur attribut `language`. Conséquence :
+  coloration syntaxique + fond grisé + classe `language-LANG`
+  appliqués comme pour la forme canonique `[source,LANG] ----`.
+
 == v2.3.24.64 — 2026-06-02
 
 === Modifié
