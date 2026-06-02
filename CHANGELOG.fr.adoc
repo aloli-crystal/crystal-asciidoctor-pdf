@@ -3,6 +3,17 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.66 — 2026-06-02
+
+=== Modifié
+
+* Dépendance `crystal-asciidoctor` bumpée à **`~> 2.0.26.7`** —
+  retrait du hack `0.` répété pour les listes ordonnées. La
+  convention canonique AsciiDoc (`.` répété pour
+  auto-numérotation, ou numérotation manuelle `1.` `2.` `3.`)
+  redevient la seule voie. Cf. note mémoire ALOLI
+  `feedback_asciidoc_ordered_lists.md`.
+
 == v2.3.24.65 — 2026-06-02
 
 === Ajouté

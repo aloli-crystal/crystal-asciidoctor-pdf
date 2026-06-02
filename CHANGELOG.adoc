@@ -3,6 +3,16 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.66 — 2026-06-02
+
+=== Changed
+
+* `crystal-asciidoctor` dependency bumped to **`~> 2.0.26.7`** —
+  removes the `0.`-repeated hack for ordered lists. The canonical
+  AsciiDoc convention (`.` repeated for auto-numbering, or manual
+  numbering `1.` `2.` `3.`) becomes the only path. See ALOLI memo
+  `feedback_asciidoc_ordered_lists.md`.
+
 == v2.3.24.65 — 2026-06-02
 
 === Added
