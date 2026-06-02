@@ -3,6 +3,26 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.63 — 2026-06-02
+
+=== Corrigé
+
+* **Blocs attachés aux items de liste rendus correctement.** Quand
+  un item de liste numérotée (ou à puces) avait un bloc attaché
+  via `+` (typiquement un bloc source `[source,console] ----`,
+  une admonition, un tableau, un autre paragraphe), `render_list`
+  itérait uniquement sur les *sous-listes* et ignorait
+  silencieusement tous les autres types de blocs enfants.
++
+Conséquence : dans les recettes de type « 1. Étape avec sa
+commande / 2. Étape suivante avec sa commande » (très fréquent
+dans les READMEs aloli-crystal), seuls les libellés des étapes
+apparaissaient dans le PDF, les commandes disparaissaient.
++
+Fix : tous les blocs enfants des items sont désormais routés via
+le dispatcher général (`dispatch(sub_block, sub_block.context.to_s)`)
+qui appelle le bon `convert_*` selon le type.
+
 == v2.3.24.62 — 2026-06-01
 
 === Modifié

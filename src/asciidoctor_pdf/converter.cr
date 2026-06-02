@@ -1427,10 +1427,18 @@ module AsciidoctorPDF
         end
         @current_y -= @theme.list_item_spacing
 
-        # Sous-listes
+        # Sous-blocs attachés à l'item (via `+`) : sous-listes,
+        # blocs de code (`[source,...] + ----` ou ```), paragraphes,
+        # tableaux, admonitions, etc. Le dispatcher général gère
+        # chaque type. Sans ce dispatch, tous les blocs *non*-liste
+        # à l'intérieur d'un item étaient silencieusement ignorés
+        # — typiquement un bloc source affiché à plat dans le
+        # source AsciiDoc disparaissait du PDF final.
         item.blocks.each do |sub_block|
           if sub_block.is_a?(Asciidoctor::List)
             render_list(sub_block, ordered: sub_block.context == :olist, indent: indent + @theme.list_indent)
+          elsif sub_block.is_a?(Asciidoctor::AbstractNode)
+            dispatch(sub_block, sub_block.context.to_s)
           end
         end
       end

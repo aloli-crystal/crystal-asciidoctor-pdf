@@ -3,6 +3,24 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.63 — 2026-06-02
+
+=== Fixed
+
+* **List-item attached blocks now render correctly.** When a list
+  item carried an attached block via `+` (typically a source
+  block `[source,console] ----`, an admonition, a table, another
+  paragraph), `render_list` only iterated on *sub-lists* and
+  silently dropped every other child block type.
++
+Result : in "1. Step with its command / 2. Next step with its
+command" recipes (very common in aloli-crystal READMEs), only
+the step labels appeared in the PDF — the commands vanished.
++
+Fix : all child blocks of list items are now routed through the
+general dispatcher (`dispatch(sub_block, sub_block.context.to_s)`)
+which calls the right `convert_*` based on type.
+
 == v2.3.24.62 — 2026-06-01
 
 === Changed
