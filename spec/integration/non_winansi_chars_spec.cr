@@ -40,9 +40,19 @@ describe "Integration · non-WinAnsi characters" do
     end
   end
 
-  it "still falls back to `?` for non-emoji characters absent from WinAnsi" do
-    # CJK ideograph 日 (U+65E5) — definitely not in any emoji set
-    # nor in WinAnsi. Should hit the `safe_text` substitute path.
+  it "renders CJK with the Noto font when available, else falls back to `?`" do
+    # CJK ideograph 日 (U+65E5) — not in any emoji set nor in WinAnsi.
+    #
+    # Behaviour depends on whether a Noto CJK font is installed in the
+    # cache (`noto-cjk pull`). Since pdf 0.6.4 the .otf CFF fonts load
+    # natively, so when one is present the character is rendered with a
+    # CIDFontType0 subset and the `?` fallback is NOT taken. Without a
+    # cached font, the `safe_text` substitute path emits `?`.
+    #
+    # NB : `IntegrationHelper.text` decodes Identity-H hex strings as
+    # raw 2-byte GIDs (not via ToUnicode), so it cannot reproduce the
+    # exact ideograph — but it can reliably tell whether a `?`
+    # substitution was emitted, which is what this test asserts.
     source = <<-ADOC
     = Test
     A CJK character: 日.
@@ -51,7 +61,13 @@ describe "Integration · non-WinAnsi characters" do
     begin
       File.exists?(path).should be_true
       text = IntegrationHelper.text(path)
-      text.should contain("?")
+      if NotoCjk.font_path
+        # Font available → glyph rendered, no fallback substitution.
+        text.should_not contain("?")
+      else
+        # No CJK font in cache → `?` fallback.
+        text.should contain("?")
+      end
     ensure
       File.delete(path) if File.exists?(path)
     end

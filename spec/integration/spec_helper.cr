@@ -89,10 +89,16 @@ module IntegrationHelper
 
   # Returns a best-effort flat text extraction of every page. Walks
   # the content streams, decodes Flate if present, and collects every
-  # literal `(...)` string as well as every hex `<...>` string (the
-  # latter decoded assuming Identity-H, i.e. 2-byte big-endian
-  # codepoints — the encoding used by TrueType fonts embedded by
-  # pdf).
+  # literal `(...)` string as well as every hex `<...>` string.
+  #
+  # CAVEAT : hex strings under Identity-H encoding hold 2-byte GLYPH
+  # IDs, not Unicode codepoints. This helper decodes them as raw
+  # 2-byte values, so for fonts where GID == codepoint (basic Latin
+  # in many fonts) the text is readable, but for CJK/composite fonts
+  # the decoded chars are the GIDs, not the source text. Asserting the
+  # exact CJK text would require parsing the font's ToUnicode CMap —
+  # not done here. Tests that touch CJK assert on the *presence /
+  # absence of the `?` fallback* instead, which is GID-agnostic.
   def self.text(pdf_path : String) : String
     reader = PDF::Reader.open(pdf_path)
     buf = String::Builder.new

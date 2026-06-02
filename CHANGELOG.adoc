@@ -3,6 +3,31 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.64 — 2026-06-02
+
+=== Changed
+
+* **CJK fonts now render natively.** Bumped the `pdf` dependency to
+  `~> 0.6.4`, which adds native OpenType/CFF (`.otf`) subsetting and
+  embedding. All Noto CJK fonts ship as `.otf`, so until now they
+  triggered `UnsupportedFontFormat` and CJK characters fell back to
+  `?`. With pdf 0.6.4 a cached Noto CJK font is loaded lazily on the
+  first CJK character and embedded as a `CIDFontType0` subset — the
+  ideographs render and the text is extractable.
+* The lazy `font_cjk` accessor comments were updated : the
+  `rescue UnsupportedFontFormat` is now a safety net for a genuinely
+  corrupt / exotic font, no longer the expected path for CJK.
+
+=== Fixed
+
+* Integration spec `non_winansi_chars_spec` no longer hard-codes the
+  obsolete "CJK → `?`" expectation. It now asserts the behaviour
+  conditional on a Noto CJK font being present in the cache (rendered,
+  no `?`) or absent (`?` fallback). The integration text-extraction
+  helper's Identity-H caveat is documented (it reads raw GIDs, not
+  ToUnicode, so it cannot reproduce exact CJK text — only the
+  presence / absence of the `?` substitution).
+
 == v2.3.24.63 — 2026-06-02
 
 === Fixed

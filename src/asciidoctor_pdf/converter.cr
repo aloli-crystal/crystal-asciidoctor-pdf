@@ -3849,8 +3849,8 @@ module AsciidoctorPDF
       # rencontré dans le document (cf. `font_cjk` plus bas).
       #
       # Bénéfice : un document sans CJK ne paye pas le coût du
-      # chargement, et surtout ne plante pas si la fonte est en
-      # format `.otf` (CFF) non subsettable par pdf actuellement.
+      # chargement (les Noto CJK `.otf` font ~15 Mo et leur subset
+      # embarqué ~1 Mo ; inutile de l'inclure dans un PDF sans CJK).
       if (cjk_path = NotoCjk.font_path) && File.exists?(cjk_path)
         @cjk_font_path = cjk_path
       end
@@ -3858,9 +3858,14 @@ module AsciidoctorPDF
 
     # Accesseur paresseux à la police CJK. Charge la fonte au
     # premier appel ; retourne `nil` si aucune fonte n'est dispo
-    # (cache vide) ou si la fonte est en format non supporté
-    # (`.otf`/CFF — `UnsupportedFontFormat` levée par pdf 0.5.6+).
-    # Les appels suivants retournent la valeur cachée.
+    # (cache vide). Les appels suivants retournent la valeur cachée.
+    #
+    # Depuis pdf 0.6.4 les fontes OpenType/CFF (`.otf`, format de
+    # toutes les Noto CJK) sont supportées nativement : elles sont
+    # sous-settées et embarquées en `CIDFontType0`/`FontFile3`. Le
+    # `rescue UnsupportedFontFormat` ci-dessous reste comme filet de
+    # sécurité pour une fonte réellement corrompue ou d'un flavour
+    # sfnt exotique, pas comme chemin nominal du CJK.
     private def font_cjk : PDF::Fonts::TrueTypeFont?
       cached = @font_cjk
       return cached if cached
