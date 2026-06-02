@@ -3,6 +3,17 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.67 — 2026-06-02
+
+=== Changed
+
+* `crystal-asciidoctor` dependency bumped to **`~> 2.0.26.8`** :
+  fix of the `HardLineBreakRx` regex that captured only one hard
+  break per paragraph (Crystal interprets the `m` flag as
+  « `.` matches `\n` too » → `(.*)` greedy across multiple lines).
+  All trailing `+` line breaks within a paragraph are now properly
+  converted to `<br>`.
+
 == v2.3.24.66 — 2026-06-02
 
 === Changed
