@@ -176,6 +176,13 @@ module AsciidoctorPDF
 
       flush = ->(buffered : String) {
         return if buffered.empty?
+        # Skip whitespace-only segments AVANT le 1er segment réel.
+        # Cas typique : HTML `<div class="paragraph">\n<p>beryl...`
+        # injecté par crystal-asciidoctor pour les admonitions et
+        # autres conteneurs — le `\n` entre `<div>` et `<p>` génère
+        # sinon un segment text=" " qui décale visuellement le 1er
+        # mot vers la droite (de la largeur d'un espace).
+        return if segments.empty? && buffered.strip.empty?
         segments << InlineSegment.new(
           text: buffered,
           bold: bold_depth > 0,

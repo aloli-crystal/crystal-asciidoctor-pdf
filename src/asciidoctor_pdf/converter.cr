@@ -826,9 +826,14 @@ module AsciidoctorPDF
       page.text(label_text, at: {@margin + label_offset, @current_y - padding - font_size})
 
       # 4) Texte de l'admonition (segments inline avec leur typographie)
+      # — justify pour toutes les lignes sauf la dernière, comme un
+      # paragraphe ordinaire.
       y = @current_y - padding - font_size
-      lines.each do |line|
-        render_segment_line(page, line, @margin + label_space, y, font_size)
+      last_idx = lines.size - 1
+      lines.each_with_index do |line, idx|
+        line_align = idx == last_idx ? "left" : @theme.base_text_align
+        render_segment_line(page, line, @margin + label_space, y, font_size,
+          target_w: content_w, align: line_align)
         y -= line_h
       end
 
@@ -3700,7 +3705,13 @@ module AsciidoctorPDF
       # qui blesserait visuellement), on abandonne le justify et on
       # aligne à gauche. Typique : ligne courte (« Version : 1.0.0 »)
       # qui se retrouve seule sur une largeur de page entière.
-      max_extra_factor = 1.5
+      # Garde-fou justify : on bail out (= rend en left) si l'extra
+      # par espace dépasse N fois la largeur d'un espace normal,
+      # pour éviter les lignes « trop étalées » sur des paragraphes
+      # courts. 2.5x est un bon compromis : ça laisse passer les
+      # paragraphes typiques (jusqu'à ~80 % de remplissage) tout en
+      # bloquant les vraies pathologies (lignes très courtes seules).
+      max_extra_factor = 2.5
       extra_per_space = 0.0
       if align == "justify" && (tw = target_w)
         natural_w = 0.0

@@ -3,6 +3,37 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.68 — 2026-06-02
+
+=== Fixed
+
+* **Admonition (NOTE/TIP/…) : first line shifted right & not
+  justified.** When `crystal-asciidoctor` renders an admonition
+  body, it wraps the inline HTML in
+  `<div class="paragraph">\n<p>…</p>\n</div>`. The `\n` between
+  `<div>` and `<p>` was kept by `InlineRenderer.parse_html` as a
+  whitespace-only initial segment, which then bled into
+  `wrap_segments` as a leading space — visually shifting the
+  first word (e.g. `beryl`) by ~one space-width vs. the
+  subsequent lines. `parse_html` now drops a whitespace-only
+  buffer when it is **the very first segment** (no impact on
+  inter-word spacing later in the stream).
+
+* **Admonition body not justified.** `convert_admonition` was
+  calling `render_segment_line` without `target_w` / `align`,
+  so the justify pipeline (`max_extra_factor`,
+  per-space distribution) never fired. It now passes
+  `content_w` and `@theme.base_text_align`, with the last line
+  forced to `"left"` (matches `render_inline_lines`).
+
+* **Justify garde-fou too strict on narrow content widths.**
+  `max_extra_factor` raised from `1.5` to `2.5` × normal
+  space width. The 1.5 ceiling blocked legitimate justification
+  on lines with few spaces or long words (e.g.
+  `un serveur bare-metal…`, candidate 5.16 pt > limit 4.77 pt).
+  The 2.5 ceiling still catches the pathological cases (single
+  isolated word, broken layout) without rejecting real paragraphs.
+
 == v2.3.24.67 — 2026-06-02
 
 === Changed

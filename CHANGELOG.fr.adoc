@@ -3,6 +3,40 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.68 — 2026-06-02
+
+=== Corrigé
+
+* **Admonition (NOTE/TIP/…) : 1re ligne décalée à droite & non
+  justifiée.** Quand `crystal-asciidoctor` rend le corps d'une
+  admonition, il enveloppe l'HTML inline dans
+  `<div class="paragraph">\n<p>…</p>\n</div>`. Le `\n` entre
+  `<div>` et `<p>` était conservé par `InlineRenderer.parse_html`
+  comme un segment initial blanc-seulement, qui se propageait
+  ensuite dans `wrap_segments` comme un espace de tête —
+  décalant visuellement le premier mot (ex. `beryl`) d'environ
+  une largeur d'espace par rapport aux lignes suivantes.
+  `parse_html` ignore désormais un buffer blanc-seulement
+  **uniquement quand c'est le tout premier segment** (sans
+  impact sur les espaces inter-mots plus loin dans le flux).
+
+* **Corps d'admonition non justifié.** `convert_admonition`
+  appelait `render_segment_line` sans `target_w` / `align`,
+  donc le pipeline de justification (`max_extra_factor`,
+  distribution par espace) ne se déclenchait jamais. Il passe
+  désormais `content_w` et `@theme.base_text_align`, avec la
+  dernière ligne forcée à `"left"` (cohérent avec
+  `render_inline_lines`).
+
+* **Garde-fou de justification trop strict sur les contenus
+  étroits.** `max_extra_factor` relevé de `1.5` à `2.5` × la
+  largeur normale d'espace. Le plafond à 1.5 bloquait des
+  justifications légitimes sur des lignes peu espacées ou avec
+  mots longs (ex. `un serveur bare-metal…`,
+  candidat 5,16 pt > limite 4,77 pt). Le plafond à 2.5 attrape
+  toujours les vrais cas pathologiques (mot isolé seul, mise en
+  page cassée) sans rejeter de vrais paragraphes.
+
 == v2.3.24.67 — 2026-06-02
 
 === Modifié
