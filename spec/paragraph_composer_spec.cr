@@ -92,18 +92,51 @@ describe AsciidoctorPDF::ParagraphComposer do
       tokens[0].as(ParagraphComposer::Box).width.should eq 26.0
     end
 
-    it "NE colle PAS deux segments contigus avec une Glue artificielle" do
-      # Cas `<strong>foo</strong>bar` : segments [Bold("foo"), Plain("bar")]
-      # sans espace explicite. Le rendu attendu est `foobar` (pas
-      # `foo bar`). Régression : la version J1 originale injectait
-      # un Glue ici, ce qui ajoutait un espace après chaque codespan
-      # avant la ponctuation suivante (« `code` ) » au lieu de
-      # « `code`) »).
+    it "insère un Glue entre 2 segments contigus quand le suivant n'est pas collant" do
+      # Cas réel constaté 2026-06-04 sur le README beryl :
+      # `*avant* https://.../[deploy]` produit le HTML
+      # `<strong>avant</strong><a href>deploy</a>` SANS espace
+      # entre les balises (le parser asciidoctor le collapse).
+      # Mon premier fix v.70 retirait toute Glue inter-segments,
+      # ce qui collait `avantdeploy` dans le rendu PDF. Le fix
+      # v.81 ré-introduit la Glue MAIS conditionnellement :
+      # seulement si le 1er caractère du seg suivant n'est pas
+      # collant (= pas de la ponctuation de fin ni NBSP).
       segments = [seg("foo", bold: true), seg("bar")]
+      tokens = ParagraphComposer.tokenize(segments, 10.0, &WIDTH_OF_CHAR)
+      tokens.size.should eq 3
+      tokens[0].should be_a ParagraphComposer::Box
+      tokens[1].should be_a ParagraphComposer::Glue
+      tokens[2].should be_a ParagraphComposer::Box
+    end
+
+    it "NE colle PAS un segment ponctuation collante au précédent" do
+      # Cas `(ex : ` `code` `)` : on veut `(ex : code)` sans
+      # espace fantôme avant `)`. La liste CLINGING_CHARS contient
+      # `.,;:!?)]}»' ` + NBSP — pour ces caractères, pas de Glue.
+      segments = [InlineSegment.new(text: "code", mono: true), seg(")")]
       tokens = ParagraphComposer.tokenize(segments, 10.0, &WIDTH_OF_CHAR)
       tokens.size.should eq 2
       tokens[0].should be_a ParagraphComposer::Box
       tokens[1].should be_a ParagraphComposer::Box
+    end
+
+    it "NE colle PAS un segment commençant par NBSP au précédent" do
+      # Typographie française : `<strong>deploy</strong><NBSP>: il`
+      # — le segment suivant commence par NBSP+`:` et doit
+      # rester collé pour matérialiser la convention. split(' ')
+      # ne casse pas sur NBSP, donc le 1er morceau du seg suivant
+      # est ` :` (NBSP+`:`) qui suit immédiatement `deploy` sans
+      # Glue. Box(deploy), Box(NBSP+:), Glue, Box(il).
+      nbsp_text = " : il"
+      segments = [seg("deploy", bold: true), seg(nbsp_text)]
+      tokens = ParagraphComposer.tokenize(segments, 10.0, &WIDTH_OF_CHAR)
+      tokens.size.should eq 4
+      tokens[0].as(ParagraphComposer::Box).segment.text.should eq "deploy"
+      tokens[1].should be_a ParagraphComposer::Box
+      tokens[1].as(ParagraphComposer::Box).segment.text.should eq " :"
+      tokens[2].should be_a ParagraphComposer::Glue
+      tokens[3].as(ParagraphComposer::Box).segment.text.should eq "il"
     end
 
     it "préserve le `)` collé après un codespan" do

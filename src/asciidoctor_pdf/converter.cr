@@ -3646,12 +3646,15 @@ module AsciidoctorPDF
           get_font(resolve_inline_font(seg)).string_width(text, font_size)
         end
       end
-      # Knuth-Plass par défaut (J3) : choix global optimal des
-      # breakpoints qui minimise la somme des badness² + pénalités
-      # de césure + double-hyphen demerits. Fallback automatique
-      # sur first-fit en cas de paragraphe pathologique (mot trop
-      # long, target_w trop petit, etc.).
-      lines = ParagraphComposer.compose_knuth_plass(tokens, width)
+      # Revert urgent v2.3.24.81 (2026-06-04) : repointé sur
+      # `compose_first_fit` après régressions visuelles sur le
+      # README beryl (cf. CHANGELOG.fr.adoc) — Knuth-Plass
+      # acceptait des layouts avec étirement excessif et des
+      # débordements de marge sans garde-fou. Le code Knuth-Plass
+      # reste disponible (`compose_knuth_plass`) en vue d'une
+      # ré-introduction propre avec garde-fou emergency + suite
+      # de tests visuels.
+      lines = ParagraphComposer.compose_first_fit(tokens, width)
       lines.map(&.segments)
     end
 
@@ -3674,17 +3677,16 @@ module AsciidoctorPDF
       # comptés (split sur ' ' seulement), donc le NBSP reste de
       # largeur normale.
       #
-      # Depuis J3 (v2.3.25.0), le `ParagraphComposer` utilise
-      # Knuth-Plass qui CHOISIT les sauts de ligne pour minimiser
-      # la badness² globale. Conséquence : chaque ligne reçue ici
-      # a déjà un `adjustment_ratio` raisonnable (rarement >> 1) ;
-      # l'ancien garde-fou `max_extra_factor = 2.5` qui basculait
-      # silencieusement en `left` au cas où le first-fit produisait
-      # une ligne aberrante n'a plus de raison d'être et a été
-      # supprimé. Le rare paragraphe pathologique (mot trop long
-      # qui force une ligne courte seule sur une page large)
-      # produit naturellement un étirement visible mais correct.
+      # Garde-fou `max_extra_factor = 2.5` : si l'extra par espace
+      # dépasse 2.5× la largeur d'un espace normal, on bascule en
+      # alignement gauche pour la ligne. Évite les lignes très
+      # étalées (paragraphe court justifié sur une largeur
+      # disproportionnée). Cette borne empirique préserve la
+      # qualité visuelle des paragraphes typiques tout en bloquant
+      # les pathologies — réintroduit lors du revert v2.3.24.81
+      # (2026-06-04) après régressions K-P sur le README beryl.
       extra_per_space = 0.0
+      max_extra_factor = 2.5
       # `extra_per_cjk_glyph` (v2.3.24.75) : étirement à appliquer
       # entre chaque glyphe CJK quand la ligne ne contient AUCUN
       # espace ASCII (cas typique : « 中文两端对齐 ») mais qu'on
@@ -3739,7 +3741,18 @@ module AsciidoctorPDF
           end
         end
         if n_spaces > 0 && tw > natural_w && align == "justify"
-          extra_per_space = (tw - natural_w) / n_spaces
+          candidate = (tw - natural_w) / n_spaces
+          # Garde-fou max_extra_factor : si l'extra par espace
+          # dépasse 2.5× la largeur d'un espace normal de la
+          # police de base, on bascule en alignement gauche (la
+          # ligne serait visuellement trop étalée). Calibré
+          # empiriquement v2.3.24.68 ; réintroduit après le
+          # revert J3 du 2026-06-04.
+          normal_space_w = get_font(@fn_body).string_width(" ", font_size)
+          if candidate <= normal_space_w * max_extra_factor
+            extra_per_space = candidate
+          end
+          # Sinon : extra_per_space reste à 0 → rendu en `left`.
         elsif n_spaces == 0 && tw > natural_w && (cjk_f = font_cjk)
           # Pas d'espace ASCII : tentative justification CJK. On
           # compte les glyphes que la police CJK peut rendre dans

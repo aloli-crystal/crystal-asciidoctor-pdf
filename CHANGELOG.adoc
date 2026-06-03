@@ -3,6 +3,94 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.81 — 2026-06-04
+
+=== Fixed
+
+* **URGENT REVERT — `wrap_segments` repointed to
+  `compose_first_fit`, `max_extra_factor` guardrail
+  reintroduced, “avantdeploy” glued fix.** Visual regressions
+  confirmed by the user on 2026-06-04 on the beryl README PDF
+  after the J3/J4 commits:
+
+  0. **“avantdeploy” glued** in the note “beryl se place
+     `*avant*` `https://.../[deploy]`” — the asciidoctor HTML
+     parser produces `<strong>avant</strong><a>deploy</a>`
+     WITHOUT a space between tags (collapsed). My v.70 fix had
+     removed the artificial inter-segment Glue to solve the
+     codespan/punctuation bug, but that removal broke this
+     reciprocal case.
+  0. **“FreeBSD 15” line-broken**, **large justify gaps**,
+     **`bootstrapper` overflowing into margin**, **long
+     commands overflowing**: Knuth-Plass without
+     `max_extra_factor` guardrail was accepting layouts with
+     extreme stretching instead of falling back to left
+     alignment for the affected line.
+
+  **Actions**:
+
+  - `wrap_segments` (converter.cr): calls
+    `compose_first_fit(tokens, width)` (instead of
+    `compose_knuth_plass`). Knuth-Plass code is **preserved**
+    in `paragraph_composer.cr` for future clean
+    re-introduction with emergency guardrail + visual tests
+    suite.
+  - `render_segment_line`: reintroduces guardrail
+    `max_extra_factor = 2.5`. If extra-per-space exceeds 2.5×
+    a normal space width, the line falls back to left
+    alignment. Empirically calibrated in v2.3.24.68.
+  - `ParagraphComposer.tokenize`: new constant
+    `CLINGING_CHARS = ".,;:!?)]}»' " + NBSP` (characters that
+    “stick” to the preceding word). At an inter-segment
+    boundary (`idx == 0` of a new seg, last token is a Box),
+    a Glue is inserted **unless** the new seg's first char is
+    in `CLINGING_CHARS`. This handles:
+
+    [horizontal]
+    `*avant* deploy`:: → `avant deploy` (letter `d` → Glue)
+    `(ex : ` `code` `)`:: → `(ex : code)` (`)` sticky → no Glue)
+    `deploy<NBSP>: il`:: → `deploy : il` (NBSP sticky → no Glue
+                          before `:`)
+    `l'arborescence`:: → `l'arborescence` (`'` sticky)
+
+  Spec updated: `paragraph_composer_spec.cr` gets 3 new cases
+  (inter-segment Glue inserted for letter, not inserted for
+  sticky punctuation, not inserted for NBSP) replacing the old
+  “never inserted” test. 261/261 specs green.
+
+  Visual verification on beryl README:
+
+  - `avant` and `deploy` correctly separated.
+  - `FreeBSD 15 via mfsBSD-in-QEMU` on one line.
+  - No more large justify gaps (item 7 “(via QEMU) et
+    installe…”).
+  - `bootstrapper` on its own line, no margin overflow.
+  - `l'arborescence :` on line 1 (was on line 2 “qui” before).
+
+  **Acknowledged methodological mistake**: 259 green specs do
+  not replace a visual test suite on real documents. Structural
+  gap to fill in a dedicated session (gold reference PDFs +
+  bbox compare). Without this infrastructure, we can't detect
+  visual regressions introduced by algorithm changes.
+
+=== Preserved
+
+All other commits remain active:
+
+* J2 — Liang hyphenation 85 languages + `hyph` CLI
+* J4.A — Codespan BG / sticky punctuation fix (rendering)
+* J4.B — Native PDF emission `Tw`/`Tj`/`TJ`
+* Chantier 1 — CJK justification via `Tc` (single-line CJK)
+* Chantier 2 — `hyph available` + 7d cache
+* Chantier 3 — 85-language manifest (after `mn-cyrl-x-lmc`
+  + `ro` exclusion)
+* `hyph install --force` + HTTP redirect follow + GitHub mirror
+* True multi-line CJK justification (tokenize_segment_with_cjk)
+
+The composition engine reverts to greedy first-fit (pre-J3
+state), but ALL peripheral improvements (native PDF,
+hyphenation, CJK, CLI) are preserved.
+
 == v2.3.24.80 — 2026-06-03
 
 === Added

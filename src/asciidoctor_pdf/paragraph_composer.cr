@@ -31,6 +31,18 @@ module AsciidoctorPDF
     DEFAULT_STRETCH_RATIO = 0.5
     DEFAULT_SHRINK_RATIO  = 1.0 / 3.0
 
+    # Caractères qui « collent » au mot précédent et ne doivent
+    # PAS être séparés par un Glue artificiel lors d'une frontière
+    # inter-segments. Liste : ponctuation de fin (`.,;:!?)]}»`),
+    # apostrophe française (`l'arborescence`), NBSP (U+00A0,
+    # cf. typographie française `deploy<NBSP>:`). Pour TOUS les
+    # autres premiers caractères (lettres, chiffres, ouvrants
+    # `([{«`, etc.), un Glue est inséré entre 2 Box de segments
+    # contigus — cas typique : `*avant*` suivi de `<a>deploy</a>`
+    # en HTML où le parser asciidoctor ne préserve pas l'espace
+    # inter-balises (constaté 2026-06-04 sur le README beryl).
+    CLINGING_CHARS = ".,;:!?)]}»'  "
+
     # Largeur fixe non-cassable : un mot, un groupe de mots reliés
     # par NBSP, ou une image inline. `segment` est l'`InlineSegment`
     # à dessiner (les attributs de style sont préservés).
@@ -165,7 +177,25 @@ module AsciidoctorPDF
           # de `)` sans espace : on ne doit pas séparer la
           # parenthèse fermante du code (le `(ex : ` `code` `)`
           # devient `(ex : code)`, pas `(ex : code )`).
+          # Insertion de Glue :
+          # - Si `idx > 0` : on est entre 2 mots du même segment
+          #   séparés par un espace ASCII → toujours Glue (avec
+          #   dédup contre Glue déjà émise pour le cas trailing
+          #   space + leading space d'un segment suivant).
+          # - Si `idx == 0` et `word` non vide et le dernier token
+          #   est une Box (frontière inter-segments) : on insère
+          #   un Glue SAUF si le 1er caractère du mot est
+          #   « collant » au mot précédent — la liste collante
+          #   couvre la ponctuation de fin (`.,;:!?)]}»`),
+          #   l'apostrophe française (`'`, dans `l'arborescence`),
+          #   et la NBSP (U+00A0, pour `<strong>deploy</strong>` +
+          #   `<NBSP>:` qui doit rester collé conformément à la
+          #   convention typographique française). Sans NBSP dans
+          #   la liste, on aurait un double-espace
+          #   `deploy NBSP :` au lieu de `deploy<NBSP>:`.
           if idx > 0 && !tokens.last?.is_a?(Glue)
+            tokens << Glue.new(space_w, glue_stretch, glue_shrink)
+          elsif idx == 0 && !word.empty? && tokens.last?.is_a?(Box) && !CLINGING_CHARS.includes?(word[0])
             tokens << Glue.new(space_w, glue_stretch, glue_shrink)
           end
 

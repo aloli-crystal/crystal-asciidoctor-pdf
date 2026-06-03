@@ -3,6 +3,99 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.81 — 2026-06-04
+
+=== Corrigé
+
+* **REVERT URGENT — `wrap_segments` repointé sur
+  `compose_first_fit`, garde-fou `max_extra_factor` réintroduit,
+  fix « avantdeploy » collés.** Régressions visuelles confirmées
+  par l'utilisateur le 2026-06-04 sur le PDF du README beryl
+  (`/Users/philippe/prod-crystal/beryl/README.fr.adoc`) après
+  les commits J3/J4 :
++
+  0. **« avantdeploy » collés** dans la note « beryl se place
+     `*avant*` `https://.../[deploy]` » — le parser HTML
+     d'asciidoctor produit `<strong>avant</strong><a>deploy</a>`
+     SANS espace entre les balises (collapse). Mon fix v.70
+     avait retiré la Glue inter-segments artificielle pour
+     régler le bug codespan/ponctuation, mais cette
+     suppression a cassé ce cas réciproque.
+  0. **« FreeBSD 15 » cassé** entre lignes, **gros gaps de
+     justify**, **mot `bootstrapper` débordant dans la marge**,
+     **commandes longues débordant** : Knuth-Plass sans garde-fou
+     `max_extra_factor` acceptait des layouts avec étirement
+     extrême au lieu de retomber en alignement gauche pour la
+     ligne concernée.
++
+  **Actions** :
++
+  - `wrap_segments` (converter.cr) : appel
+    `compose_first_fit(tokens, width)` (au lieu de
+    `compose_knuth_plass`). Le code Knuth-Plass est **conservé**
+    dans `paragraph_composer.cr` pour ré-introduction future
+    propre avec garde-fou emergency + suite de tests visuels.
+  - `render_segment_line` : ré-introduit le garde-fou
+    `max_extra_factor = 2.5`. Si l'extra par espace dépasse
+    2,5 × la largeur d'un espace normal, on bascule en
+    alignement gauche pour cette ligne. Calibrage empirique
+    v2.3.24.68.
+  - `ParagraphComposer.tokenize` : nouvelle constante
+    `CLINGING_CHARS = ".,;:!?)]}»' " + NBSP` (caractères qui
+    « collent » au mot précédent). À une frontière
+    inter-segments (`idx == 0` d'un nouveau seg, le dernier
+    token est une Box), un Glue est inséré **sauf** si le 1er
+    caractère du seg suivant est dans `CLINGING_CHARS`. Cela
+    règle :
++
+    [horizontal]
+    `*avant* deploy`:: → `avant deploy` (lettre `d` → Glue)
+    `(ex : ` `code` `)`:: → `(ex : code)` (`)` collante → pas
+                            de Glue)
+    `deploy<NBSP>: il`:: → `deploy : il` (NBSP collante → pas
+                          de Glue avant `:`)
+    `l'arborescence`:: → `l'arborescence` (`'` collante)
++
+  Spec mise à jour : `paragraph_composer_spec.cr` a 3 nouveaux
+  cas (Glue inter-segments inséré pour lettre, non-inséré pour
+  ponctuation collante, non-inséré pour NBSP) remplaçant
+  l'ancien test « jamais d'insertion ». 261/261 specs verts.
++
+  Vérification visuelle sur README beryl :
++
+  - `avant` et `deploy` séparés correctement.
+  - `FreeBSD 15 via mfsBSD-in-QEMU` sur une ligne.
+  - Plus de gros gaps de justification (item 7 « (via QEMU) et
+    installe… »).
+  - `bootstrapper` sur sa propre ligne, pas de débordement.
+  - `l'arborescence :` ligne 1 (était sur ligne 2 « qui »
+    auparavant).
++
+  **Erreur méthodologique reconnue** : les 259 specs verts ne
+  remplacent pas une suite de tests visuels sur de vrais
+  documents. Manque structurel à combler dans une session
+  dédiée (PDFs gold de référence + bbox compare). Sans cette
+  infrastructure, on ne sait pas détecter des régressions
+  visuelles introduites par un changement d'algorithme.
+
+=== Ce qui est préservé
+
+Tous les autres commits restent actifs :
+
+* J2 — Hyphenation Liang 85 langues + CLI `hyph`
+* J4.A — Fix BG codespan / ponctuation collante (rendu)
+* J4.B — Émission PDF native `Tw`/`Tj`/`TJ`
+* Chantier 1 — Justification CJK via `Tc` (lignes mono-CJK)
+* Chantier 2 — `hyph available` + cache 7j
+* Chantier 3 — Manifest 85 langues (après exclusion `mn-cyrl-x-lmc`
+  + `ro`)
+* `hyph install --force` + suivi HTTP redirects + mirror GitHub
+* Vraie justification CJK multi-lignes (tokenize_segment_with_cjk)
+
+Le moteur de composition redevient first-fit greedy (état avant
+J3), mais TOUTES les améliorations périphériques (PDF natif,
+hyphenation, CJK, CLI) sont conservées.
+
 == v2.3.24.80 — 2026-06-03
 
 === Ajouté
