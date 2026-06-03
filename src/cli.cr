@@ -1,5 +1,14 @@
 require "./asciidoctor_pdf"
+require "./asciidoctor_pdf/hyph_cli"
 require "option_parser"
+
+# Sous-commande `hyph` : gestion des patterns de césure Liang.
+# Court-circuite le parsing OptionParser principal (lui-même
+# dédié à la génération PDF).
+if ARGV.first? == "hyph"
+  AsciidoctorPDF::HyphCli.run(ARGV.size > 1 ? ARGV[1..] : [] of String)
+  exit 0
+end
 
 input_file = ""
 output_file = ""

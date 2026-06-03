@@ -1,4 +1,5 @@
 require "./inline_renderer"
+require "./hyphenation"
 
 module AsciidoctorPDF
   # Moteur de composition de paragraphes inspiré de TeX.
@@ -94,13 +95,17 @@ module AsciidoctorPDF
     # largeur de ce texte dans la police de ce segment, en
     # points PDF.
     #
-    # Compatible bug-pour-bug avec l'ancien `wrap_segments` :
-    # entre deux segments contigus dont le dernier émis est une
-    # Box, un Glue artificiel est inséré (cas
-    # `<strong>foo</strong>bar` → `foo bar` avec espace).
+    # Le paramètre optionnel `hyphenator` active la césure
+    # Liang (J2) : chaque mot dont le cœur alphabétique fait
+    # au moins `LEFT_MIN + RIGHT_MIN` lettres est fragmenté en
+    # sous-Box reliées par `Penalty` (cost = 50, flagged = true,
+    # width = largeur du tiret). En `compose_first_fit` (J1) ces
+    # Penalty sont ignorées (rendu identique au mot monolithique) ;
+    # elles seront consommées par `compose_knuth_plass` (J3).
     def self.tokenize(
       segments : Array(InlineSegment),
       font_size : Float64,
+      hyphenator : Hyphenation::Hyphenator? = nil,
       & : InlineSegment, String -> Float64
     ) : Array(Token)
       tokens = [] of Token
@@ -117,9 +122,11 @@ module AsciidoctorPDF
           next
         end
 
-        # Mesure space_w dans la police du segment courant.
-        # On capture un seul yield pour éviter des appels répétés.
+        # Mesure space_w (et hyphen_w si césure activée) dans la
+        # police du segment courant. On capture un yield par
+        # caractère pour éviter des appels répétés.
         space_w = yield seg, " "
+        hyphen_w = hyphenator ? (yield seg, "-") : 0.0
         glue_stretch = space_w * DEFAULT_STRETCH_RATIO
         glue_shrink = space_w * DEFAULT_SHRINK_RATIO
 
@@ -150,30 +157,106 @@ module AsciidoctorPDF
           # émise ci-dessus, pas de Box à produire.
           next if word.empty?
 
-          word_w = yield seg, word
-          word_seg = InlineSegment.new(
-            text: word,
-            bold: seg.bold,
-            italic: seg.italic,
-            mono: seg.mono,
-            sup: seg.sup,
-            sub: seg.sub,
-            mark: seg.mark,
-            kbd: seg.kbd,
-            button: seg.button,
-            menu: seg.menu,
-            color: seg.color,
-            link: seg.link,
-            image_path: seg.image_path,
-            image_width: seg.image_width,
-            image_height: seg.image_height,
-            line_break: false,
-          )
-          tokens << Box.new(word_w, word_seg)
+          # Tentative de césure (J2 : structure typée seulement —
+          # les Penalty intermédiaires sont ignorées par
+          # `compose_first_fit` ; elles seront consommées par
+          # `compose_knuth_plass` à J3 pour distribuer
+          # globalement les coupures de paragraphe).
+          positions = if hyphenator
+                        try_hyphenate(word, hyphenator)
+                      else
+                        [] of Int32
+                      end
+
+          if positions.empty?
+            word_w = yield seg, word
+            tokens << Box.new(word_w, clone_segment(seg, word))
+          else
+            # Fragmenter le mot. La ponctuation de tête / queue
+            # reste collée à la 1re / dernière syllabe (calculée
+            # par `try_hyphenate` qui retourne des positions
+            # dans le mot complet, ponctuation incluse).
+            fragments = [] of String
+            prev = 0
+            positions.each do |p|
+              fragments << word[prev...p]
+              prev = p
+            end
+            fragments << word[prev..]
+
+            fragments.each_with_index do |frag, i|
+              frag_w = yield seg, frag
+              tokens << Box.new(frag_w, clone_segment(seg, frag))
+              # Penalty de césure entre deux syllabes : si la
+              # coupure est prise, on ajoute un tiret (largeur
+              # `hyphen_w`). Le coût `50` est la valeur TeX par
+              # défaut (`\hyphenpenalty`). `flagged: true` signale
+              # une césure pour les `double_hyphen_demerits` de
+              # Knuth-Plass (J3).
+              if i < fragments.size - 1
+                tokens << Penalty.new(hyphen_w, 50.0, true)
+              end
+            end
+          end
         end
       end
 
       tokens
+    end
+
+    # Détecte le cœur alphabétique du mot (en enlevant la
+    # ponctuation de tête et de queue, ex. `(typo).` → cœur
+    # `typo` aux indices 1..4), appelle l'hyphenator dessus, et
+    # remappe les positions retournées vers les indices dans le
+    # mot complet (préfixe ponctuation inclus).
+    private def self.try_hyphenate(
+      word : String,
+      hyphenator : Hyphenation::Hyphenator,
+    ) : Array(Int32)
+      chars = word.chars
+      start = 0
+      while start < chars.size && !chars[start].letter?
+        start += 1
+      end
+      finish = chars.size
+      while finish > start && !chars[finish - 1].letter?
+        finish -= 1
+      end
+      core_size = finish - start
+      return [] of Int32 if core_size < Hyphenation::LEFT_MIN + Hyphenation::RIGHT_MIN
+
+      # Le cœur doit être purement alphabétique (apostrophes,
+      # tirets internes : pas de césure pour rester simple).
+      (start...finish).each do |i|
+        return [] of Int32 unless chars[i].letter?
+      end
+
+      core = chars[start...finish].join
+      positions = hyphenator.hyphenate(core)
+      # Remap vers les indices du mot complet : préfixe `start`
+      # caractères avant le cœur.
+      positions.map { |p| p + start }
+    end
+
+    private def self.clone_segment(source : InlineSegment, text : String) : InlineSegment
+      InlineSegment.new(
+        text: text,
+        bold: source.bold,
+        italic: source.italic,
+        mono: source.mono,
+        sup: source.sup,
+        sub: source.sub,
+        mark: source.mark,
+        kbd: source.kbd,
+        button: source.button,
+        menu: source.menu,
+        color: source.color,
+        link: source.link,
+        image_path: source.image_path,
+        image_width: source.image_width,
+        image_height: source.image_height,
+        line_break: false,
+      )
     end
 
     # First-fit greedy : place chaque Box dans la ligne courante

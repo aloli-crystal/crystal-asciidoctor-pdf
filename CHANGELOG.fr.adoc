@@ -3,6 +3,99 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.71 — 2026-06-03
+
+=== Ajouté
+
+* **J2 : module `Hyphenation` (algorithme Liang).** Nouvelle
+  implémentation de l'algorithme de césure par patterns Liang
+  (Franklin Mark Liang, *Word Hy-phen-a-tion by Com-pu-ter*,
+  thèse Stanford, 1983) — l'algorithme historique de TeX.
++
+  Trois sous-modules :
++
+  0. **`Hyphenation::Trie`** : structure de patterns Liang.
+     `insert(pattern)` accepte les chiffres-valeurs entre les
+     lettres (`1ba`, `ab3a`, `.ad4d`), `scores_for(word)`
+     calcule les scores Liang à chaque position du mot encadré
+     de `.`.
+  0. **`Hyphenation::Hyphenator`** : algorithme principal.
+     `hyphenate(word)` retourne les positions de césure légales
+     en respectant `LEFT_MIN = 2` et `RIGHT_MIN = 3` (valeurs
+     TeX par défaut), avec support des exceptions
+     (`\hyphenation{syl-la-bus}`).
+  0. **`Hyphenation::Loader`** : cascade de résolution
+     projet `./hyphenation/hyph-<lang>.tex` →
+     XDG `${XDG_CONFIG_HOME:-~/.config}/asciidoctor-pdf/hyphenation/`
+     → embarqué au build (7 langues incluses). Cache
+     class-level, alias `en` → `en-us`, `de` → `de-1996`.
+
+* **7 patterns Liang embarqués au build via `read_file`** :
+  FR (~ 30 ko), EN-US (~ 33 ko), DE-1996 (~ 268 ko), ES (~ 42 ko),
+  IT (~ 5 ko), PT (~ 5 ko), NL (~ 86 ko). Total : ~ 470 ko
+  embarqués au binaire. Sources : CTAN (paquet hyph-utf8),
+  licences MIT / LPPL-1.3 / Knuth-permissive / BSD-3-Clause selon
+  la langue (cf. `src/asciidoctor_pdf/hyphenation/manifest.cr`
+  pour le détail).
+
+* **Manifest des langues CTAN connues**
+  (`src/asciidoctor_pdf/hyphenation/manifest.cr`) : pour chaque
+  pattern, URL canonique CTAN, SHA-256 attendu, taille, licence,
+  flag `embedded`. 7 entrées pour l'instant (les 7 langues
+  embarquées) ; à étendre vers les ~ 80 langues hyph-utf8 dans
+  une itération ultérieure.
+
+* **Intégration dans `ParagraphComposer.tokenize`** : le
+  composer accepte un paramètre `hyphenator` optionnel. Chaque
+  mot dont le cœur alphabétique fait au moins
+  `LEFT_MIN + RIGHT_MIN` lettres est fragmenté en sous-Box
+  reliées par `Penalty(cost = 50, flagged = true,
+  width = hyphen_w)`. La ponctuation de tête / queue reste
+  collée à la première / dernière syllabe. En
+  `compose_first_fit` (J1), les Penalty sont ignorées (rendu
+  identique au mot monolithique) — la valeur viendra à J3 avec
+  Knuth-Plass.
+
+* **Détection de la langue du document** dans `Converter` :
+  attribut AsciiDoc `:lang:`. Stocké dans `@document_lang`,
+  utilisé par `wrap_segments` pour résoudre l'hyphenator via
+  `Hyphenation::Loader.for(@document_lang)`. Pas de défaut
+  implicite : si `:lang:` n'est pas posé, pas de césure
+  (composition gracieuse).
+
+* **Sous-commande CLI `hyph`**
+  (`bin/crystal-asciidoctor-pdf hyph <sub>`). 7 sous-commandes
+  conformes à `doc/CLI_HYPH_SPEC.adoc` et aux conventions ALOLI
+  (`help [<sub>]` obligatoire, flags long + court, refus
+  explicite des sous-commandes inconnues, XDG strict) :
++
+  0. **`list [-j|--json]`** : liste les patterns disponibles
+     (embarqués + installés via XDG).
+  0. **`available`** : liste les patterns du manifest local.
+  0. **`install <lang> [-s|--sha256] [-u|--from] [-f|--force]`** :
+     télécharge depuis CTAN, vérifie SHA-256 contre le manifest
+     embarqué (refus si mismatch), valide le contenu
+     (`\patterns{` ou `\hyphenation{` présent), refuse les
+     fichiers > 1 Mo, écrit dans XDG.
+  0. **`remove <lang>`** : supprime un pattern installé. Refuse
+     de toucher les patterns embarqués au build.
+  0. **`update [<lang>]`** : re-télécharge un ou tous les
+     patterns installés.
+  0. **`show <lang>`** : affiche les métadonnées (URL, SHA-256,
+     licence, taille, statut).
+  0. **`help [<sub>]`** : aide générale ou ciblée.
++
+  Codes de sortie numérotés (0 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10)
+  pour scripting. Inspiration `tlmgr` (TeX Live Manager) : pas
+  de téléchargement automatique au runtime, action toujours
+  explicite, vérification SHA-256 obligatoire.
+
+=== Tests
+
+* 17 nouveaux specs : 7 sur `Hyphenation::Trie/Hyphenator/Loader`,
+  5 sur l'intégration `ParagraphComposer.tokenize` avec
+  hyphenator. Total : 237 / 237 verts.
+
 == v2.3.24.70 — 2026-06-03
 
 === Corrigé

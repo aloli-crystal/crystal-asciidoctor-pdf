@@ -3,6 +3,63 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.71 — 2026-06-03
+
+=== Added
+
+* **J2: `Hyphenation` module (Liang algorithm).** New
+  implementation of Liang's pattern-based hyphenation
+  (Franklin Mark Liang, *Word Hy-phen-a-tion by Com-pu-ter*,
+  Stanford thesis, 1983) — the historical TeX algorithm.
+  Three sub-modules: `Trie` (Liang pattern storage),
+  `Hyphenator` (main algorithm with `LEFT_MIN = 2`,
+  `RIGHT_MIN = 3` defaults, exceptions support), `Loader`
+  (cascade project / XDG / embedded, class-level cache,
+  `en` → `en-us` and `de` → `de-1996` aliases).
+
+* **7 Liang patterns embedded at build via `read_file`**:
+  FR (~ 30 KB), EN-US (~ 33 KB), DE-1996 (~ 268 KB),
+  ES (~ 42 KB), IT (~ 5 KB), PT (~ 5 KB), NL (~ 86 KB).
+  Total: ~ 470 KB embedded in the binary. Sources: CTAN
+  (hyph-utf8 package). Licenses vary per file (MIT /
+  LPPL-1.3 / Knuth-permissive / BSD-3-Clause) — see
+  `src/asciidoctor_pdf/hyphenation/manifest.cr`.
+
+* **Manifest of known CTAN languages**: URL, expected SHA-256,
+  size, license, `embedded` flag per language. 7 entries
+  initially (the embedded ones); to be extended toward the
+  ~80 hyph-utf8 languages in a later iteration.
+
+* **Integration in `ParagraphComposer.tokenize`**: composer
+  takes an optional `hyphenator` parameter. Each word whose
+  alphabetic core is at least `LEFT_MIN + RIGHT_MIN` letters
+  long is fragmented into sub-Boxes connected by `Penalty`
+  (cost 50, flagged, hyphen width). Head/tail punctuation
+  stays glued to first/last syllable. In `compose_first_fit`
+  (J1) Penalties are ignored (rendering identical to
+  monolithic word) — value comes at J3 with Knuth-Plass.
+
+* **Document language detection** in `Converter`: AsciiDoc
+  `:lang:` attribute. Stored in `@document_lang`, used by
+  `wrap_segments` to resolve the hyphenator via
+  `Hyphenation::Loader.for(@document_lang)`. No implicit
+  default: if `:lang:` is not set, no hyphenation (graceful
+  composition).
+
+* **CLI `hyph` sub-command**
+  (`bin/crystal-asciidoctor-pdf hyph <sub>`). 7 sub-commands
+  matching `doc/CLI_HYPH_SPEC.adoc` and ALOLI conventions:
+  `list`, `available`, `install`, `remove`, `update`, `show`,
+  `help`. Numbered exit codes (0 / 2 / 3-10) for scripting.
+  `tlmgr` inspiration: no automatic runtime download, always
+  explicit action, mandatory SHA-256 verification.
+
+=== Tests
+
+* 17 new specs: 7 on `Hyphenation::Trie/Hyphenator/Loader`,
+  5 on `ParagraphComposer.tokenize` × hyphenator integration.
+  Total: 237 / 237 green.
+
 == v2.3.24.70 — 2026-06-03
 
 === Fixed

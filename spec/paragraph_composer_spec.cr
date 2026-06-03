@@ -169,6 +169,96 @@ describe AsciidoctorPDF::ParagraphComposer do
     end
   end
 
+  describe ".tokenize avec hyphenator" do
+    it "fragmente un mot et insère des Penalty de césure" do
+      trie = Hyphenation::Trie.new
+      # Pattern de test : score 3 entre 'ab' et 'cd' du mot "abcdef"
+      trie.insert("ab3cd")
+      hyph = Hyphenation::Hyphenator.new(trie, {} of String => Array(Int32))
+      # Vérifie d'abord que le hyphenator donne bien la position [2]
+      hyph.hyphenate("abcdef").should eq [2]
+
+      tokens = ParagraphComposer.tokenize(
+        [seg("abcdef")], 10.0, hyph,
+      ) { |_, t| t.size.to_f }
+
+      # Attendu : Box("ab"), Penalty, Box("cdef")
+      tokens.size.should eq 3
+      tokens[0].should be_a ParagraphComposer::Box
+      tokens[1].should be_a ParagraphComposer::Penalty
+      tokens[2].should be_a ParagraphComposer::Box
+      tokens[0].as(ParagraphComposer::Box).segment.text.should eq "ab"
+      tokens[2].as(ParagraphComposer::Box).segment.text.should eq "cdef"
+      pen = tokens[1].as(ParagraphComposer::Penalty)
+      pen.cost.should eq 50.0
+      pen.flagged.should be_true
+      pen.width.should eq 1.0 # largeur du tiret (= "-".size avec WIDTH_OF_CHAR)
+    end
+
+    it "préserve la ponctuation collée aux extrémités du mot" do
+      trie = Hyphenation::Trie.new
+      trie.insert("ab3cd") # même pattern : position 2 dans le cœur
+      hyph = Hyphenation::Hyphenator.new(trie, {} of String => Array(Int32))
+
+      # « (abcdef). » : ponctuation `(` en tête et `).` en queue.
+      # Le cœur est `abcdef` à l'indice 1..6 dans le mot complet.
+      # Position de césure dans le cœur : 2 → dans le mot complet : 3.
+      tokens = ParagraphComposer.tokenize(
+        [seg("(abcdef).")], 10.0, hyph,
+      ) { |_, t| t.size.to_f }
+
+      # Attendu : Box("(ab"), Penalty, Box("cdef).")
+      tokens.size.should eq 3
+      tokens[0].as(ParagraphComposer::Box).segment.text.should eq "(ab"
+      tokens[2].as(ParagraphComposer::Box).segment.text.should eq "cdef)."
+    end
+
+    it "n'essaye PAS de césurer un mot trop court (< LEFT_MIN + RIGHT_MIN)" do
+      trie = Hyphenation::Trie.new
+      trie.insert("ab3cd")
+      hyph = Hyphenation::Hyphenator.new(trie, {} of String => Array(Int32))
+
+      # "abc" (3 chars) < 2 + 3 = 5 → pas de césure
+      tokens = ParagraphComposer.tokenize(
+        [seg("abc")], 10.0, hyph,
+      ) { |_, t| t.size.to_f }
+      tokens.size.should eq 1
+      tokens[0].should be_a ParagraphComposer::Box
+    end
+
+    it "produit la même sortie qu'un Box monolithique si aucune position de césure" do
+      trie = Hyphenation::Trie.new # trie vide
+      hyph = Hyphenation::Hyphenator.new(trie, {} of String => Array(Int32))
+
+      tokens = ParagraphComposer.tokenize(
+        [seg("hello")], 10.0, hyph,
+      ) { |_, t| t.size.to_f }
+      tokens.size.should eq 1
+      tokens[0].should be_a ParagraphComposer::Box
+      tokens[0].as(ParagraphComposer::Box).segment.text.should eq "hello"
+    end
+
+    it "n'affecte pas le rendu first-fit (Penalty intermédiaires ignorées)" do
+      trie = Hyphenation::Trie.new
+      trie.insert("ab3cd")
+      hyph = Hyphenation::Hyphenator.new(trie, {} of String => Array(Int32))
+
+      tokens = ParagraphComposer.tokenize(
+        [seg("abcdef foo")], 10.0, hyph,
+      ) { |_, t| t.size.to_f }
+      lines = ParagraphComposer.compose_first_fit(tokens, 100.0)
+      lines.size.should eq 1
+      # Le mot fragmenté est reconstitué sans tiret (la Penalty
+      # n'est pas prise par first-fit) : "abcdef" + " foo".
+      # Les segments rendus sont 3 : "ab", "cdef" (deux fragments),
+      # puis " foo" (avec préfixe espace).
+      lines[0].segments.size.should eq 3
+      lines[0].segments[0].text.should eq "ab"
+      lines[0].segments[1].text.should eq "cdef"
+      lines[0].segments[2].text.should eq " foo"
+    end
+  end
+
   describe ".compose_first_fit" do
     it "place tous les tokens sur une seule ligne s'ils tiennent" do
       tokens = ParagraphComposer.tokenize([seg("foo bar")], 10.0, &WIDTH_OF_CHAR)

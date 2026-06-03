@@ -86,6 +86,11 @@ module AsciidoctorPDF
     @page_metas : Array(PageMeta) = [] of PageMeta
     @current_section_title : String = ""
     @document_title : String = ""
+    # Langue du document AsciiDoc (`:lang:` ou défaut `en`).
+    # Utilisée pour résoudre les patterns de césure Liang via
+    # `Hyphenation::Loader.for(@document_lang)`. `nil` = pas de
+    # césure (le composer émet des Box monolithiques).
+    @document_lang : String? = nil
     @index_entries : Array(IndexEntry) = [] of IndexEntry
     # Entrées de la table des matières.
     # Chaque entrée capture {titre, niveau, page (1-based), nom de destination
@@ -241,6 +246,14 @@ module AsciidoctorPDF
       # ASCII spaces only just before each `page.text` call.
       @document_title = decode_html_entities(node.doctitle || "")
       @output_path = determine_output_path(node)
+
+      # Détection de la langue : attribut `:lang:` du document
+      # AsciiDoc. Détermine quel pattern Liang sera utilisé pour
+      # la césure. Pas de valeur par défaut implicite — si
+      # l'auteur n'a pas spécifié, on n'active pas la césure
+      # (composition sans césure, comportement gracieux).
+      lang_attr = node.attr?("lang") ? node.attr("lang").to_s.strip : ""
+      @document_lang = lang_attr.empty? ? nil : lang_attr
 
       # Résolution per-document du thème : si l'utilisateur n'a pas
       # passé de thème explicite au constructeur, on lit l'attribut
@@ -3610,7 +3623,13 @@ module AsciidoctorPDF
       width : Float64,
       font_size : Float64,
     ) : Array(Array(InlineSegment))
-      tokens = ParagraphComposer.tokenize(segments, font_size) do |seg, text|
+      # Résout l'hyphenator pour la langue du document.
+      # Renvoie `nil` si la langue est inconnue / absente : le
+      # composer fonctionne alors sans césure (comportement
+      # gracieux, pas d'erreur).
+      hyphenator = @document_lang.try { |l| Hyphenation::Loader.for(l) }
+
+      tokens = ParagraphComposer.tokenize(segments, font_size, hyphenator) do |seg, text|
         # Mesure de largeur dans la police résolue du segment, à
         # `font_size` brut (sans ajustement sup/sub/kbd) — conforme
         # au comportement historique de `wrap_segments`.
