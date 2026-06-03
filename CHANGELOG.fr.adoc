@@ -3,6 +3,63 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.25.0 — 2026-06-03
+
+=== Changé
+
+* **J3 : Knuth-Plass devient le moteur de composition par
+  défaut.** Le bump du 3ᵉ chiffre (`24.71` → `25.0`) signale
+  cette bascule structurelle, conformément à la convention
+  ALOLI de versioning des portages (3 chiffres calés sur la gem
+  Ruby + 4ᵉ propre au portage).
++
+  `ParagraphComposer.compose_knuth_plass` implémente
+  l'algorithme de Knuth & Plass (*Breaking Paragraphs into
+  Lines*, Software Practice & Experience vol. 11, p. 1119-1184,
+  1981), l'algorithme historique de TeX. Principe :
++
+  0. Identification des breakpoints légaux (chaque `Glue` qui
+     suit une `Box`, chaque `Penalty` non infinie, fin du
+     paragraphe).
+  0. Pour chaque breakpoint candidat B, programmation dynamique
+     sur tous les breakpoints A précédant B : calcul de la
+     `badness` de la ligne A→B (`100 · |adjustment_ratio|³`,
+     formule TeX), des `demerits` (`(1 + badness)² +
+     penalty² + double_hyphen_demerits`), mémorisation du
+     chemin optimal.
+  0. Backtrace pour reconstruire la séquence optimale.
+  0. Fallback gracieux sur first-fit si aucun chemin admissible
+     (paragraphe pathologique : mot trop long, target_w trop
+     petit).
++
+  Bénéfices visibles :
++
+  0. **Lignes équilibrées** dans un paragraphe (les
+     `adjustment_ratio` sont proches d'une ligne à l'autre)
+     contre first-fit qui produit des « tasse-puis-vide ».
+  0. **Exploitation des Penalty de césure J2** : quand un mot
+     long ferait un étirement extrême, K-P préfère couper le
+     mot (Penalty flagged, tiret ajouté) plutôt qu'écarteler
+     tous les espaces de la ligne.
+  0. **Moins de rivers** (alignements verticaux d'espaces
+     gênants) grâce à l'harmonisation.
+  0. **Pénalité de double césure** (`10000` demerits) pour
+     éviter deux lignes consécutives terminées par un tiret.
+
+* **Suppression du garde-fou `max_extra_factor = 2.5`** dans
+  `render_segment_line`. Cette heuristique faisait basculer
+  silencieusement en alignement gauche quand l'`extra_per_space`
+  first-fit dépassait 2,5× la largeur d'un espace normal —
+  pansement sur le mauvais comportement de first-fit qui
+  remplissait chaque ligne au maximum sans regarder la suite.
+  Avec Knuth-Plass, l'étirement reste raisonnable par
+  construction (K-P minimise la badness² globalement), et
+  l'utilisateur retrouve toujours la justification demandée
+  par son thème. Les rares paragraphes pathologiques (mot
+  unique trop long sur une page très large) produisent
+  désormais un étirement visible mais correct, plutôt qu'un
+  silent fallback en `left` qui rompait l'apparence du document.
+
 == v2.3.24.71 — 2026-06-03
 
 === Ajouté

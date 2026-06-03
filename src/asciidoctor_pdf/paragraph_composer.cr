@@ -312,6 +312,261 @@ module AsciidoctorPDF
       lines
     end
 
+    # Algorithme **Knuth-Plass** de composition de paragraphe.
+    #
+    # Référence : Donald E. Knuth et Michael F. Plass,
+    # *Breaking Paragraphs into Lines*, Software Practice &
+    # Experience, vol. 11, p. 1119-1184, 1981. (Reproduit en
+    # annexe du TeXbook, chapitre 14.)
+    #
+    # Principe : modélise le paragraphe comme un graphe orienté
+    # où les nœuds sont les breakpoints légaux (Glue après Box,
+    # Penalty non-infinie, fin du paragraphe) et les arcs sont
+    # les lignes possibles. Le coût d'un arc (= « demerits »)
+    # est une fonction quadratique de la « badness » (étirement
+    # ou compression nécessaire pour atteindre `target_w`) plus
+    # les pénalités locales (césure, double césure consécutive).
+    # Programmation dynamique : pour chaque breakpoint B, on
+    # mémorise le `total_demerits` minimal accumulé depuis le
+    # début, et le breakpoint A qui mène à ce minimum.
+    # Backtrace final pour reconstruire la séquence optimale.
+    #
+    # Avantages par rapport à `compose_first_fit` :
+    #
+    # - Distribution **globale** des étirements (les lignes ont
+    #   des `adjustment_ratio` similaires, plus de paragraphes
+    #   « tasse-puis-vide »).
+    # - Exploite les `Penalty` de césure quand elles évitent un
+    #   étirement extrême (un mot long césure plutôt qu'étirer
+    #   tous les espaces).
+    # - Évite les *rivers* (alignements verticaux d'espaces
+    #   gênants) grâce à l'harmonisation des lignes.
+    #
+    # Fallback : si aucun chemin admissible n'est trouvé (ex.
+    # paragraphe pathologique sans aucun breakpoint), retombe
+    # sur `compose_first_fit`.
+    def self.compose_knuth_plass(
+      tokens : Array(Token),
+      target_w : Float64,
+    ) : Array(Line)
+      return [] of Line if tokens.empty?
+
+      n = tokens.size
+
+      # Précalcul des largeurs / stretch / shrink cumulés pour
+      # interroger en O(1) la largeur d'une sous-séquence
+      # `tokens[a...b]` : `widths[b] - widths[a]`.
+      widths = Array.new(n + 1, 0.0)
+      stretches = Array.new(n + 1, 0.0)
+      shrinks = Array.new(n + 1, 0.0)
+      tokens.each_with_index do |t, i|
+        widths[i + 1] = widths[i]
+        stretches[i + 1] = stretches[i]
+        shrinks[i + 1] = shrinks[i]
+        case t
+        when Box
+          widths[i + 1] += t.width
+        when Glue
+          widths[i + 1] += t.width
+          stretches[i + 1] += t.stretch
+          shrinks[i + 1] += t.shrink
+        when Penalty
+          # Pas de contribution naturelle — `width` n'est ajouté
+          # qu'aux lignes qui se TERMINENT sur cette Penalty
+          # (« si la coupure est prise »).
+        end
+      end
+
+      # Liste ordonnée des breakpoints candidats :
+      #   - `-1` : start virtuel (avant tout token)
+      #   - chaque `Glue` qui suit une `Box` (break naturel
+      #     entre deux mots)
+      #   - chaque `Penalty` avec `cost < INFINITY` (forced si
+      #     `cost <= NEG_INFINITY` ; conditionnel sinon)
+      #   - `n` : fin virtuelle (forced)
+      candidates = [-1]
+      tokens.each_with_index do |t, i|
+        case t
+        when Glue
+          candidates << i if i > 0 && tokens[i - 1].is_a?(Box)
+        when Penalty
+          candidates << i if t.cost < INFINITY
+        end
+      end
+      candidates << n
+
+      # `records[b]` mémorise la meilleure façon d'atteindre le
+      # breakpoint `b` : total des demerits accumulés, indice
+      # du breakpoint précédent, ratio d'ajustement de la ligne
+      # entrante, et flag « cette ligne se termine sur une
+      # césure » (pour la pénalité de double césure).
+      records = {} of Int32 => NamedTuple(demerits: Float64, prev: Int32, ratio: Float64, flagged: Bool)
+      records[-1] = {demerits: 0.0, prev: -2, ratio: 0.0, flagged: false}
+
+      candidates[1..].each do |b|
+        best_demerits = Float64::INFINITY
+        best_prev = -1
+        best_ratio = 0.0
+        best_flagged = false
+
+        candidates.each do |a|
+          break if a >= b
+          next unless (prev_rec = records[a]?)
+
+          # La ligne va de `a + 1` à `b`. On consomme la Glue
+          # ou Penalty en position `a` (point de coupure) ;
+          # on saute aussi les Glues de tête (lstrip TeX).
+          start_idx = a + 1
+          while start_idx < b && tokens[start_idx].is_a?(Glue)
+            start_idx += 1
+          end
+          next if start_idx >= b
+
+          line_w = widths[b] - widths[start_idx]
+          line_stretch = stretches[b] - stretches[start_idx]
+          line_shrink = shrinks[b] - shrinks[start_idx]
+
+          # Si on coupe sur une Penalty à `b`, sa `width` (le
+          # tiret de césure si flagged) s'ajoute à la ligne.
+          penalty_at_b = b < n && tokens[b].is_a?(Penalty) ? tokens[b].as(Penalty) : nil
+          if penalty_at_b
+            line_w += penalty_at_b.width
+          end
+
+          # Adjustment ratio : positif = étirement, négatif =
+          # compression. `Float64::INFINITY` = ligne impossible
+          # à étirer suffisamment, on n'avance pas.
+          delta = target_w - line_w
+          ratio = if delta > 0
+                    line_stretch > 0 ? delta / line_stretch : Float64::INFINITY
+                  elsif delta < 0
+                    line_shrink > 0 ? delta / line_shrink : -Float64::INFINITY
+                  else
+                    0.0
+                  end
+
+          # Seuils TeX par défaut : tolerance = 10 en stretch,
+          # -1 en shrink (au-delà = ligne pathologique, on
+          # passe au breakpoint suivant).
+          next if ratio > 10.0 || ratio < -1.0
+
+          # Badness = 100 · |ratio|³ (formule TeX, TeXbook ch. 12).
+          badness = 100.0 * (ratio.abs ** 3)
+
+          # Demerits = (1 + badness)² + pénalité², plus
+          # `double_hyphen_demerits = 10000` si césure
+          # consécutive (TeX `\doublehyphendemerits`).
+          base = 1.0 + badness
+          demerits = base * base
+          penalty_cost = penalty_at_b ? penalty_at_b.cost : 0.0
+          if penalty_cost > 0
+            demerits += penalty_cost * penalty_cost
+          end
+          flagged_b = penalty_at_b ? penalty_at_b.flagged : false
+          if flagged_b && prev_rec[:flagged]
+            demerits += 10_000.0
+          end
+
+          total = prev_rec[:demerits] + demerits
+          if total < best_demerits
+            best_demerits = total
+            best_prev = a
+            best_ratio = ratio
+            best_flagged = flagged_b
+          end
+        end
+
+        if best_demerits < Float64::INFINITY
+          records[b] = {demerits: best_demerits, prev: best_prev, ratio: best_ratio, flagged: best_flagged}
+        end
+      end
+
+      # Fallback gracieux si Knuth-Plass n'a pas trouvé de
+      # chemin admissible (paragraphe pathologique, mot trop
+      # long, target_w trop petit) : retombe sur first-fit qui
+      # accepte tout.
+      return compose_first_fit(tokens, target_w) unless records.has_key?(n)
+
+      # Backtrace pour reconstruire la séquence de breakpoints.
+      path = [] of Int32
+      curr = n
+      while curr != -1
+        path.unshift(curr)
+        curr = records[curr][:prev]
+      end
+
+      # Construction des Line à partir de la séquence.
+      lines = [] of Line
+      prev_bp = -1
+      path.each do |bp|
+        start_idx = prev_bp + 1
+        end_idx = bp
+        while start_idx < end_idx && tokens[start_idx].is_a?(Glue)
+          start_idx += 1
+        end
+
+        next if start_idx >= end_idx
+
+        line_tokens = tokens[start_idx...end_idx]
+        rec = records[bp]
+        ends_on_hyphen = bp < n && rec[:flagged]
+        hyphen_w = ends_on_hyphen ? tokens[bp].as(Penalty).width : 0.0
+
+        lines << finalize_kp_line(line_tokens, rec[:ratio], hyphen_w, ends_on_hyphen)
+
+        prev_bp = bp
+      end
+
+      lines
+    end
+
+    # Construit une `Line` Knuth-Plass : comme `finalize_line`
+    # (first-fit), plus l'injection du tiret de césure `-` à la
+    # fin du dernier segment si la ligne se termine sur une
+    # Penalty flagged.
+    private def self.finalize_kp_line(
+      tokens : Array(Token),
+      ratio : Float64,
+      hyphen_w : Float64,
+      ends_on_hyphen : Bool,
+    ) : Line
+      segments = [] of InlineSegment
+      natural_width = 0.0
+      n_spaces = 0
+      preceded_by_glue = false
+
+      tokens.each do |tok|
+        case tok
+        when Glue
+          natural_width += tok.width
+          n_spaces += 1
+          preceded_by_glue = true
+        when Box
+          orig = tok.segment
+          text = preceded_by_glue ? " " + orig.text : orig.text
+          segments << clone_segment(orig, text)
+          natural_width += tok.width
+          preceded_by_glue = false
+        when Penalty
+          # Penalties intermédiaires : skip (la ligne ne s'y
+          # termine pas, sinon ce serait géré via `ends_on_hyphen`).
+        end
+      end
+
+      if ends_on_hyphen && !segments.empty?
+        last = segments.last
+        segments[segments.size - 1] = clone_segment(last, last.text + "-")
+        natural_width += hyphen_w
+      end
+
+      Line.new(
+        segments: segments,
+        natural_width: natural_width,
+        adjustment_ratio: ratio,
+        n_spaces: n_spaces,
+      )
+    end
+
     private def self.finalize_line(tokens : Array(Token), target_w : Float64) : Line
       segments = [] of InlineSegment
       natural_width = 0.0

@@ -3,6 +3,50 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.25.0 — 2026-06-03
+
+=== Changed
+
+* **J3: Knuth-Plass becomes the default composition engine.**
+  Bumping the 3rd digit (`24.71` → `25.0`) signals this
+  structural shift per the ALOLI versioning convention for
+  port versions (3 digits aligned with the Ruby gem + 4th
+  port-specific).
+
+  `ParagraphComposer.compose_knuth_plass` implements the
+  Knuth & Plass algorithm (*Breaking Paragraphs into Lines*,
+  Software Practice & Experience vol. 11, p. 1119-1184, 1981),
+  the historical TeX algorithm:
+
+  0. Identify legal breakpoints (each `Glue` after a `Box`,
+     each non-infinite `Penalty`, end of paragraph).
+  0. For each candidate breakpoint B, dynamic programming over
+     all preceding breakpoints A: compute the `badness` of the
+     A→B line (`100 · |adjustment_ratio|³`, TeX formula), the
+     `demerits` (`(1 + badness)² + penalty² +
+     double_hyphen_demerits`), memoize the optimal path.
+  0. Backtrace to reconstruct the optimal sequence.
+  0. Graceful fallback on first-fit if no admissible path
+     (pathological paragraph: word too long, target_w too small).
+
+  Visible benefits: balanced lines (similar `adjustment_ratio`
+  across the paragraph), exploitation of J2 hyphenation
+  Penalties (K-P prefers hyphenation over extreme stretching),
+  fewer rivers, double-hyphen penalty (10000 demerits) to
+  avoid two consecutive hyphen-ended lines.
+
+* **Removed the `max_extra_factor = 2.5` guard** in
+  `render_segment_line`. This heuristic silently fell back to
+  `left` alignment when first-fit's `extra_per_space` exceeded
+  2.5× a normal space's width — a band-aid on first-fit's bad
+  behavior of maxing out each line without looking ahead.
+  With Knuth-Plass, stretching stays reasonable by construction
+  (K-P minimizes badness² globally), and the user always gets
+  the justification their theme requests. Rare pathological
+  paragraphs (single overlong word on a wide page) now produce
+  visible-but-correct stretching rather than a silent
+  fallback to `left` that broke document appearance.
+
 == v2.3.24.71 — 2026-06-03
 
 === Added

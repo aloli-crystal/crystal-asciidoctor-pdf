@@ -3636,7 +3636,12 @@ module AsciidoctorPDF
         font = get_font(resolve_inline_font(seg))
         font.string_width(text, font_size)
       end
-      lines = ParagraphComposer.compose_first_fit(tokens, width)
+      # Knuth-Plass par défaut (J3) : choix global optimal des
+      # breakpoints qui minimise la somme des badness² + pénalités
+      # de césure + double-hyphen demerits. Fallback automatique
+      # sur first-fit en cas de paragraphe pathologique (mot trop
+      # long, target_w trop petit, etc.).
+      lines = ParagraphComposer.compose_knuth_plass(tokens, width)
       lines.map(&.segments)
     end
 
@@ -3654,24 +3659,21 @@ module AsciidoctorPDF
       align : String = "left",
     ) : Nil
       # Justify : calcule l'espace inutilisé sur la ligne et le
-      # distribue entre les espaces inter-mots. On dessine chaque
-      # mot individuellement en élargissant les espaces ASCII. Les
-      # espaces insécables (U+00A0 — typographie française) ne sont
-      # PAS comptés (split sur ' ' seulement), donc le NBSP reste
-      # de largeur normale.
+      # distribue entre les espaces inter-mots. Les espaces
+      # insécables (U+00A0 — typographie française) ne sont PAS
+      # comptés (split sur ' ' seulement), donc le NBSP reste de
+      # largeur normale.
       #
-      # Garde-fou : si l'extra par espace dépasse `max_extra_factor`
-      # fois la largeur d'un espace normal (= ligne « trop étalée »
-      # qui blesserait visuellement), on abandonne le justify et on
-      # aligne à gauche. Typique : ligne courte (« Version : 1.0.0 »)
-      # qui se retrouve seule sur une largeur de page entière.
-      # Garde-fou justify : on bail out (= rend en left) si l'extra
-      # par espace dépasse N fois la largeur d'un espace normal,
-      # pour éviter les lignes « trop étalées » sur des paragraphes
-      # courts. 2.5x est un bon compromis : ça laisse passer les
-      # paragraphes typiques (jusqu'à ~80 % de remplissage) tout en
-      # bloquant les vraies pathologies (lignes très courtes seules).
-      max_extra_factor = 2.5
+      # Depuis J3 (v2.3.25.0), le `ParagraphComposer` utilise
+      # Knuth-Plass qui CHOISIT les sauts de ligne pour minimiser
+      # la badness² globale. Conséquence : chaque ligne reçue ici
+      # a déjà un `adjustment_ratio` raisonnable (rarement >> 1) ;
+      # l'ancien garde-fou `max_extra_factor = 2.5` qui basculait
+      # silencieusement en `left` au cas où le first-fit produisait
+      # une ligne aberrante n'a plus de raison d'être et a été
+      # supprimé. Le rare paragraphe pathologique (mot trop long
+      # qui force une ligne courte seule sur une page large)
+      # produit naturellement un étirement visible mais correct.
       extra_per_space = 0.0
       if align == "justify" && (tw = target_w)
         natural_w = 0.0
@@ -3688,14 +3690,7 @@ module AsciidoctorPDF
           end
         end
         if n_spaces > 0 && tw > natural_w
-          candidate = (tw - natural_w) / n_spaces
-          # Mesure la largeur d'un espace ordinaire dans la police
-          # de base pour calibrer le seuil.
-          normal_space_w = get_font(@fn_body).string_width(" ", font_size)
-          if candidate <= normal_space_w * max_extra_factor
-            extra_per_space = candidate
-          end
-          # else : la ligne serait trop étirée — on tombe sur left.
+          extra_per_space = (tw - natural_w) / n_spaces
         end
       end
 
