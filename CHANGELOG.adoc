@@ -3,6 +3,60 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.77 — 2026-06-03
+
+=== Added
+
+* **Hyphenation manifest extended to 87 languages.** The
+  manifest `src/asciidoctor_pdf/hyphenation/manifest.cr` now
+  lists 87 languages (7 embedded + 80 listable for
+  `asciidoctor-pdf hyph install <lang>`) — virtually the full
+  upstream hyph-utf8 set (88 files; 1 excluded:
+  `grc-x-ibycus`, legacy Ibycus 8-bit encoding redirecting to
+  `ibyhyph.tex`, no direct `\patterns{}`).
+
+  Reference source: shallow clone of
+  `https://github.com/hyphenation/tex-hyphen.git` (the GitHub
+  API was bypassed for stability against the anonymous
+  rate-limit). For each language, the manifest records the
+  canonical CTAN URL, byte size, SHA-256 (mandatory check on
+  install), and the license parsed from the `% licence:` YAML
+  block at the source file's head.
+
+  **Added language codes** (80, alphabetical):
+  `af`, `ar`, `as`, `be`, `bg`, `bn`, `ca`, `cop`, `cs`, `cu`,
+  `cy`, `da`, `de-1901`, `de-ch-1901`, `el-monoton`,
+  `el-polyton`, `en-gb`, `eo`, `et`, `eu`, `fa`, `fi`,
+  `fi-x-school`, `fur`, `ga`, `gl`, `grc`, `gu`, `he`, `hi`,
+  `hr`, `hsb`, `hu`, `hy`, `ia`, `id`, `is`, `ka`, `kk`,
+  `kmr`, `kn`, `la`, `la-x-classic`, `la-x-liturgic`, `lt`,
+  `lv`, `mk`, `ml`, `mn-cyrl`, `mn-cyrl-x-lmc`, `mr`,
+  `mul-ethi`, `nb`, `nn`, `no`, `oc`, `or`, `pa`, `pi`, `pl`,
+  `pms`, `rm`, `ro`, `ru`, `sa`, `sh-cyrl`, `sh-latn`, `sk`,
+  `sl`, `sq`, `sr-cyrl`, `sv`, `ta`, `te`, `th`, `tk`, `tr`,
+  `uk`, `vi`, `zh-latn-pinyin`.
+
+  **Sizes**: min 595 B (`ar`), max 529 279 B (`hu`),
+  median ~11 583 B. No file exceeds 1 MB (install sanity-check
+  ceiling).
+
+  **Licenses** (count per category): MIT (46), LPPL (20),
+  GPL (5), FSF-unlimited (3), Permissive (2), LGPL (2),
+  Unknown (2 — `mn-cyrl-x-lmc` and `ro` whose source headers
+  declare no license; to audit before any strictly-free
+  distribution), plus singletons (BSD-3-Clause,
+  BSD-3-Clause-like (`bg`), Knuth-permissive, LPPL-1.3-or-MIT,
+  MPL, Public-Domain, Unlicense).
+
+  User-visible effect: `asciidoctor-pdf hyph available` now
+  lists all 87 languages with local status (`embarqué` /
+  `installé` / `absent`), and `hyph install <lang>` accepts
+  any of the 87 codes without an additional `--from` /
+  `--sha256` parameter (expected SHA-256 is read from the
+  manifest).
+
+  259/259 specs green. Ameba clean.
+
 == v2.3.24.76 — 2026-06-03
 
 === Added
