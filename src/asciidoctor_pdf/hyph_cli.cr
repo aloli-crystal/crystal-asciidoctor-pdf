@@ -458,6 +458,19 @@ module AsciidoctorPDF
         exit EXIT_USAGE
       end
 
+      # Refuse les langues exclues du manifest pour cause de
+      # licence non déclarée. Message en anglais (lingua franca
+      # des discussions de licensing libre).
+      if (reason = Hyphenation::EXCLUDED_LANGS[lang]?) && from_url.nil?
+        STDERR.puts "Refusing to install `#{lang}`: #{reason}"
+        STDERR.puts ""
+        STDERR.puts "If you have independently verified the licensing situation and"
+        STDERR.puts "still want to install this language, you can bypass the manifest"
+        STDERR.puts "by providing both --from <URL> and --sha256 <HASH> explicitly:"
+        STDERR.puts "  asciidoctor-pdf hyph install #{lang} --from <URL> --sha256 <HASH>"
+        exit EXIT_MANIFEST_MISSING
+      end
+
       entry = Hyphenation::MANIFEST[lang]?
       expected_sha = sha256_arg || entry.try &.sha256
 

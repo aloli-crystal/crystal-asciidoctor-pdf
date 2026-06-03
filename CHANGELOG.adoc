@@ -3,6 +3,39 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.78 — 2026-06-03
+
+=== Removed
+
+* **Languages with undeclared licenses removed from manifest
+  (`mn-cyrl-x-lmc`, `ro`).** Manifest size goes from 87 to
+  **85 languages**. The two removed entries carried
+  `license: "Unknown"` because their upstream source header
+  declares no free-software grant (`NONE` for `mn-cyrl-x-lmc`,
+  `[None]` for `ro`). Distributing these patterns via our
+  manifest would put our users in a legally ambiguous spot —
+  the ALOLI convention being to distribute only
+  clearly-licensed free software, we prefer to exclude them.
+
+  New constant `EXCLUDED_LANGS : Hash(String, String)` in
+  `manifest.cr` maps each excluded language code to a
+  diagnostic message in English (lingua franca of free-software
+  licensing discussions). The `hyph install <lang>`
+  sub-command consults this table BEFORE the manifest: if the
+  language is listed and the user did not pass `--from`,
+  install is refused with the explanatory message and exit
+  code `10` (manifest missing).
+
+  Users can still install these languages manually after
+  independently verifying the legal situation:
+
+  [source,bash]
+  ----
+  asciidoctor-pdf hyph install ro \
+    --from https://example.org/hyph-ro.tex \
+    --sha256 <HASH_THEY_COMPUTED>
+  ----
+
 == v2.3.24.77 — 2026-06-03
 
 === Added

@@ -3,6 +3,58 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.78 — 2026-06-03
+
+=== Retiré
+
+* **Langues à licence non déclarée retirées du manifest
+  (`mn-cyrl-x-lmc`, `ro`).** Le manifest est ramené de 87 à
+  **85 langues**. Les deux entrées retirées portaient
+  `license: "Unknown"` parce que leur en-tête source upstream
+  ne déclare pas de grant de licence libre (`NONE` pour
+  `mn-cyrl-x-lmc`, `[None]` pour `ro`). Distribuer ces
+  patterns via notre manifest placerait nos utilisateurs en
+  position d'ambiguïté juridique — la convention ALOLI étant
+  de ne distribuer que du libre clairement licencié, on
+  préfère les exclure.
++
+  Nouvelle constante `EXCLUDED_LANGS : Hash(String, String)`
+  dans `manifest.cr` qui mappe chaque code de langue exclu
+  vers un message diagnostique en anglais (lingua franca des
+  discussions de licensing libre). La sous-commande
+  `hyph install <lang>` consulte cette table AVANT le
+  manifest : si la langue y figure et que l'utilisateur n'a
+  pas passé `--from`, l'install est refusé avec le message
+  explicatif et un code de sortie `10` (manifest missing).
++
+  L'utilisateur peut toujours installer ces langues
+  manuellement après avoir vérifié indépendamment la
+  situation juridique :
++
+  [source,bash]
+  ----
+  asciidoctor-pdf hyph install ro \
+    --from https://example.org/hyph-ro.tex \
+    --sha256 <HASH_QU_IL_A_CALCULE>
+  ----
++
+  Message complet rendu :
++
+  [source,text]
+  ----
+  Refusing to install `ro`: License field is `[None]` in the
+  upstream source file (https://github.com/hyphenation/tex-hyphen,
+  hyph-ro.tex). Without an explicit free-software license grant,
+  redistribution is legally ambiguous and we exclude this
+  language from our manifest.
+
+  If you have independently verified the licensing situation
+  and still want to install this language, you can bypass the
+  manifest by providing both --from <URL> and --sha256 <HASH>
+  explicitly:
+    asciidoctor-pdf hyph install ro --from <URL> --sha256 <HASH>
+  ----
+
 == v2.3.24.77 — 2026-06-03
 
 === Ajouté
