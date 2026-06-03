@@ -3,15 +3,63 @@
 :toc-title: Versions
 :toclevels: 2
 
-== v2.3.25.0 — 2026-06-03
+== v2.3.24.73 — 2026-06-03
+
+=== Fixed
+
+* **J4: residual visual gap between codespan and clinging
+  punctuation.** Symptom: `(ex : `186260`).` visibly rendered
+  as `(ex : `186260` ).` with a ~1-2 pt space before the
+  closing parenthesis. Same for ``prepare_rescue`,`` which
+  rendered as ``prepare_rescue` ,``.
+
+  Cause: the “badge” branch of `render_segment_line` (mark /
+  codespan / kbd / button segments) drew the text in one shot
+  then added `extra_per_space * count(' ')` to `current_x`.
+  The next segment (punctuation) therefore started
+  `extra_per_space` points too far right.
+
+  Fix: when the segment carries a leading space prefix (Glue
+  rendered by the composer) AND we're in justify mode, the
+  leading space is now stretched **BEFORE** the draw — we
+  advance `current_x` by `prefix_w + extra_per_space`, then
+  draw `seg.text[1..]` (without the prefix). At the end of
+  the draw, `current_x` matches exactly the visual end of the
+  badge text; the following punctuation glues naturally. The
+  background rectangle (`badge_x`) is also offset by
+  `extra_for_leading` to stay aligned with the actually-drawn
+  text.
+
+  Verification: `pdftotext -bbox-layout` now extracts
+  `186260).` as a single word (before: `186260` and `).`
+  separated with 4.72 pt gap).
+
+=== Documented
+
+* **J4.B (native PDF `Tw`) deferred.** Ideal would have been
+  relying on PDF's `Tw` operator (Word Spacing,
+  ISO 32000-1 § 9.3.3), which applies the extra to *all*
+  ASCII spaces of a `Tj` string at the PDF engine level — no
+  position calculation Crystal-side. But the `pdf` shard
+  (aloli-crystal/pdf) doesn't expose it currently: it does
+  word-by-word drawing with a `word_spacing` property on its
+  Fragments (cf. `lib/pdf/src/pdf/text/formatted/box.cr:310`).
+  Adding native `Tw` would require extending the `pdf` gem —
+  separate work. The J4.A fix above achieves the same visual
+  result via manual cursor advancement.
+
+== v2.3.24.72 — 2026-06-03
 
 === Changed
 
 * **J3: Knuth-Plass becomes the default composition engine.**
-  Bumping the 3rd digit (`24.71` → `25.0`) signals this
-  structural shift per the ALOLI versioning convention for
-  port versions (3 digits aligned with the Ruby gem + 4th
-  port-specific).
+  We stay on the 4th digit for now (`24.71` → `24.72`) —
+  alignment with the Ruby asciidoctor-pdf 2.3.24 gem
+  maintained, pending an explicit decision on whether this
+  shard — which is progressively diverging from the gem's
+  behavior (native Knuth-Plass, Liang hyphenation, custom
+  CLI, etc.) — should switch to autonomous versioning (3rd
+  digit bump or even a new SemVer scheme).
 
   `ParagraphComposer.compose_knuth_plass` implements the
   Knuth & Plass algorithm (*Breaking Paragraphs into Lines*,

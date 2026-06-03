@@ -3738,8 +3738,15 @@ module AsciidoctorPDF
         # button) — le fond démarre au premier vrai caractère du
         # segment et s'arrête au dernier. On calcule donc un offset
         # `leading_space_w` qui décale les 4 rectangles de fond.
+        #
+        # J4 (v2.3.24.73) : en mode justify, l'espace de tête est
+        # étiré (`extra_per_space`) — on doit décaler `badge_x` du
+        # même montant pour que le BG suive le texte effectivement
+        # dessiné, sinon le BG est avancé seulement de la largeur
+        # naturelle de l'espace alors que le texte est plus loin.
         leading_space_w = seg.text.starts_with?(' ') ? font.string_width(" ", eff_font_size) : 0.0
-        badge_x = before + leading_space_w
+        extra_for_leading = (leading_space_w > 0 && extra_per_space > 0.0) ? extra_per_space : 0.0
+        badge_x = before + leading_space_w + extra_for_leading
         badge_w = seg_w - leading_space_w
 
         # Mark : surlignage jaune pâle derrière le texte. Le segment
@@ -3817,13 +3824,38 @@ module AsciidoctorPDF
             current_x += font.string_width(part, eff_font_size)
           end
         else
-          # Route through `draw_text_run` so emojis & unrenderable chars
-          # get the same treatment as the rest of the engine.
-          draw_text_run(page, seg.text, current_x, eff_y, font_name, eff_font_size)
-          # Avancement horizontal : la mesure est faite à `eff_font_size`,
-          # plus une petite réserve pour kbd/button/mark/mono afin que
-          # les encadrés ne se touchent pas du segment suivant.
-          current_x = before + seg_w
+          # J4 (v2.3.24.73) : si le segment porte un préfixe espace
+          # (rendu de la Glue) ET qu'on est en mode justify
+          # (`extra_per_space > 0`), on **étire l'espace de tête
+          # AVANT** de dessiner le segment, plutôt que d'ajouter
+          # un extra APRÈS via `count(' ')`. Sans ce fix, le
+          # segment précédent (souvent un codespan suivi d'une
+          # ponctuation collante : `(ex : `code`)`) voyait un gap
+          # de `extra_per_space` entre la fin du badge et la
+          # ponctuation suivante. Avec ce fix, l'extra est consommé
+          # AVANT le texte du segment — le `current_x` à la fin du
+          # draw correspond exactement à la fin visuelle du texte,
+          # et la ponctuation suivante colle naturellement.
+          if extra_per_space > 0.0 && seg.text.starts_with?(' ')
+            prefix_w = font.string_width(" ", eff_font_size)
+            current_x += prefix_w + extra_per_space
+            rest = seg.text[1..]
+            draw_text_run(page, rest, current_x, eff_y, font_name, eff_font_size)
+            current_x += font.string_width(rest, eff_font_size)
+            # Espaces internes restants (très rares pour les badges
+            # puisque le composer fragmente — mais on couvre).
+            internal_spaces = rest.count(' ')
+            current_x += extra_per_space * internal_spaces if internal_spaces > 0
+          else
+            # Route through `draw_text_run` so emojis & unrenderable chars
+            # get the same treatment as the rest of the engine.
+            draw_text_run(page, seg.text, current_x, eff_y, font_name, eff_font_size)
+            # Avancement horizontal : la mesure est faite à `eff_font_size`,
+            # plus une petite réserve pour kbd/button/mark/mono afin que
+            # les encadrés ne se touchent pas du segment suivant.
+            current_x = before + seg_w
+            current_x += extra_per_space * seg.text.count(' ') if extra_per_space > 0.0
+          end
 
           # Padding inter-segments pour les badges : nécessaire quand
           # le segment suivant est un mot ordinaire (sinon le BG/
@@ -3845,10 +3877,6 @@ module AsciidoctorPDF
             current_x += 2.0 if seg.mark
             current_x += @theme.codespan_padding_x if seg.mono && !seg.kbd
           end
-
-          # Pour les segments avec badge : on compte juste l'extra
-          # *après* (le badge reste de largeur fixe).
-          current_x += extra_per_space * seg.text.count(' ') if extra_per_space > 0.0
         end
 
         # Annotation lien

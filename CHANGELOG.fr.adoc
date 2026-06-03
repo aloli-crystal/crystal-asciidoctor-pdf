@@ -3,15 +3,65 @@
 :toc-title: Versions
 :toclevels: 2
 
-== v2.3.25.0 — 2026-06-03
+== v2.3.24.73 — 2026-06-03
+
+=== Corrigé
+
+* **J4 : gap visuel résiduel entre codespan et ponctuation
+  collante.** Symptôme : « (ex : `186260`). » rendait
+  visiblement « (ex : `186260` ). » avec un espace d'environ
+  1 à 2 pt avant la parenthèse fermante. Pareil pour
+  « `prepare_rescue`, » qui devenait « `prepare_rescue` , ».
++
+  Cause : la branche « badge » de `render_segment_line`
+  (segments mark / codespan / kbd / button) dessinait le
+  texte en bloc puis ajoutait `extra_per_space * count(' ')`
+  à `current_x`. Le segment suivant (ponctuation) commençait
+  alors `extra_per_space` points trop loin.
++
+  Fix : si le segment porte un préfixe espace (rendu de la
+  Glue précédente par le composer) ET qu'on est en mode
+  justify, l'espace de tête est désormais étiré **AVANT**
+  le draw — on avance `current_x` de
+  `prefix_w + extra_per_space`, puis on dessine `seg.text[1..]`
+  (sans le préfixe). À la fin du draw, `current_x` correspond
+  exactement à la fin visuelle du texte du badge ; la
+  ponctuation suivante colle naturellement. Le rectangle de
+  fond (`badge_x`) est aussi décalé du `extra_for_leading`
+  pour rester aligné avec le texte effectivement dessiné.
++
+  Vérification : `pdftotext -bbox-layout` extrait désormais
+  `186260).` comme un seul mot (avant : `186260` et `).`
+  séparés avec écart 4,72 pt).
+
+=== Documenté
+
+* **J4.B (`Tw` natif PDF) reporté.** L'idéal eût été de
+  s'appuyer sur l'opérateur PDF `Tw` (Word Spacing,
+  ISO 32000-1 § 9.3.3) qui applique l'extra à *tous* les
+  espaces ASCII d'une chaîne `Tj` au niveau du moteur PDF
+  lui-même — pas de calcul de position côté Crystal. Mais le
+  shard `pdf` (aloli-crystal/pdf) ne l'expose pas
+  actuellement : il fait du dessin mot-par-mot avec une
+  propriété `word_spacing` sur ses Fragments
+  (cf. `lib/pdf/src/pdf/text/formatted/box.cr:310`). Ajouter
+  `Tw` natif demanderait d'étendre le gem `pdf` — chantier
+  séparé. Le fix J4.A ci-dessus atteint le même résultat
+  visuel par avancement manuel.
+
+== v2.3.24.72 — 2026-06-03
 
 === Changé
 
 * **J3 : Knuth-Plass devient le moteur de composition par
-  défaut.** Le bump du 3ᵉ chiffre (`24.71` → `25.0`) signale
-  cette bascule structurelle, conformément à la convention
-  ALOLI de versioning des portages (3 chiffres calés sur la gem
-  Ruby + 4ᵉ propre au portage).
+  défaut.** On reste pour l'instant sur le 4ᵉ chiffre (`24.71`
+  → `24.72`) — alignement maintenu avec la gem Ruby
+  asciidoctor-pdf 2.3.24, en attendant de décider explicitement
+  si ce shard, qui s'éloigne progressivement du fonctionnement
+  de la gem (Knuth-Plass natif, hyphenation Liang, CLI
+  spécifique, etc.), doit basculer sur un versioning autonome
+  (bump du 3ᵉ chiffre voire passage à un nouveau schéma
+  SemVer).
 +
   `ParagraphComposer.compose_knuth_plass` implémente
   l'algorithme de Knuth & Plass (*Breaking Paragraphs into
