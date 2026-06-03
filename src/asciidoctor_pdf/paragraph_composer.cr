@@ -128,21 +128,27 @@ module AsciidoctorPDF
         # rend de facto insécable côté composition.
         words = seg.text.split(' ')
         words.each_with_index do |word, idx|
-          # Mots vides (double-espace, trailing space) : on les
-          # ignore. Le pipeline en amont (inline_renderer ligne
-          # 70) normalise les runs de whitespace, ce cas est donc
-          # rare en pratique.
-          next if word.empty?
-
-          # Glue à insérer si : (a) on est pas le 1er mot du
-          # segment, OU (b) on est le 1er mot mais le dernier
-          # token émis est une Box (frontière inter-segments sans
-          # espace : cas `<strong>foo</strong>bar`).
-          last = tokens.last?
-          needs_glue = idx > 0 || last.is_a?(Box)
-          if needs_glue
+          # `idx > 0` = un espace ASCII séparait ce mot du
+          # précédent dans le texte de ce segment. On émet une
+          # Glue, avec déduplication contre une Glue déjà émise
+          # (cas multi-espaces ou segments whitespace-only
+          # consécutifs — rare en pratique post-normalisation).
+          #
+          # IMPORTANT : on n'émet JAMAIS de Glue artificielle
+          # entre deux segments contigus sans espace dans leur
+          # texte. Si l'auteur a écrit `<strong>foo</strong>bar`,
+          # le rendu doit être `foobar`. Idem pour `code` suivi
+          # de `)` sans espace : on ne doit pas séparer la
+          # parenthèse fermante du code (le `(ex : ` `code` `)`
+          # devient `(ex : code)`, pas `(ex : code )`).
+          if idx > 0 && !tokens.last?.is_a?(Glue)
             tokens << Glue.new(space_w, glue_stretch, glue_shrink)
           end
+
+          # Mot vide (trailing space `foo ` ou segment
+          # whitespace-only ` `) : la Glue éventuelle est déjà
+          # émise ci-dessus, pas de Box à produire.
+          next if word.empty?
 
           word_w = yield seg, word
           word_seg = InlineSegment.new(

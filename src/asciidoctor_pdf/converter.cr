@@ -3681,7 +3681,7 @@ module AsciidoctorPDF
       end
 
       current_x = x
-      segments.each do |seg|
+      segments.each_with_index do |seg, seg_idx|
         # Image inline (raster ou SVG) : route vers `page.svg` ou
         # `page.image` selon l'extension. La taille est calculée à
         # partir des attrs (pdfwidth/width/height) ; à défaut on prend
@@ -3716,12 +3716,24 @@ module AsciidoctorPDF
         seg_w = font.string_width(seg.text, eff_font_size)
         before = current_x
 
+        # Le `ParagraphComposer` peut préfixer le texte d'un espace
+        # ASCII (rendu de la Glue précédente). Cet espace doit
+        # apparaître dans le draw_text final (séparation visuelle
+        # entre mots, base de la justification), mais ne doit PAS
+        # hériter du fond gris des badges (mark / codespan / kbd /
+        # button) — le fond démarre au premier vrai caractère du
+        # segment et s'arrête au dernier. On calcule donc un offset
+        # `leading_space_w` qui décale les 4 rectangles de fond.
+        leading_space_w = seg.text.starts_with?(' ') ? font.string_width(" ", eff_font_size) : 0.0
+        badge_x = before + leading_space_w
+        badge_w = seg_w - leading_space_w
+
         # Mark : surlignage jaune pâle derrière le texte. Le segment
         # garde sa couleur de texte d'origine.
         if seg.mark
           mark_pad = 1.5
           page.fill_color("fff59d") # jaune pastel
-          page.rectangle(before - mark_pad, eff_y - 2, seg_w + 2 * mark_pad, eff_font_size + 4)
+          page.rectangle(badge_x - mark_pad, eff_y - 2, badge_w + 2 * mark_pad, eff_font_size + 4)
           page.fill
         end
         # Code inline (codespan) : fond grisé optionnel +
@@ -3733,12 +3745,12 @@ module AsciidoctorPDF
           px = @theme.codespan_padding_x
           py = @theme.codespan_padding_y
           page.fill_color(@theme.codespan_background_color)
-          page.rectangle(before - px, eff_y - py, seg_w + 2 * px, eff_font_size + 2 * py)
+          page.rectangle(badge_x - px, eff_y - py, badge_w + 2 * px, eff_font_size + 2 * py)
           page.fill
           if !@theme.codespan_border_color.empty? && @theme.codespan_border_width > 0.0
             page.stroke_color(@theme.codespan_border_color)
             page.line_width(@theme.codespan_border_width)
-            page.rectangle(before - px, eff_y - py, seg_w + 2 * px, eff_font_size + 2 * py)
+            page.rectangle(badge_x - px, eff_y - py, badge_w + 2 * px, eff_font_size + 2 * py)
             page.stroke
           end
         end
@@ -3747,11 +3759,11 @@ module AsciidoctorPDF
           kbd_pad_x = 3.0
           kbd_pad_y = 1.0
           page.fill_color("f5f5f5")
-          page.rectangle(before - kbd_pad_x, eff_y - kbd_pad_y, seg_w + 2 * kbd_pad_x, eff_font_size + 2 * kbd_pad_y)
+          page.rectangle(badge_x - kbd_pad_x, eff_y - kbd_pad_y, badge_w + 2 * kbd_pad_x, eff_font_size + 2 * kbd_pad_y)
           page.fill
           page.stroke_color("cccccc")
           page.line_width(0.4)
-          page.rectangle(before - kbd_pad_x, eff_y - kbd_pad_y, seg_w + 2 * kbd_pad_x, eff_font_size + 2 * kbd_pad_y)
+          page.rectangle(badge_x - kbd_pad_x, eff_y - kbd_pad_y, badge_w + 2 * kbd_pad_x, eff_font_size + 2 * kbd_pad_y)
           page.stroke
         end
         # Bouton : encadré gris pâle à coins arrondis simulés
@@ -3759,7 +3771,7 @@ module AsciidoctorPDF
         # arrondis sans Bezier dédié, on garde simple).
         if seg.button
           page.fill_color("e0e0e0")
-          page.rectangle(before - 3, eff_y - 1.5, seg_w + 6, eff_font_size + 3)
+          page.rectangle(badge_x - 3, eff_y - 1.5, badge_w + 6, eff_font_size + 3)
           page.fill
         end
 
@@ -3798,9 +3810,28 @@ module AsciidoctorPDF
           # plus une petite réserve pour kbd/button/mark/mono afin que
           # les encadrés ne se touchent pas du segment suivant.
           current_x = before + seg_w
-          current_x += 4.0 if seg.kbd || seg.button
-          current_x += 2.0 if seg.mark
-          current_x += @theme.codespan_padding_x if seg.mono && !seg.kbd
+
+          # Padding inter-segments pour les badges : nécessaire quand
+          # le segment suivant est un mot ordinaire (sinon le BG/
+          # encadré du badge chevaucherait le 1er caractère du mot
+          # suivant). À SUPPRIMER quand le suivant commence par un
+          # espace (séparation déjà fournie par la Glue rendue) ou
+          # par une ponctuation collante (`.,;:!?)]}»`) — sans cette
+          # exception, on voit un trou avant la ponctuation, ex.
+          # « (ex : `code` ) » au lieu de « (ex : `code`) ».
+          next_seg = segments[seg_idx + 1]?
+          next_clings = if (n = next_seg) && !n.text.empty?
+                          first = n.text[0]
+                          first == ' ' || ".,;:!?)]}»".includes?(first)
+                        else
+                          true # dernier segment de la ligne — pas de padding
+                        end
+          unless next_clings
+            current_x += 4.0 if seg.kbd || seg.button
+            current_x += 2.0 if seg.mark
+            current_x += @theme.codespan_padding_x if seg.mono && !seg.kbd
+          end
+
           # Pour les segments avec badge : on compte juste l'extra
           # *après* (le badge reste de largeur fixe).
           current_x += extra_per_space * seg.text.count(' ') if extra_per_space > 0.0

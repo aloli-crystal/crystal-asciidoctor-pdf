@@ -3,6 +3,52 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.70 — 2026-06-03
+
+=== Corrigé
+
+* **Fond gris du codespan débordait sur l'espace de tête.**
+  Quand le `ParagraphComposer` rend un codespan (ou kbd / button
+  / mark) précédé d'une Glue de justification, le segment porte
+  un préfixe d'espace ASCII (` code` au lieu de `code`). Le
+  rectangle de fond du badge couvrait ce préfixe, ce qui faisait
+  déborder le fond gris à gauche du premier vrai caractère. Le
+  rectangle est désormais décalé d'un `leading_space_w` calculé
+  à la mesure de la police courante : le fond démarre au premier
+  caractère et s'arrête au dernier, l'espace de tête reste
+  blanc et joue son rôle de séparateur visuel.
+
+* **Espace fantôme inséré entre `` `code` `` et la ponctuation
+  collante (`)`, `.`, `,`, `;`, `:`, `!`, `?`, `]`, `}`, `»`).**
+  Deux causes en cascade :
++
+  0. `ParagraphComposer#tokenize` injectait un Glue artificiel
+     entre deux Box de segments contigus (« compatible bug-pour-
+     bug » avec l'ancien `wrap_segments`). Cette branche est
+     supprimée : le HTML d'asciidoctor contient déjà les espaces
+     nécessaires dans le texte des segments, on ne doit pas en
+     fabriquer. Les segments sans espace inter-frontière sont
+     désormais rendus contigus (`<strong>foo</strong>bar` →
+     `foobar`).
+  0. `render_segment_line` ajoutait `codespan_padding_x` (et
+     équivalents kbd / button / mark) à `current_x` après chaque
+     badge, pour empêcher le prochain mot de chevaucher le BG du
+     badge. Ce padding est désormais conditionnel : il n'est
+     pas appliqué si le segment suivant commence par un espace
+     (séparation déjà fournie) ou par une ponctuation collante.
+     Avant le fix : « `code` ). » (visible). Après : « `code`). ».
+
+  Spec dédiée `paragraph_composer_spec` : nouveau cas
+  « préserve le `)` collé après un codespan » qui valide la
+  séquence de tokens attendue pour `(ex : ` `` `code` `` `)`.
+
+  Note : un écart résiduel de ~1-2 pt peut subsister sur les
+  lignes très justifiées (l'`extra_per_space` first-fit est
+  appliqué pour l'espace de tête du codespan, ce qui décale
+  la ponctuation suivante). Sera réglé par J3 (Knuth-Plass)
+  qui supprime cette heuristique au profit d'une distribution
+  globale optimale.
+
 == v2.3.24.69 — 2026-06-03
 
 === Corrigé

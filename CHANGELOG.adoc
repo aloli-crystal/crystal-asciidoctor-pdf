@@ -3,6 +3,50 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.70 — 2026-06-03
+
+=== Fixed
+
+* **Codespan background bled over the leading space.** When the
+  `ParagraphComposer` renders a codespan (or kbd / button / mark)
+  preceded by a justification Glue, the segment carries a leading
+  ASCII space prefix (` code` rather than `code`). The badge's
+  background rectangle covered that prefix, making the gray
+  background overflow to the left of the first real character.
+  The rectangle is now offset by a `leading_space_w` computed in
+  the current font: the background starts at the first character
+  and ends at the last, the leading space stays white and plays
+  its visual separator role.
+
+* **Phantom space inserted between `` `code` `` and clinging
+  punctuation (`)`, `.`, `,`, `;`, `:`, `!`, `?`, `]`, `}`, `»`).**
+  Two causes in cascade:
++
+  0. `ParagraphComposer#tokenize` was injecting an artificial
+     Glue between two Boxes from contiguous segments
+     (“bug-for-bug compatible” with the old `wrap_segments`).
+     That branch is removed: asciidoctor's HTML already contains
+     the necessary spaces in segment texts, we mustn't fabricate
+     any. Segments without an inter-frontier space are now
+     rendered contiguously (`<strong>foo</strong>bar` → `foobar`).
+  0. `render_segment_line` was adding `codespan_padding_x` (and
+     kbd / button / mark equivalents) to `current_x` after each
+     badge to prevent the next word from overlapping the badge's
+     background. That padding is now conditional: it's skipped
+     when the next segment starts with a space (separation
+     already provided) or with clinging punctuation. Before:
+     `` `code` ). `` (visible). After: `` `code`). ``.
+
+  Dedicated spec in `paragraph_composer_spec`: new case
+  “preserves the `)` glued after a codespan” validating the
+  expected token sequence for `(ex : ` `` `code` `` `)`.
+
+  Note: a residual gap of ~1-2 pt may persist on heavily
+  justified lines (the first-fit `extra_per_space` is applied
+  to the codespan's leading space, shifting the following
+  punctuation). Will be addressed by J3 (Knuth-Plass) which
+  removes this heuristic in favor of optimal global distribution.
+
 == v2.3.24.69 — 2026-06-03
 
 === Fixed

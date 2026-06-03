@@ -92,11 +92,47 @@ describe AsciidoctorPDF::ParagraphComposer do
       tokens[0].as(ParagraphComposer::Box).width.should eq 26.0
     end
 
-    it "insère un Glue artificiel entre deux segments contigus sans espace" do
+    it "NE colle PAS deux segments contigus avec une Glue artificielle" do
       # Cas `<strong>foo</strong>bar` : segments [Bold("foo"), Plain("bar")]
-      # sans espace explicite — reproduit le comportement historique
-      # de wrap_segments qui injectait un séparateur.
+      # sans espace explicite. Le rendu attendu est `foobar` (pas
+      # `foo bar`). Régression : la version J1 originale injectait
+      # un Glue ici, ce qui ajoutait un espace après chaque codespan
+      # avant la ponctuation suivante (« `code` ) » au lieu de
+      # « `code`) »).
       segments = [seg("foo", bold: true), seg("bar")]
+      tokens = ParagraphComposer.tokenize(segments, 10.0, &WIDTH_OF_CHAR)
+      tokens.size.should eq 2
+      tokens[0].should be_a ParagraphComposer::Box
+      tokens[1].should be_a ParagraphComposer::Box
+    end
+
+    it "préserve le `)` collé après un codespan" do
+      # Cas typique : `(ex : ` `code` `)` en AsciiDoc → 3 segments
+      # [Plain("(ex : "), Mono("code"), Plain(")")]. Le rendu
+      # final doit être `(ex : code)` sans espace fantôme avant `)`.
+      segments = [
+        seg("(ex : "),
+        InlineSegment.new(text: "code", mono: true),
+        seg(")"),
+      ]
+      tokens = ParagraphComposer.tokenize(segments, 10.0, &WIDTH_OF_CHAR)
+      # Attendu : Box("(ex : "), Glue (trailing space seg1), Box("code"), Box(")")
+      # PAS de Glue entre Box("code") et Box(")").
+      tokens.size.should eq 4
+      tokens[0].should be_a ParagraphComposer::Box
+      tokens[1].should be_a ParagraphComposer::Glue
+      tokens[2].should be_a ParagraphComposer::Box
+      tokens[3].should be_a ParagraphComposer::Box
+      tokens[0].as(ParagraphComposer::Box).segment.text.should eq "(ex :"
+      tokens[2].as(ParagraphComposer::Box).segment.text.should eq "code"
+      tokens[3].as(ParagraphComposer::Box).segment.text.should eq ")"
+    end
+
+    it "émet une Glue (sans Box) pour un segment whitespace-only" do
+      # Cas où le HTML parser produit [Bold("foo"), Plain(" "), Italic("bar")]
+      # avec l'espace dans un segment séparé. Doit produire un seul
+      # Glue (pas zéro, pas plus).
+      segments = [seg("foo", bold: true), seg(" "), seg("bar")]
       tokens = ParagraphComposer.tokenize(segments, 10.0, &WIDTH_OF_CHAR)
       tokens.size.should eq 3
       tokens[0].should be_a ParagraphComposer::Box
@@ -104,11 +140,26 @@ describe AsciidoctorPDF::ParagraphComposer do
       tokens[2].should be_a ParagraphComposer::Box
     end
 
-    it "ignore les mots vides (double espace, trailing space)" do
+    it "déduplique les Glues consécutives (trailing space + leading space)" do
+      # Cas pathologique mais possible : seg1=`foo ` (trailing) +
+      # seg2=` bar` (leading) — l'espace est compté dans les deux
+      # segments. Le rendu attendu reste `foo bar` (un seul espace).
+      segments = [seg("foo "), seg(" bar")]
+      tokens = ParagraphComposer.tokenize(segments, 10.0, &WIDTH_OF_CHAR)
+      tokens.size.should eq 3
+      tokens.map(&.class).should eq [
+        ParagraphComposer::Box,
+        ParagraphComposer::Glue,
+        ParagraphComposer::Box,
+      ]
+    end
+
+    it "ignore les mots vides mais conserve la Glue (double espace)" do
       # Pathologique post-normalisation, mais doit rester robuste.
+      # « foo  bar » → split=["foo", "", "bar"]. La Glue est émise
+      # à idx=1 (idx>0), le mot vide n'émet pas de Box. La Glue à
+      # idx=2 est dédupliquée. Résultat : Box Glue Box.
       tokens = ParagraphComposer.tokenize([seg("foo  bar")], 10.0, &WIDTH_OF_CHAR)
-      # « foo  bar » → split=["foo", "", "bar"]. Le mot vide est
-      # ignoré, on a donc Box Glue Box (un seul Glue, pas deux).
       tokens.size.should eq 3
       tokens.map(&.class).should eq [
         ParagraphComposer::Box,
