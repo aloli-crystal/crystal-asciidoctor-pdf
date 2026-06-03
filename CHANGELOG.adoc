@@ -3,6 +3,89 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.79 — 2026-06-03
+
+=== Added
+
+* **True multi-line CJK justification.**
+  `ParagraphComposer.tokenize` now detects segments containing
+  CJK characters (≥ U+3000) and delegates to a dedicated
+  `tokenize_segment_with_cjk` helper which splits EACH CJK
+  character into a standalone `Box`, separated by a thin
+  `Glue` (`width = 0`, `stretch = char_w × 0.5`,
+  `shrink = 0`) between two consecutive CJK chars.
+
+  These thin Glues serve two purposes:
+
+  0. **Legal break-point** that `compose_knuth_plass` uses to
+     wrap long CJK paragraphs onto multiple lines. Before this
+     change, lacking break-points (CJK paragraphs have no
+     ASCII space to naturally act as Glue), a CJK paragraph
+     stayed unavoidably on a single line — the composer
+     couldn't break it, the user saw it extending past the
+     margin.
+  0. **`Tc` stretch support.** Knuth-Plass stretches these
+     Glues in proportion to each line's `adjustment_ratio`;
+     the renderer recomputes the same value via
+     `extra_per_cjk_glyph = (target_w - natural_w) /
+     (n_cjk - 1)` and emits it via
+     `page.text(..., char_spacing:)`.
+
+  NO Glue between a CJK char and an adjacent Latin char: the
+  Sino-Japanese convention writes `日本2026年` glued; breaking
+  here would be a typographic violation.
+
+  Composer-side corollaries:
+
+  - `finalize_line` and `finalize_kp_line` distinguish a
+    “space” Glue (`width > 0`, Latin) from a “thin” Glue
+    (`width == 0`, CJK). Only space Glues contribute to
+    `n_spaces` and trigger a leading space on the following
+    Box — thin CJK Glues introduce no space character in the
+    rendered output.
+  - The measurement block in `wrap_segments` now accepts an
+    isolated CJK char: it uses `font_cjk.string_width` when
+    the char is ≥ U+3000 and recognized by the CJK font, else
+    `font.string_width` (main Latin font). Without that fix,
+    each CJK char would be measured at 0 by Noto Sans Latin
+    → phantom-width tokens, underestimated `natural_w`,
+    badly-broken lines.
+  - The block is now captured as a named `Proc`
+    (`&measure : ...`) rather than as implicit `yield`.
+    Crystal forbids `yield` inside a Proc literal —
+    refactor needed so `tokenize_segment_with_cjk` can
+    forward the block to a sub-lambda `flush_latin`. (Bonus:
+    `Array(Char)` instead of `String::Builder` for the Latin
+    buffer, because `String::Builder.to_s` may only be called
+    once and `flush_latin` is called multiple times per
+    paragraph.)
+
+  Renderer-side corollaries (`render_segment_line`):
+
+  - `seg_w` computation detects CJK chars and splits by run
+    to use `font_cjk` on CJK, `font` on Latin. Without it,
+    `seg_w ≈ 0` for isolated CJK chars and `current_x`
+    wouldn't advance between two adjacent CJK segs: all
+    glyphs piled up at the same visual position ≈ 36.
+  - The “non-badge” branch (word-by-word) propagates the
+    same correction on the `part_w` measured between
+    consecutive `draw_text_run` calls.
+  - The CJK `Tc` advancement is now added to `current_x`
+    AFTER the seg's draw: `current_x += n_cjk_in_seg ×
+    extra_per_cjk_glyph` to follow the PDF engine which
+    translates its own cursor by `glyph_w + Tc` after each
+    glyph.
+
+  Verification on a long Chinese paragraph (~50 Han
+  characters + Knuth-Plass + Latin algorithm):
+
+  - The composer correctly breaks between two CJK chars
+    (transition `测` / `试`).
+  - Both resulting lines are justified to the right edge
+    (xMax=559.28 = target_w).
+  - 259/259 specs green. Ameba clean. The J4.A fix
+    preserved (“186260).” still glued).
+
 == v2.3.24.78 — 2026-06-03
 
 === Removed

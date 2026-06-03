@@ -106,7 +106,7 @@ module AsciidoctorPDF
       segments : Array(InlineSegment),
       font_size : Float64,
       hyphenator : Hyphenation::Hyphenator? = nil,
-      & : InlineSegment, String -> Float64
+      &measure : InlineSegment, String -> Float64
     ) : Array(Token)
       tokens = [] of Token
 
@@ -123,12 +123,29 @@ module AsciidoctorPDF
         end
 
         # Mesure space_w (et hyphen_w si césure activée) dans la
-        # police du segment courant. On capture un yield par
-        # caractère pour éviter des appels répétés.
-        space_w = yield seg, " "
-        hyphen_w = hyphenator ? (yield seg, "-") : 0.0
+        # police du segment courant. Le bloc est capturé en Proc
+        # nommé `measure` (signature `&measure : ...`), ce qui
+        # permet de le passer à `tokenize_segment_with_cjk` —
+        # Crystal interdit `yield` dans un Proc literal ou un
+        # bloc forwardé.
+        space_w = measure.call(seg, " ")
+        hyphen_w = hyphenator ? measure.call(seg, "-") : 0.0
         glue_stretch = space_w * DEFAULT_STRETCH_RATIO
         glue_shrink = space_w * DEFAULT_SHRINK_RATIO
+
+        # Détection CJK : si le segment contient au moins un
+        # caractère dans la plage CJK (≥ U+3000), on délègue à
+        # un tokenizer dédié qui split CHAQUE char CJK en Box
+        # autonome, avec une Glue mince (largeur 0 + stretch
+        # positif) entre 2 chars CJK consécutifs. Ces Glues
+        # mince servent à la fois de point de coupure légal
+        # (les paragraphes CJK n'ont pas d'espace ASCII pour
+        # servir de breakpoint naturel) et de support pour
+        # l'étirement Knuth-Plass / Tc lors de la justification.
+        if seg.text.each_char.any? { |c| c.ord >= 0x3000 }
+          tokenize_segment_with_cjk(seg, tokens, space_w, glue_stretch, glue_shrink, &measure)
+          next
+        end
 
         # Split sur ESPACE ASCII strict : la NBSP (U+00A0) reste
         # incluse dans le morceau précédent ou suivant, ce qui la
@@ -169,7 +186,7 @@ module AsciidoctorPDF
                       end
 
           if positions.empty?
-            word_w = yield seg, word
+            word_w = measure.call(seg, word)
             tokens << Box.new(word_w, clone_segment(seg, word))
           else
             # Fragmenter le mot. La ponctuation de tête / queue
@@ -185,7 +202,7 @@ module AsciidoctorPDF
             fragments << word[prev..]
 
             fragments.each_with_index do |frag, i|
-              frag_w = yield seg, frag
+              frag_w = measure.call(seg, frag)
               tokens << Box.new(frag_w, clone_segment(seg, frag))
               # Penalty de césure entre deux syllabes : si la
               # coupure est prise, on ajoute un tiret (largeur
@@ -202,6 +219,91 @@ module AsciidoctorPDF
       end
 
       tokens
+    end
+
+    # Tokenize un segment dont le texte contient au moins un
+    # caractère CJK (≥ U+3000). Stratégie :
+    #
+    # - Run latin courant accumulé dans un buffer ; à chaque char
+    #   CJK rencontré, le buffer est flushé (= tokenisé comme du
+    #   standard : split par espace ASCII, Box + Glue).
+    # - Chaque char CJK devient une Box autonome (texte = char).
+    #   Entre deux Box CJK consécutives, on émet une Glue mince :
+    #   `width = 0`, `stretch = char_w × 0.5` (la convention typo
+    #   CJK accepte des étirements jusqu'à ~75 %, donc 50 % de
+    #   stretch nominal laisse de la marge confortable), `shrink
+    #   = 0` (pas de compression entre glyphes CJK). Cette Glue
+    #   sert deux usages :
+    #
+    #   . **Point de coupure légal** : `compose_knuth_plass` peut
+    #     casser la ligne ici (avant J4 / chantier 1, les
+    #     paragraphes CJK longs restaient sur une seule ligne car
+    #     le composer ne trouvait aucun breakpoint).
+    #   . **Support d'étirement** : Knuth-Plass étire ces Glues
+    #     en proportion de l'`adjustment_ratio` global de la ligne ;
+    #     `render_segment_line` retrouve la même valeur via le Tc
+    #     calculé à partir de `natural_w` et `n_cjk`.
+    #
+    # PAS de Glue entre un char CJK et un char latin adjacent : la
+    # convention sino-japonaise écrit `日本2026年` collé, et casser
+    # entre `本` et `2` poserait des problèmes de lecture.
+    private def self.tokenize_segment_with_cjk(
+      seg : InlineSegment,
+      tokens : Array(Token),
+      space_w : Float64,
+      glue_stretch : Float64,
+      glue_shrink : Float64,
+      &measure : InlineSegment, String -> Float64
+    )
+      # `Array(Char)` plutôt que `String::Builder` : ce dernier
+      # interdit les `.to_s` répétés (« Can only invoke 'to_s'
+      # once on String::Builder »), or `flush_latin` est appelé
+      # plusieurs fois sur le même buffer dans un même paragraphe
+      # (à chaque transition latin → CJK).
+      latin_buf = [] of Char
+      prev_was_cjk = false
+
+      # `flush_latin` est une closure : elle capture
+      # `latin_buf`, `tokens`, `prev_was_cjk` et `measure` (le
+      # bloc Proc-ified). On ne peut PAS faire `yield` dans un
+      # Proc en Crystal — d'où la signature `&measure : ...` qui
+      # capture le bloc en Proc nommé et permet `measure.call`.
+      flush_latin = -> {
+        unless latin_buf.empty?
+          str = latin_buf.join
+          latin_buf.clear
+          parts = str.split(' ')
+          parts.each_with_index do |part, idx|
+            if idx > 0 && !tokens.last?.is_a?(Glue)
+              tokens << Glue.new(space_w, glue_stretch, glue_shrink)
+            end
+            next if part.empty?
+            word_w = measure.call(seg, part)
+            tokens << Box.new(word_w, clone_segment(seg, part))
+          end
+          prev_was_cjk = false
+        end
+        nil
+      }
+
+      seg.text.each_char do |c|
+        if c.ord >= 0x3000
+          flush_latin.call
+          char_str = c.to_s
+          char_w = measure.call(seg, char_str)
+          # Glue mince ENTRE 2 chars CJK consécutifs (jamais avant
+          # le premier, ni après un run latin — auquel cas on
+          # joint sans espace, cf. `日本2026年`).
+          if prev_was_cjk
+            tokens << Glue.new(0.0, char_w * 0.5, 0.0)
+          end
+          tokens << Box.new(char_w, clone_segment(seg, char_str))
+          prev_was_cjk = true
+        else
+          latin_buf << c
+        end
+      end
+      flush_latin.call
     end
 
     # Détecte le cœur alphabétique du mot (en enlevant la
@@ -539,8 +641,19 @@ module AsciidoctorPDF
         case tok
         when Glue
           natural_width += tok.width
-          n_spaces += 1
-          preceded_by_glue = true
+          # `tok.width > 0` distingue une Glue « espace »
+          # (largeur ≈ space_w, séparation entre mots latins)
+          # d'une Glue « mince » (largeur 0, jointure entre
+          # glyphes CJK). Seules les Glue espace contribuent au
+          # comptage `n_spaces` (utilisé par le renderer pour
+          # `extra_per_space`) et déclenchent le préfixe « ` ` »
+          # sur la Box suivante. Pour les Glue mince CJK, on ne
+          # veut PAS de caractère espace entre les glyphes —
+          # l'étirement est appliqué via Tc côté renderer.
+          if tok.width > 0
+            n_spaces += 1
+            preceded_by_glue = true
+          end
         when Box
           orig = tok.segment
           text = preceded_by_glue ? " " + orig.text : orig.text
@@ -579,8 +692,14 @@ module AsciidoctorPDF
         when Glue
           natural_width += tok.width
           total_stretch += tok.stretch
-          n_spaces += 1
-          preceded_by_glue = true
+          # Voir `finalize_kp_line` : Glue mince CJK
+          # (`tok.width == 0`) ne compte ni dans `n_spaces` ni
+          # comme déclencheur de préfixe espace devant la Box
+          # suivante.
+          if tok.width > 0
+            n_spaces += 1
+            preceded_by_glue = true
+          end
         when Box
           orig = tok.segment
           text = preceded_by_glue ? " " + orig.text : orig.text

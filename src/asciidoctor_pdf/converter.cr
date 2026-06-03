@@ -3633,8 +3633,18 @@ module AsciidoctorPDF
         # Mesure de largeur dans la police résolue du segment, à
         # `font_size` brut (sans ajustement sup/sub/kbd) — conforme
         # au comportement historique de `wrap_segments`.
-        font = get_font(resolve_inline_font(seg))
-        font.string_width(text, font_size)
+        #
+        # CJK : si le texte est un seul caractère CJK
+        # (≥ U+3000) et que `font_cjk` sait le rendre, on mesure
+        # avec `font_cjk` plutôt qu'avec la police principale qui
+        # retournerait 0 / ε (Noto Sans Latin ne contient pas
+        # les glyphes CJK). Cohérent avec la stratégie de rendu
+        # qui bascule sur `font_cjk` dans `draw_text_run`.
+        if text.size == 1 && (c = text[0]) && c.ord >= 0x3000 && (cjk_f = font_cjk) && cjk_f.has_glyph?(c)
+          cjk_f.string_width(text, font_size)
+        else
+          get_font(resolve_inline_font(seg)).string_width(text, font_size)
+        end
       end
       # Knuth-Plass par défaut (J3) : choix global optimal des
       # breakpoints qui minimise la somme des badness² + pénalités
@@ -3746,16 +3756,6 @@ module AsciidoctorPDF
           end
           if n_cjk > 1
             candidate = (tw - natural_w) / (n_cjk - 1)
-            # Garde-fou : on n'étire pas un glyphe CJK de plus de
-            # 75 % de sa largeur (la ligne deviendrait illisible
-            # — typique : 2 glyphes seuls sur une ligne très large).
-            # 75 % est plus permissif que les 50 % d'un premier
-            # POC : la convention typographique CJK accepte
-            # couramment des étirements jusqu'à ~100 % (un blanc
-            # entre glyphes de la taille d'un glyphe). 75 % reste
-            # conservateur tout en débloquant les lignes courtes
-            # comme le hiragana qui contient moins de glyphes
-            # qu'une ligne en idéogrammes purs.
             typical_cjk_w = cjk_f.string_width("中", font_size)
             extra_per_cjk_glyph = candidate if candidate <= typical_cjk_w * 0.75
           end
@@ -3794,8 +3794,24 @@ module AsciidoctorPDF
         font = get_font(font_name)
         set_font(page, font_name, eff_font_size)
 
-        # Mesurer d'abord pour dessiner d'éventuels arrière-plans
-        seg_w = font.string_width(seg.text, eff_font_size)
+        # Mesurer d'abord pour dessiner d'éventuels arrière-plans.
+        # Pour les segments contenant des chars CJK (issus du
+        # tokenize_segment_with_cjk qui split chaque char en Box
+        # séparée), on doit mesurer chaque run avec la bonne
+        # police — Noto Sans Latin retourne 0 / ε pour les
+        # glyphes CJK alors que `font_cjk` (Noto CJK) donne la
+        # vraie largeur. Sans cette correction, `current_x`
+        # n'avançait pas entre 2 chars CJK et tous les glyphes
+        # se superposaient à la même position.
+        seg_w = if seg.text.each_char.any? { |c| c.ord >= 0x3000 } && (cjk_meas = font_cjk)
+                  total = 0.0
+                  text_with_emoji_segments(seg.text).each do |(kind, val)|
+                    total += (kind == :cjk ? cjk_meas.string_width(val, eff_font_size) : font.string_width(val, eff_font_size))
+                  end
+                  total
+                else
+                  font.string_width(seg.text, eff_font_size)
+                end
         before = current_x
 
         # Le `ParagraphComposer` peut préfixer le texte d'un espace
@@ -3902,12 +3918,24 @@ module AsciidoctorPDF
               end
               next if part.empty?
               draw_text_run(page, part, current_x, eff_y, font_name, eff_font_size, cjk_char_spacing: extra_per_cjk_glyph)
-              # Pour un run CJK : avancer aussi du Tc cumulé (le moteur
-              # PDF ajoute `n × Tc` à sa position interne, mais comme
-              # chaque page.text fait un nouveau BT/ET avec Td absolu,
-              # notre curseur Crystal doit refléter la fin VISUELLE
-              # du draw — `string_width + (n - 1) × Tc`).
-              part_w = font.string_width(part, eff_font_size)
+              # Mesure de l'avancement : si `part` contient des
+              # chars CJK, on splitte par run pour utiliser
+              # `font_cjk` sur les glyphes CJK (la police
+              # principale Noto Sans Latin retourne 0 / ε pour
+              # eux). Bug corrigé : sans ce split, l'avancement
+              # était ≈ 0 entre chars CJK et tous les glyphes
+              # se superposaient à la même position visuelle.
+              part_w = if part.each_char.any? { |c| c.ord >= 0x3000 } && (cjk_part_f = font_cjk)
+                         total = 0.0
+                         text_with_emoji_segments(part).each do |(kind, val)|
+                           total += (kind == :cjk ? cjk_part_f.string_width(val, eff_font_size) : font.string_width(val, eff_font_size))
+                         end
+                         total
+                       else
+                         font.string_width(part, eff_font_size)
+                       end
+              # Pour un run CJK : ajouter aussi le Tc cumulé
+              # (étirement entre glyphes appliqué par PDF via Tc).
               if extra_per_cjk_glyph > 0
                 cjk_count = part.each_char.count { |c| c.ord >= 0x3000 }
                 part_w += (cjk_count - 1) * extra_per_cjk_glyph if cjk_count > 1
@@ -3947,6 +3975,16 @@ module AsciidoctorPDF
             # les encadrés ne se touchent pas du segment suivant.
             current_x = before + seg_w
             current_x += extra_per_space * seg.text.count(' ') if extra_per_space > 0.0
+            # Avancement Tc CJK : chaque glyphe CJK consume une
+            # largeur de `Tc` supplémentaire (le moteur PDF
+            # l'applique après chaque glyphe). Le curseur Crystal
+            # doit suivre pour positionner correctement le segment
+            # suivant. Le Tc après le dernier glyphe est invisible
+            # (offset cursor sans contenu).
+            if extra_per_cjk_glyph > 0
+              n_cjk_in_seg = seg.text.each_char.count { |c| c.ord >= 0x3000 }
+              current_x += n_cjk_in_seg * extra_per_cjk_glyph
+            end
           end
 
           # Padding inter-segments pour les badges : nécessaire quand
