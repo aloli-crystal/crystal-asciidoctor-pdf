@@ -3,6 +3,45 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.76 — 2026-06-03
+
+=== Added
+
+* **`asciidoctor-pdf hyph available` sub-command.** Completes
+  the `hyph` suite (which already ships `list`, `install`,
+  `remove`, `update`, `show`, `help`). Queries CTAN — more
+  precisely the GitHub API of `hyphenation/tex-hyphen` — to
+  list ALL upstream Liang patterns, then cross-checks against
+  the embedded manifest and the user's local state.
+
+  Three flags (each with a short alias, ALOLI convention):
+
+  - `-r` / `--refresh-cache`: force a re-download
+  - `-j` / `--json`: structured JSON output instead of the
+    table
+  - `-o` / `--offline`: explicit fallback to the local
+    manifest, no HTTP request
+
+  Default table output with columns:
+
+  - **langue** (language): short code (`fr`, `ja`, etc.)
+  - **source CTAN**: `✓` if found upstream, `—` otherwise
+  - **manifest**: `✓` if in the embedded manifest, `✗`
+    otherwise
+  - **local**: `embarqué`, `installé`, or `absent`
+
+  Disk cache at
+  `${XDG_CACHE_HOME:-~/.cache}/asciidoctor-pdf/hyph-available.json`
+  with a 7-day TTL (aligned with `doc/CLI_HYPH_SPEC.adoc`).
+  Source URL configurable via `HYPH_MIRROR` or `CTAN_MIRROR`;
+  default is the GitHub API (JSON listing); naive HTML regex
+  fallback for classic CTAN mirrors.
+
+  Network error: stderr warning + fallback to the embedded
+  manifest + exit `0` (CI-usable). 16 unit + integration
+  specs via `Process.run` against the binary (flag parsing,
+  cache reads, fallback, output formats).
+
 == v2.3.24.75 — 2026-06-03
 
 === Added

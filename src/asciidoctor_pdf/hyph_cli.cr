@@ -21,6 +21,29 @@ module AsciidoctorPDF
       "hyphenation",
     )
 
+    # TTL du cache `hyph-available.json` : 7 jours (cf. spec).
+    AVAILABLE_CACHE_TTL = 7.days
+
+    # Dossier XDG de cache (différent de la conf : XDG_CACHE_HOME).
+    # Contient `hyph-available.json`. Résolu dynamiquement à
+    # chaque appel pour que les tests puissent piloter
+    # `XDG_CACHE_HOME` via env (constante figée = non testable).
+    def self.xdg_cache_dir : String
+      File.join(
+        ENV["XDG_CACHE_HOME"]? || (ENV["HOME"]? ? "#{ENV["HOME"]}/.cache" : "/tmp"),
+        "asciidoctor-pdf",
+      )
+    end
+
+    def self.available_cache_file : String
+      File.join(xdg_cache_dir, "hyph-available.json")
+    end
+
+    # URL par défaut interrogée par `hyph available` (API GitHub :
+    # JSON listing, parsing trivial). L'utilisateur peut override
+    # via `CTAN_MIRROR` ou `HYPH_MIRROR`.
+    DEFAULT_AVAILABLE_URL = "https://api.github.com/repos/hyphenation/tex-hyphen/contents/hyph-utf8/tex/generic/hyph-utf8/patterns/tex"
+
     # Refuse silencieusement d'installer un fichier > 1 Mo (anti-DoS).
     MAX_FILE_SIZE = 1_048_576
 
@@ -75,6 +98,26 @@ module AsciidoctorPDF
 
           OPTIONS
               -j, --json    Sortie JSON parseable
+          HELP
+      when "available", "av"
+        puts <<-HELP
+          NAME
+              hyph available — liste les patterns publiés sur CTAN
+
+          SYNOPSIS
+              crystal-asciidoctor-pdf hyph available [-r|--refresh-cache] [-j|--json] [-o|--offline]
+
+          OPTIONS
+              -r, --refresh-cache  Ignore le cache local et re-interroge CTAN
+              -j, --json           Sortie JSON parseable
+              -o, --offline        N'effectue aucune requête réseau (manifest local seul)
+
+          ENVIRONNEMENT
+              CTAN_MIRROR / HYPH_MIRROR  URL alternative à interroger (defaut : API GitHub)
+
+          CACHE
+              Fichier : #{available_cache_file}
+              TTL     : 7 jours
           HELP
       when "install", "in"
         puts <<-HELP
@@ -190,25 +233,199 @@ module AsciidoctorPDF
       end
     end
 
-    private def self.cmd_available(_args : Array(String)) : Nil
-      # MVP : on liste juste les entries du manifest local.
-      # L'interrogation CTAN à la volée est prévue dans
-      # CLI_HYPH_SPEC.adoc (`--refresh-cache`) — laissée pour
-      # une itération ultérieure.
-      puts "Manifest local (#{Hyphenation::MANIFEST.size} entrées) :"
-      puts ""
-      printf "%-12s  %-9s  %-12s  %s\n", "Langue", "Status", "Taille", "Licence"
-      puts "-" * 60
-      installed = installed_langs
-      Hyphenation::MANIFEST.each do |lang, entry|
-        status = if entry.embedded
-                   "embarqué"
-                 elsif installed.includes?(lang)
-                   "installé"
-                 else
-                   "disponible"
-                 end
-        printf "%-12s  %-9s  %-12s  %s\n", lang, status, "#{entry.size} o", entry.license
+    # URL effective à interroger : `HYPH_MIRROR` puis `CTAN_MIRROR`
+    # puis l'API GitHub par défaut (cf. spec). Publique pour les tests.
+    def self.available_source_url : String
+      ENV["HYPH_MIRROR"]? || ENV["CTAN_MIRROR"]? || DEFAULT_AVAILABLE_URL
+    end
+
+    # Décide si le cache `hyph-available.json` est encore valide
+    # (présent et plus récent que la TTL). N'inspecte pas le
+    # contenu — un fichier corrompu sera re-fetch au pire après
+    # une erreur de parsing. Publique pour les tests.
+    def self.available_cache_valid? : Bool
+      return false unless File.file?(available_cache_file)
+      age = Time.utc - File.info(available_cache_file).modification_time
+      age < AVAILABLE_CACHE_TTL
+    end
+
+    # Récupère la liste brute des langues `hyph-*` disponibles
+    # sur la source (API GitHub par défaut). Effectue UNE requête
+    # HTTP et écrit la réponse dans le cache. En cas d'erreur, lève
+    # une exception : l'appelant gère le fallback / l'exit code.
+    #
+    # Le résultat est un `Array(String)` de codes langue triés
+    # (extrait du nom de fichier `hyph-<lang>.tex`).
+    private def self.fetch_available_langs(url : String) : Array(String)
+      body = HTTP::Client.get(url) do |response|
+        raise "HTTP #{response.status_code} #{response.status_message}" unless response.success?
+        response.body_io.gets_to_end
+      end
+      langs = parse_available_response(body, url)
+      Dir.mkdir_p(xdg_cache_dir)
+      File.write(available_cache_file, {
+        "source"     => url,
+        "fetched_at" => Time.utc.to_rfc3339,
+        "langs"      => langs,
+      }.to_json)
+      langs
+    end
+
+    # Parse la réponse de la source. Pour l'API GitHub, on attend
+    # un tableau d'objets `{name: "hyph-fr.tex", ...}` ; en
+    # fallback CTAN (HTML), on scanne les `href="hyph-*.tex"`.
+    # Le choix de format est inféré de l'URL (`api.github.com`
+    # versus tout le reste). Publique pour les tests.
+    def self.parse_available_response(body : String, url : String) : Array(String)
+      langs = [] of String
+
+      if url.includes?("api.github.com")
+        # Format JSON GitHub : tableau d'objets `name`.
+        arr = JSON.parse(body).as_a
+        arr.each do |entry|
+          name = entry["name"]?.try &.as_s
+          next unless name
+          if (lang = extract_lang_from_filename(name))
+            langs << lang
+          end
+        end
+      else
+        # Fallback : scan HTML naïf des `href="hyph-*.tex"`.
+        body.scan(/href="(hyph-[a-z0-9-]+\.tex)"/i).each do |m|
+          if (lang = extract_lang_from_filename(m[1]))
+            langs << lang
+          end
+        end
+      end
+
+      langs.uniq.sort
+    end
+
+    # `hyph-fr.tex` → `fr`, `hyph-en-us.tex` → `en-us`,
+    # autre chose → `nil`. Publique pour les tests.
+    def self.extract_lang_from_filename(name : String) : String?
+      return nil unless name.starts_with?("hyph-") && name.ends_with?(".tex")
+      name.lchop("hyph-").rchop(".tex")
+    end
+
+    # Lit le cache disque. Retourne `nil` si absent ou corrompu.
+    # Publique pour les tests.
+    def self.read_cached_langs : Array(String)?
+      return nil unless File.file?(available_cache_file)
+      data = JSON.parse(File.read(available_cache_file))
+      data["langs"].as_a.map(&.as_s)
+    rescue
+      nil
+    end
+
+    private def self.cmd_available(args : Array(String)) : Nil
+      json = false
+      offline = false
+      refresh = false
+
+      args.each do |arg|
+        case arg
+        when "-j", "--json"
+          json = true
+        when "-o", "--offline"
+          offline = true
+        when "-r", "--refresh-cache"
+          refresh = true
+        else
+          STDERR.puts "Erreur : flag `#{arg}` inconnu pour `hyph available`."
+          STDERR.puts "Flags valides : -j/--json, -o/--offline, -r/--refresh-cache."
+          exit EXIT_USAGE
+        end
+      end
+
+      # `--refresh-cache` : on efface le cache disque AVANT le
+      # fetch pour garantir un re-fetch même si la requête échoue
+      # (l'utilisateur a explicitement demandé à invalider).
+      if refresh && File.file?(available_cache_file)
+        File.delete(available_cache_file)
+      end
+
+      remote_langs = nil.as(Array(String)?)
+      warning = nil.as(String?)
+
+      if offline
+        # Mode hors-ligne : on n'interroge pas le réseau et on
+        # n'utilise pas non plus le cache (la source effective
+        # est le manifest embarqué).
+        remote_langs = nil
+      elsif !refresh && available_cache_valid? && (cached = read_cached_langs)
+        # Cache encore frais : lecture sans HTTP.
+        remote_langs = cached
+      else
+        # Pas de cache valable : fetch HTTP. En cas d'erreur, on
+        # tombe sur le manifest avec un warning (exit 0 + stderr).
+        begin
+          remote_langs = fetch_available_langs(available_source_url)
+        rescue ex
+          warning = "Avertissement : impossible d'interroger #{available_source_url} (#{ex.message}). Repli sur le manifest embarqué."
+        end
+      end
+
+      installed = installed_langs.to_set
+      embedded_langs = Hyphenation::Loader::EMBEDDED.keys.to_set
+      manifest_langs = Hyphenation::MANIFEST.keys.to_set
+
+      # Univers des langues à afficher : union des trois sources
+      # (CTAN distant + manifest local + langues installées). Si
+      # `--offline`, on retire la couche CTAN.
+      universe = manifest_langs + installed + embedded_langs
+      universe += remote_langs.to_set if remote_langs
+      sorted = universe.to_a.sort
+
+      if json
+        rows = sorted.map do |lang|
+          {
+            "lang"     => JSON::Any.new(lang),
+            "ctan"     => JSON::Any.new(remote_langs ? remote_langs.includes?(lang) : false),
+            "manifest" => JSON::Any.new(manifest_langs.includes?(lang)),
+            "local"    => JSON::Any.new(local_status_label(lang, embedded_langs, installed)),
+          }
+        end
+        payload = {
+          "source"     => JSON::Any.new(remote_langs ? available_source_url : "offline"),
+          "fetched_at" => JSON::Any.new(File.file?(available_cache_file) ? File.info(available_cache_file).modification_time.to_utc.to_rfc3339 : ""),
+          "total"      => JSON::Any.new(sorted.size.to_i64),
+          "patterns"   => JSON::Any.new(rows.map { |r| JSON::Any.new(r) }),
+        }
+        puts JSON::Any.new(payload).to_json
+        STDERR.puts warning if warning
+      else
+        STDERR.puts warning if warning
+        puts "Patterns hyphenation disponibles (#{sorted.size} langues) :"
+        puts ""
+        printf "%-12s  %-12s  %-9s  %s\n", "Langue", "Source CTAN", "Manifest", "Local"
+        puts "-" * 60
+        sorted.each do |lang|
+          ctan_col = if remote_langs.nil?
+                       "—"
+                     elsif remote_langs.includes?(lang)
+                       "oui"
+                     else
+                       "non"
+                     end
+          manifest_col = manifest_langs.includes?(lang) ? "✓" : "✗"
+          local_col = local_status_label(lang, embedded_langs, installed)
+          printf "%-12s  %-12s  %-9s  %s\n", lang, ctan_col, manifest_col, local_col
+        end
+      end
+    end
+
+    # Étiquette « local » pour le tableau / JSON : embarqué (au
+    # build), installé (XDG), ou absent. Ordre de priorité :
+    # installé l'emporte sur embarqué (la couche utilisateur
+    # masque la couche binaire).
+    private def self.local_status_label(lang : String, embedded : Set(String), installed : Set(String)) : String
+      if installed.includes?(lang)
+        "installé"
+      elsif embedded.includes?(lang)
+        "embarqué"
+      else
+        "absent"
       end
     end
 
