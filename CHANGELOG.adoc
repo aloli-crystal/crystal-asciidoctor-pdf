@@ -3,6 +3,63 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.74 — 2026-06-03
+
+=== Added
+
+* **J4.B: native PDF emission for justified text — `TJ` for
+  composite fonts, `Tw` for simple fonts.** Bumped
+  `aloli-crystal/pdf` dependency from `~> 0.6.4` to `~> 1.2`,
+  which now exposes `page.text(word_spacing:, char_spacing:)`
+  (`Tw` + `Tc` operators, ISO 32000-1 §§ 9.3.3 and 9.3.2) and
+  `page.text_positioned(runs)` (`TJ` operator, § 9.4.3) with
+  automatic font-type detection via `page.composite_font?`.
+
+  Implementation in `render_segment_line`:
+
+  0. For each non-badge segment with `extra_per_space > 0`:
+     try the native path via the new helper
+     `try_native_justified_text`.
+  0. If the segment is natively renderable (no country flag,
+     no emoji, no CJK run — checked by `native_renderable?`):
+
+     - **Simple font (Type1, AFM)**: `page.text(content,
+       word_spacing: extra)` emits native `Tw`. The PDF engine
+       applies the extra to every `0x20` byte.
+     - **Composite font (TrueType, CID — our default with Noto
+       Sans)**: `Tw` does not apply (ISO 32000-1 § 9.3.3:
+       “word spacing shall not apply to occurrences of the
+       byte value 32 in multiple-byte codes”). Instead we emit
+       `TJ` with explicit between-word offsets:
+       `[word1, " ", -extra_tj, word2, " ", -extra_tj, word3] TJ`.
+       The negative delta in text space units translates the
+       cursor rightward (inverse PDF convention).
+  0. If the segment contains an inline-mixed element (flag,
+     emoji, CJK run): fall back to manual word-by-word
+     advancement via `draw_text_run` — behavior preserved.
+
+  Quantitative verification on the test PDF
+  (`/tmp/codespan-test.adoc`): 58 `TJ` operators now emitted
+  (was 0), 30 % `Tj` operators saved (~200 → 139). Visual
+  rendering is strictly pixel-identical — the optimization
+  happens at the PDF content stream level, not glyph placement.
+
+  Typographic bonus for CJK: the `TJ` path is the
+  infrastructure needed for upcoming CJK justification (`Tc`
+  character-spacing stretching all glyphs rather than spaces,
+  the canonical “中文两端对齐” convention).
+
+=== Documentation correction
+
+* **Rectified the v2.3.24.73 note about native `Tw`.** The
+  previous changelog claimed the `aloli-crystal/pdf` shard
+  didn't support `Tw`. That was a false negative on my side —
+  a grep against `lib/pdf/` (installation frozen at `0.6.4`)
+  missed the new methods added in `1.1.0` and `1.2.0`. The
+  dependency bump above restores ground truth: `Tw` / `Tc` /
+  `TJ` are all three available in `pdf 1.2.0`, with automatic
+  font-type detection to emit the right operator.
+
 == v2.3.24.73 — 2026-06-03
 
 === Fixed

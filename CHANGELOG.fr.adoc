@@ -3,6 +3,66 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.74 — 2026-06-03
+
+=== Ajouté
+
+* **J4.B : émission PDF native pour le texte justifié — `TJ`
+  pour les polices composites, `Tw` pour les polices simples.**
+  Bump de la dépendance `aloli-crystal/pdf` de `~> 0.6.4` à
+  `~> 1.2` qui expose désormais `page.text(word_spacing:,
+  char_spacing:)` (opérateurs `Tw` + `Tc`,
+  ISO 32000-1 §§ 9.3.3 et 9.3.2) et `page.text_positioned(runs)`
+  (opérateur `TJ`, § 9.4.3) avec auto-détection du type de
+  police via `page.composite_font?`.
++
+  Implémentation dans `render_segment_line` :
++
+  0. Pour chaque segment non-badge avec `extra_per_space > 0` :
+     tentative préalable du chemin natif via le nouveau helper
+     `try_native_justified_text`.
+  0. Si le segment est rendable nativement (pas de drapeau pays,
+     pas d'emoji, pas de run CJK — vérifié par `native_renderable?`) :
++
+     - **Police simple (Type1, AFM)** : `page.text(content,
+       word_spacing: extra)` qui émet `Tw` natif. Le moteur PDF
+       applique l'extra à chaque octet `0x20`.
+     - **Police composite (TrueType, CID — notre cas par défaut
+       avec Noto Sans)** : `Tw` ne s'applique pas (ISO 32000-1
+       § 9.3.3 : « word spacing shall not apply to occurrences
+       of the byte value 32 in multiple-byte codes »). On émet
+       à la place un `TJ` avec déplacements explicites entre
+       mots : `[mot1, " ", -extra_tj, mot2, " ", -extra_tj, mot3] TJ`.
+       Le delta négatif en text space units translate le curseur
+       vers la droite (convention PDF inverse).
+  0. Si le segment contient un élément inline mixte (drapeau,
+     emoji, run CJK) : fallback sur l'avancement manuel
+     mot-par-mot via `draw_text_run` — comportement préservé.
++
+  Vérification quantitative sur le PDF de test
+  (`/tmp/codespan-test.adoc`) : 58 opérateurs `TJ` désormais
+  émis (auparavant 0), 30 % d'opérateurs `Tj` économisés
+  (~200 → 139). Le rendu visuel reste strictement identique au
+  pixel près — l'optimisation se fait au niveau du flux de
+  content stream PDF, pas du placement des glyphes.
++
+  Bonus typographique CJK : la voie `TJ` est l'infrastructure
+  nécessaire pour la justification CJK à venir (`Tc`
+  character-spacing étirant tous les glyphes plutôt que les
+  espaces, convention « 中文两端对齐 »).
+
+=== Corrigé documentation
+
+* **Rectification de la note v2.3.24.73 sur `Tw` natif.** Le
+  changelog précédent affirmait que le shard `aloli-crystal/pdf`
+  ne supportait pas `Tw`. C'était un faux positif de ma part —
+  un grep depuis `lib/pdf/` (l'installation figée à `0.6.4`)
+  manquait les nouvelles méthodes ajoutées en `1.1.0` et `1.2.0`.
+  Le bump de dépendance ci-dessus rétablit la vérité : `Tw` /
+  `Tc` / `TJ` sont tous trois disponibles dans le gem
+  `pdf 1.2.0`, avec auto-détection du type de police pour
+  émettre l'opérateur adapté.
+
 == v2.3.24.73 — 2026-06-03
 
 === Corrigé

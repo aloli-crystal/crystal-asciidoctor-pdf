@@ -3813,15 +3813,29 @@ module AsciidoctorPDF
         # et l'extra est juste comptabilisé pour `current_x`.
         has_badge = seg.mark || seg.kbd || seg.button || seg.mono
         if extra_per_space > 0.0 && !has_badge && seg.text.includes?(' ')
-          parts = seg.text.split(' ')
-          space_w = font.string_width(" ", eff_font_size)
-          parts.each_with_index do |part, i|
-            if i > 0
-              current_x += space_w + extra_per_space
+          # J4.B (v2.3.24.74) : tente d'abord le chemin PDF natif —
+          # `Tw` (ISO 32000-1 § 9.3.3) pour les polices simples,
+          # `TJ` (§ 9.4.3) avec déplacements explicites pour les
+          # polices composites (TTF / CID) où `Tw` ne s'applique pas
+          # au byte 32 des codes multi-octets. Une seule opération
+          # PDF par segment au lieu d'un `Tj` par mot — flux plus
+          # compact et émission conforme à la pratique standard.
+          # Fallback sur l'avancement manuel mot-par-mot quand le
+          # texte contient des éléments inline mixtes (drapeaux,
+          # emojis, runs CJK) qui demandent un dessin segmenté.
+          if (advanced = try_native_justified_text(page, seg.text, current_x, eff_y, font_name, eff_font_size, extra_per_space))
+            current_x += advanced
+          else
+            parts = seg.text.split(' ')
+            space_w = font.string_width(" ", eff_font_size)
+            parts.each_with_index do |part, i|
+              if i > 0
+                current_x += space_w + extra_per_space
+              end
+              next if part.empty?
+              draw_text_run(page, part, current_x, eff_y, font_name, eff_font_size)
+              current_x += font.string_width(part, eff_font_size)
             end
-            next if part.empty?
-            draw_text_run(page, part, current_x, eff_y, font_name, eff_font_size)
-            current_x += font.string_width(part, eff_font_size)
           end
         else
           # J4 (v2.3.24.73) : si le segment porte un préfixe espace
@@ -4342,6 +4356,86 @@ module AsciidoctorPDF
       flush_text.call
       flush_cjk.call
       result
+    end
+
+    # Texte « rendable nativement » par le moteur PDF = sans drapeau
+    # pays, sans emoji, sans run CJK. Pour ces textes, on peut
+    # déléguer la justification au PDF (`Tw` ou `TJ`) au lieu de
+    # passer par `draw_text_run` mot-par-mot. Les éléments inline
+    # mixtes nécessitent en effet la pipeline `draw_text_run` qui
+    # bascule sur des dessins SVG (drapeaux, emojis) ou sur la
+    # police CJK secondaire. La NBSP (U+00A0) est tolérée — elle
+    # sera substituée par un espace ASCII au moment de l'émission.
+    private def native_renderable?(text : String) : Bool
+      flag_segs = InlineFlags.segments(text)
+      return false if flag_segs.size != 1 || flag_segs[0][0] != :text
+      emoji_segs = text_with_emoji_segments(text.gsub(' ', ' '))
+      emoji_segs.size == 1 && emoji_segs[0][0] == :text
+    end
+
+    # J4.B (v2.3.24.74) : tente une émission PDF native d'un texte
+    # justifié. Renvoie la largeur consommée si succès, `nil` si on
+    # doit retomber sur le chemin manuel mot-par-mot.
+    #
+    # Pour les polices simples (Type1 / AFM standard, ex. Helvetica) :
+    # `page.text(content, word_spacing: extra)` émet l'opérateur PDF
+    # natif `Tw` (ISO 32000-1 § 9.3.3). Une seule opération par
+    # segment, le moteur PDF applique l'extra à chaque octet 0x20.
+    #
+    # Pour les polices composites (TrueType / CID, Noto Sans etc.) :
+    # `Tw` ne s'applique PAS (cf. spec § 9.3.3 « word spacing shall
+    # not apply to occurrences of the byte value 32 in multiple-byte
+    # codes »). On utilise alors `page.text_positioned(runs)` qui
+    # émet l'opérateur `TJ` (§ 9.4.3) avec des déplacements
+    # explicites entre chaque mot : `[mot, " ", -delta, mot, …] TJ`.
+    # Le delta est négatif en text space units car la convention
+    # PDF est d'inverser le signe (déplacement à droite = nombre
+    # négatif soustrait à la position).
+    #
+    # Tests en aval via bbox-extraction : le rendu visuel doit
+    # rester identique au chemin manuel mot-par-mot.
+    private def try_native_justified_text(
+      page : PDF::Page,
+      text : String,
+      x : Float64,
+      y : Float64,
+      font_name : String,
+      font_size : Float64,
+      extra_per_space : Float64,
+    ) : Float64?
+      return nil unless native_renderable?(text)
+
+      softened = text.gsub(' ', ' ')
+      printable = safe_text(softened, font_name)
+      font = get_font(font_name)
+      set_font(page, font_name, font_size)
+
+      if page.composite_font?
+        # TJ array : on émet chaque mot séparément, entrecoupé
+        # d'un espace ASCII puis d'un déplacement `extra_tj`.
+        # Les espaces eux-mêmes restent dans la chaîne (largeur
+        # naturelle space_w consommée par le glyph), le delta
+        # vient s'ajouter pour matérialiser l'élargissement justify.
+        extra_tj = -extra_per_space * 1000.0 / font_size
+        runs = [] of PDF::Page::TextRun
+        parts = printable.split(' ')
+        parts.each_with_index do |part, i|
+          if i > 0
+            runs << " "
+            runs << extra_tj
+          end
+          runs << part unless part.empty?
+        end
+        page.text_positioned(runs, at: {x, y})
+      else
+        # Polices simples : `Tw` natif suffit.
+        page.text(printable, at: {x, y}, word_spacing: extra_per_space)
+      end
+
+      # Largeur consommée = string width naturelle + extra · nb_espaces.
+      # Identique pour les deux chemins puisque le rendu visuel
+      # est équivalent (Tw et TJ produisent le même placement).
+      font.string_width(printable, font_size) + extra_per_space * printable.count(' ')
     end
 
     # Découpe un texte en lignes selon la largeur disponible.

@@ -30,7 +30,7 @@ shards:
 
   pdf:
     git: https://github.com/aloli-crystal/pdf.git
-    version: 0.6.4
+    version: 1.2.0
 
   stumpy_core:
     git: https://github.com/stumpycr/stumpy_core.git
