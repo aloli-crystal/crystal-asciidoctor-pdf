@@ -3597,87 +3597,28 @@ module AsciidoctorPDF
     # donnée. Préserve les attributs de style (gras, italique, mono,
     # couleur, lien) — ce que `wrap_text` ne sait pas faire car il
     # travaille sur du texte brut.
+    #
+    # Implémentation : délègue à `ParagraphComposer` qui transforme
+    # les segments en flux de tokens TeX (Box/Glue/Penalty) puis
+    # compose les lignes via un algorithme first-fit. La structure
+    # typée prépare le passage à Knuth-Plass + Liang hyphenation
+    # (J3). Bénéfice immédiat : les espaces insécables (NBSP) sont
+    # absorbés dans la Box voisine et garantis insécables —
+    # « deploy : il » ne peut plus être cassé sur le `:`.
     private def wrap_segments(
       segments : Array(InlineSegment),
       width : Float64,
       font_size : Float64,
     ) : Array(Array(InlineSegment))
-      lines = [] of Array(InlineSegment)
-      current_line = [] of InlineSegment
-      current_width = 0.0
-
-      segments.each do |seg|
-        # Marqueur de saut de ligne forcé (`<br>` HTML, `+\n`
-        # AsciiDoc) : ferme la ligne courante quel que soit son état
-        # de remplissage et démarre une nouvelle ligne vide.
-        if seg.line_break
-          lines << current_line
-          current_line = [] of InlineSegment
-          current_width = 0.0
-          next
-        end
-
-        # Image inline : occupe une largeur connue (pdfwidth / width
-        # explicite, ou défaut basé sur la taille de police). Pas de
-        # split par mots — on traite le segment comme un atome.
-        if seg.image_path
-          img_w = seg.image_width || (font_size * 1.2)
-          if current_width + img_w > width && !current_line.empty?
-            lines << current_line
-            current_line = [] of InlineSegment
-            current_width = 0.0
-          end
-          current_line << seg
-          current_width += img_w + 2.0
-          next
-        end
-
-        font_name = resolve_inline_font(seg)
-        font = get_font(font_name)
-        space_w = font.string_width(" ", font_size)
-
-        # En début de ligne (current_line vide), on strip les
-        # whitespace de tête — notamment le `\n` qui suit un `<br>`
-        # injecté par crystal-asciidoctor pour un hard break ` +`
-        # AsciiDoc. Sans ce strip, le 1er mot apparaissait précédé
-        # d'un blanc parasite (« Licence » avec espace devant).
-        effective_text = current_line.empty? ? seg.text.lstrip : seg.text
-        words = effective_text.split(" ")
-        words.each_with_index do |word, idx|
-          word_w = font.string_width(word, font_size)
-          sep_w = (idx > 0 || !current_line.empty?) ? space_w : 0.0
-
-          if current_width + sep_w + word_w > width && !current_line.empty?
-            lines << current_line
-            current_line = [] of InlineSegment
-            current_width = 0.0
-            sep_w = 0.0
-          end
-
-          prefix = sep_w > 0 ? " " : ""
-          current_line << InlineSegment.new(
-            text: prefix + word,
-            bold: seg.bold,
-            italic: seg.italic,
-            mono: seg.mono,
-            sup: seg.sup,
-            sub: seg.sub,
-            mark: seg.mark,
-            kbd: seg.kbd,
-            button: seg.button,
-            menu: seg.menu,
-            color: seg.color,
-            link: seg.link,
-            image_path: seg.image_path,
-            image_width: seg.image_width,
-            image_height: seg.image_height
-          )
-          current_width += sep_w + word_w
-        end
+      tokens = ParagraphComposer.tokenize(segments, font_size) do |seg, text|
+        # Mesure de largeur dans la police résolue du segment, à
+        # `font_size` brut (sans ajustement sup/sub/kbd) — conforme
+        # au comportement historique de `wrap_segments`.
+        font = get_font(resolve_inline_font(seg))
+        font.string_width(text, font_size)
       end
-
-      lines << current_line unless current_line.empty?
-      lines
+      lines = ParagraphComposer.compose_first_fit(tokens, width)
+      lines.map(&.segments)
     end
 
     # Rend une ligne de segments inline sur la page PDF.

@@ -3,6 +3,63 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.69 — 2026-06-03
+
+=== Corrigé
+
+* **NBSP française écrasée avant d'atteindre le wrap.** La regex
+  de normalisation des whitespace dans `InlineRenderer.parse`
+  (`gsub(/\s+/, " ")`) traitait l'espace insécable U+00A0 comme
+  un whitespace ordinaire (PCRE2 en mode Unicode classe la NBSP
+  dans `\s`). Résultat : toutes les NBSP fraîchement insérées
+  par `apply_french_typography` (devant `:`, `;`, `!`, `?`, `»`)
+  étaient remplacées par un espace ASCII une étape plus loin,
+  et `wrap_segments` cassait la ligne dessus. La règle de
+  l'Imprimerie nationale n'était pas respectée : « deploy : il »
+  pouvait se voir séparé en « deploy » sur une ligne et « : il »
+  sur la suivante.
+
+  La regex devient `gsub(/[^\S\x{00A0}]+/, " ")` — « tout
+  whitespace SAUF la NBSP ». Les NBSP sont désormais préservées
+  tout au long du pipeline et atteignent `wrap_segments` qui ne
+  splittait déjà que sur l'espace ASCII strict.
+
+=== Ajouté
+
+* **Moteur de composition de paragraphes structuré
+  (`ParagraphComposer`).** Refactor de `wrap_segments` qui
+  délègue désormais à un nouveau module
+  `src/asciidoctor_pdf/paragraph_composer.cr` modélisant le flux
+  de texte en tokens TeX : `Box` (mot ou groupe NBSP-lié,
+  largeur fixe non-cassable), `Glue` (espace élastique, point
+  de coupure légal), `Penalty` (saut forcé / interdit /
+  conditionnel). L'algorithme `compose_first_fit` reproduit
+  fidèlement le comportement greedy historique — 217/217 specs
+  passent. Bénéfice immédiat : l'insécabilité des NBSP est
+  garantie par construction (elles sont absorbées dans la Box
+  voisine et ne peuvent plus être des break-points).
+
+  Référence : Knuth & Plass, *Breaking Paragraphs into Lines*,
+  Software Practice & Experience, vol. 11, p. 1119-1184, 1981.
+
+  Cette structure est la fondation typée pour les jalons
+  suivants : J2 (patterns Liang de césure pour FR/EN/DE/ES/IT/
+  PT/NL embarqués + sous-commande CLI `hyph` pour ajouter
+  d'autres langues), J3 (algorithme Knuth-Plass — optimisation
+  globale du paragraphe minimisant la badness), J4 (sortie PDF
+  via l'opérateur natif `Tw` ISO 32000-1 § 9.3.3).
+
+=== Documentation
+
+* **`doc/CLI_HYPH_SPEC.adoc`** : spécification de la
+  sous-commande CLI `hyph` à venir (7 sous-commandes : `list`,
+  `available`, `install`, `remove`, `update`, `show`, `help`).
+  Inspiration `tlmgr` (TeX Live Manager) — pas de
+  téléchargement automatique au runtime, vérification SHA-256
+  obligatoire contre un manifest embarqué, cascade de
+  résolution projet → XDG → embarqué. Implémentation
+  ultérieure, indépendante du chantier composer.
+
 == v2.3.24.68 — 2026-06-02
 
 === Corrigé

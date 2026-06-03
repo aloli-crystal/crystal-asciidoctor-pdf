@@ -11,6 +11,7 @@ require "./asciidoctor_pdf/win_ansi"
 require "./asciidoctor_pdf/sanitizer"
 require "./asciidoctor_pdf/text_transformer"
 require "./asciidoctor_pdf/inline_renderer"
+require "./asciidoctor_pdf/paragraph_composer"
 require "./asciidoctor_pdf/syntax_highlighter"
 require "./asciidoctor_pdf/converter"
 

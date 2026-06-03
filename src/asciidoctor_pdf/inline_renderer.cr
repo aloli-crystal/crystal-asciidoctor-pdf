@@ -61,7 +61,13 @@ module AsciidoctorPDF
         .gsub(/&ndash;/, "\u2013")
         .gsub(/&#160;/, "\u00A0")
         .gsub(/&nbsp;/, "\u00A0")
-        .gsub(/\s+/, " ")
+        # Normalise les runs de whitespace en un espace ASCII unique,
+        # SAUF la NBSP (U+00A0) qui doit rester ins\u00E9cable : `\s` matche
+        # tous les whitespace Unicode (NBSP incluse) et \u00E9crabouillerait
+        # le marquage de typographie fran\u00E7aise pos\u00E9 en amont par
+        # `apply_french_typography`. La classe `[^\S\u00A0]` =
+        # \u00AB whitespace mais pas la NBSP \u00BB.
+        .gsub(/[^\S\x{00A0}]+/, " ")
 
       # Parcourir le HTML avec un état de style courant
       parse_html(text, segments)

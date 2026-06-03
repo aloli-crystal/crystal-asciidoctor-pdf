@@ -1,0 +1,832 @@
+= Sous-commande CLI `hyph` — gestion des patterns de césure
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+Cette spec décrit la sous-commande `hyph` du binaire
+`bin/asciidoctor-pdf` (nom court interne : `crystal-asciidoctor-pdf`).
+Elle gère les *patterns de césure Liang* utilisés par le moteur
+Knuth-Plass introduit aux jalons J1–J4 du chantier de composition de
+paragraphes.
+
+== Synopsis
+
+[source,bash]
+----
+asciidoctor-pdf hyph <sous-commande> [options] [arguments]
+----
+
+== But
+
+Permettre à l'utilisateur :
+
+0. de *lister* les patterns disponibles localement (embarqués, installés,
+   projet) ;
+0. de *découvrir* les patterns publiables via CTAN ;
+0. d'*installer*, *mettre à jour*, *supprimer* des patterns sans
+   recompiler le binaire ;
+0. d'*inspecter* les métadonnées d'un pattern (URL, SHA-256, licence).
+
+== Philosophie : `tlmgr`-like
+
+Inspiration directe du TeX Live Manager :
+
+0. *Aucun téléchargement implicite au runtime du rendu PDF.* Le rendu
+   utilise uniquement ce qui est déjà sur disque (cascade). Tout
+   téléchargement est *explicite* via `hyph install` ou `hyph update`.
+0. *Pas de daemon, pas d'arrière-plan.* L'utilisateur garde la main.
+0. *Empreintes vérifiables.* Tout pattern téléchargé est vérifié par
+   SHA-256, soit contre le manifest embarqué, soit contre une valeur
+   passée explicitement par l'utilisateur.
+0. *Reproductible.* La cascade autorise un commit `./hyphenation/*.tex`
+   dans le repo AsciiDoc pour figer la version utilisée en CI.
+
+== Cascade de résolution
+
+Quand le moteur Knuth-Plass demande les patterns pour une langue donnée,
+la résolution se fait *du plus prioritaire au moins* :
+
+[cols="1,3,3,1"]
+|===
+| Ordre | Source | Emplacement | Priorité
+
+| 1
+| Projet courant
+| `./hyphenation/hyph-<lang>.tex`
+| max
+
+| 2
+| Utilisateur (XDG)
+| `${XDG_CONFIG_HOME:-~/.config}/asciidoctor-pdf/hyphenation/hyph-<lang>.tex`
+| haute
+
+| 3
+| Embarquée (build-time)
+| 7 langues : FR, EN, DE, ES, IT, PT, NL (via macro `read_file`)
+| basse
+
+| 4
+| Fallback
+| pas de césure + warning au log : `[hyph] no patterns for '<lang>', falling back to no hyphenation`
+| -
+|===
+
+Conséquence : un fichier `./hyphenation/hyph-fr.tex` commité dans le
+repo AsciiDoc *écrase* la version FR embarquée — utile pour figer une
+révision précise en CI.
+
+== Sous-commandes
+
+=== `hyph list`
+
+Liste les patterns disponibles localement après application de la
+cascade.
+
+==== Signature
+
+[source,bash]
+----
+asciidoctor-pdf hyph list [-j|--json] [-a|--all]
+----
+
+==== Flags
+
+[cols="1,1,4"]
+|===
+| Long | Short | Description
+
+| `--json`
+| `-j`
+| Sortie JSON exploitable par scripts. Sortie texte humaine par défaut.
+
+| `--all`
+| `-a`
+| Inclut les langues du manifest non installées (statut `available`).
+  Par défaut, seules les langues présentes localement sont listées.
+|===
+
+==== Exit codes
+
+[cols="1,5"]
+|===
+| Code | Sens
+
+| `0` | Succès (liste affichée, même vide).
+| `2` | Flag inconnu ou argument positionnel inattendu.
+|===
+
+==== Format texte
+
+[source,bash]
+----
+$ asciidoctor-pdf hyph list
+LANG     SOURCE      VERSION       SIZE     PATH
+fr       embedded    2023-08-15    42 KiB   <built-in>
+fr       project     2024-01-12    44 KiB   ./hyphenation/hyph-fr.tex   (overrides embedded)
+en-us    embedded    2023-08-15    38 KiB   <built-in>
+ja       installed   2024-02-03    91 KiB   ~/.config/asciidoctor-pdf/hyphenation/hyph-ja.tex
+----
+
+==== Format JSON
+
+[source,json]
+----
+{
+  "patterns": [
+    {
+      "lang": "fr",
+      "source": "project",
+      "version": "2024-01-12",
+      "size_bytes": 45056,
+      "path": "./hyphenation/hyph-fr.tex",
+      "overrides": "embedded"
+    },
+    {
+      "lang": "ja",
+      "source": "installed",
+      "version": "2024-02-03",
+      "size_bytes": 93184,
+      "path": "/home/phil/.config/asciidoctor-pdf/hyphenation/hyph-ja.tex"
+    }
+  ]
+}
+----
+
+==== Exemples
+
+[source,bash]
+----
+asciidoctor-pdf hyph list                # texte humain, local seulement
+asciidoctor-pdf hyph list -j             # JSON, local seulement
+asciidoctor-pdf hyph list -a             # inclut les langues CTAN non installées
+asciidoctor-pdf hyph list -a -j | jq '.patterns[] | select(.source == "available")'
+----
+
+=== `hyph available`
+
+Liste les ~80 langues téléchargeables depuis CTAN avec leur statut
+local. *Effectue une requête HTTP* (opt-in implicite, mais une seule).
+
+==== Signature
+
+[source,bash]
+----
+asciidoctor-pdf hyph available [-r|--refresh-cache] [-j|--json] [-o|--offline]
+----
+
+==== Flags
+
+[cols="1,1,4"]
+|===
+| Long | Short | Description
+
+| `--refresh-cache`
+| `-r`
+| Force la requête HTTP même si le cache local (TTL 7 jours) est encore
+  valide.
+
+| `--json`
+| `-j`
+| Sortie JSON.
+
+| `--offline`
+| `-o`
+| Ne fait aucune requête réseau ; affiche uniquement le manifest embarqué
+  (utile en CI sans accès Internet).
+|===
+
+==== Exit codes
+
+[cols="1,5"]
+|===
+| Code | Sens
+
+| `0` | Succès.
+| `3` | Erreur réseau (timeout, DNS, HTTP 5xx). Le manifest embarqué est
+        affiché en repli avec un avertissement.
+| `2` | Flag inconnu.
+|===
+
+==== Sortie texte
+
+[source,bash]
+----
+$ asciidoctor-pdf hyph available
+LANG        NAME                       VERSION       STATUS         LICENSE
+fr          French                     2023-08-15    embedded       LPPL 1.3
+en-us       English (US)               2023-08-15    embedded       LPPL 1.3
+en-gb       English (UK)               2023-08-15    available      LPPL 1.3
+ja          Japanese                   2024-02-03    installed      MIT
+zh          Chinese (simplified)       2023-12-01    available      LPPL 1.3
+ar          Arabic                     2023-09-22    available      LPPL 1.3
+... (75 more)
+----
+
+==== Exemples
+
+[source,bash]
+----
+asciidoctor-pdf hyph available
+asciidoctor-pdf hyph available -r              # bypass cache
+asciidoctor-pdf hyph available -o              # CI sans réseau
+CTAN_MIRROR=https://ctan.crest.fr asciidoctor-pdf hyph available
+----
+
+=== `hyph install <lang>`
+
+Télécharge `hyph-<lang>.tex` depuis CTAN, vérifie SHA-256, place le
+fichier dans le répertoire utilisateur XDG.
+
+==== Signature
+
+[source,bash]
+----
+asciidoctor-pdf hyph install <lang> [-u|--from <url>] [-s|--sha256 <hash>] [-f|--force] [-n|--dry-run]
+----
+
+==== Arguments
+
+[cols="1,5"]
+|===
+| `<lang>` | Code BCP 47 court, p.ex. `fr`, `en-us`, `ja`, `zh-hans`.
+|===
+
+==== Flags
+
+[cols="1,1,4"]
+|===
+| Long | Short | Description
+
+| `--from`
+| `-u`
+| URL alternative au lieu de l'URL CTAN du manifest. Implique
+  `--sha256` (vérification obligatoire).
+
+| `--sha256`
+| `-s`
+| SHA-256 attendu (hex, 64 caractères). *Obligatoire* si la langue n'est
+  pas manifestée OU si `--from` est utilisé.
+
+| `--force`
+| `-f`
+| Réinstalle même si la langue est déjà présente (XDG).
+
+| `--dry-run`
+| `-n`
+| Affiche ce qui serait téléchargé et vérifié, sans rien écrire.
+|===
+
+==== Exit codes
+
+[cols="1,5"]
+|===
+| Code | Sens
+
+| `0`  | Installation réussie (fichier écrit, SHA-256 vérifié).
+| `2`  | Argument invalide (code langue malformé, hash non-hex, flag inconnu).
+| `3`  | Erreur réseau (DNS, timeout, HTTP 4xx/5xx).
+| `4`  | SHA-256 mismatch — le fichier *n'est pas écrit*.
+| `5`  | Langue inconnue (pas dans le manifest) ET `--sha256` non fourni.
+| `6`  | Fichier > 1 Mo (refus silencieux DoS, message d'erreur clair).
+| `7`  | Contenu invalide (absence de `\patterns{` et `\hyphenation{`).
+| `8`  | XDG read-only ou permission refusée à l'écriture.
+| `9`  | Langue déjà installée et `--force` non fourni.
+|===
+
+==== Exemples
+
+[source,bash]
+----
+# Cas standard : langue manifestée
+asciidoctor-pdf hyph install ja
+
+# Langue non manifestée : --sha256 obligatoire
+asciidoctor-pdf hyph install lt -s 9c3f1e2b...
+
+# URL alternative (miroir privé, version patchée) : --sha256 obligatoire
+asciidoctor-pdf hyph install fr -u https://intra.aloli.fr/hyph-fr.tex \
+  -s 4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b
+
+# Override d'une version déjà installée
+asciidoctor-pdf hyph install ja -f
+
+# Simulation
+asciidoctor-pdf hyph install ar -n
+----
+
+=== `hyph remove <lang>`
+
+Supprime un pattern *installé par l'utilisateur* (XDG). Refuse
+explicitement de toucher aux patterns embarqués au build.
+
+==== Signature
+
+[source,bash]
+----
+asciidoctor-pdf hyph remove <lang> [-y|--yes]
+----
+
+==== Flags
+
+[cols="1,1,4"]
+|===
+| Long | Short | Description
+| `--yes` | `-y` | Pas de prompt de confirmation interactive.
+|===
+
+==== Exit codes
+
+[cols="1,5"]
+|===
+| Code | Sens
+
+| `0`  | Suppression réussie.
+| `2`  | Argument invalide.
+| `10` | Pattern absent du XDG (rien à supprimer).
+| `11` | Tentative de suppression d'un pattern embarqué (refusé).
+| `8`  | Permission refusée.
+|===
+
+==== Exemples
+
+[source,bash]
+----
+asciidoctor-pdf hyph remove ja
+asciidoctor-pdf hyph remove zh -y       # sans prompt
+asciidoctor-pdf hyph remove fr          # refusé (embarqué) -> exit 11
+----
+
+=== `hyph update [<lang>]`
+
+Re-télécharge un ou tous les patterns *installés par l'utilisateur*. Les
+patterns embarqués ne sont pas concernés (ils suivent la version du
+binaire).
+
+==== Signature
+
+[source,bash]
+----
+asciidoctor-pdf hyph update [<lang>] [-a|--all] [-n|--dry-run] [-y|--yes]
+----
+
+==== Comportement
+
+0. Sans argument et sans `-a` : erreur (exit 2), demande explicite.
+0. Avec `<lang>` : met à jour ce pattern uniquement.
+0. Avec `-a|--all` : met à jour tous les patterns du XDG.
+0. Si le SHA-256 distant correspond déjà au local : *no-op*, log
+   `up-to-date`.
+
+==== Exit codes
+
+Identiques à `hyph install`, plus :
+
+[cols="1,5"]
+|===
+| `12` | Aucune langue installée (rien à mettre à jour avec `-a`).
+|===
+
+==== Exemples
+
+[source,bash]
+----
+asciidoctor-pdf hyph update ja
+asciidoctor-pdf hyph update -a
+asciidoctor-pdf hyph update -a -n        # simulation
+asciidoctor-pdf hyph update -a -y        # batch CI
+----
+
+=== `hyph show <lang>`
+
+Affiche les métadonnées d'un pattern (URL CTAN, SHA-256, licence, date,
+source réelle après cascade).
+
+==== Signature
+
+[source,bash]
+----
+asciidoctor-pdf hyph show <lang> [-j|--json]
+----
+
+==== Sortie texte
+
+[source,bash]
+----
+$ asciidoctor-pdf hyph show fr
+Language:      fr (French)
+Source:        project (./hyphenation/hyph-fr.tex)
+Overrides:     embedded
+Size:          45056 bytes
+SHA-256:       4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b
+Manifest URL:  https://mirrors.ctan.org/language/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-fr.tex
+License:       LPPL 1.3
+Pinned:        2023-08-15
+----
+
+==== Exit codes
+
+[cols="1,5"]
+|===
+| `0`  | Succès.
+| `13` | Langue absente (ni embarquée, ni installée, ni dans le projet).
+| `2`  | Argument invalide.
+|===
+
+=== `hyph help [<sub>]`
+
+Convention ALOLI obligatoire. Équivalent à `--help` global, ou focus sur
+une sous-commande.
+
+==== Signature
+
+[source,bash]
+----
+asciidoctor-pdf hyph help [<sub>]
+----
+
+==== Comportement
+
+0. Sans argument : affiche l'aide générale de `hyph` (toutes les
+   sous-commandes, courte description, exemples canoniques).
+0. Avec `<sub>` valide : affiche l'aide détaillée de cette sous-commande
+   (flags, exit codes, exemples).
+0. Avec `<sub>` invalide : exit 2, liste les sous-commandes valides.
+
+==== Exemples
+
+[source,bash]
+----
+asciidoctor-pdf hyph help
+asciidoctor-pdf hyph help install
+asciidoctor-pdf hyph help zorglub        # exit 2 + liste valide
+----
+
+=== Sous-commande inconnue
+
+Comportement strict ALOLI : refus explicite, exit 2, liste des
+sous-commandes valides.
+
+[source,bash]
+----
+$ asciidoctor-pdf hyph foobar
+error: unknown subcommand 'foobar'
+valid subcommands: list, available, install, remove, update, show, help
+----
+
+== Manifest embarqué
+
+=== Emplacement
+
+`src/asciidoctor_pdf/hyphenation/manifest.cr`
+
+=== Structure
+
+Constante Crystal `MANIFEST : Hash(String, PatternMeta)`, générée à la
+main puis maintenue dans le repo. Une entrée par langue connue.
+
+=== Champs par entrée
+
+[cols="1,3"]
+|===
+| Clé | Description
+
+| `name`     | Nom humain (anglais), p.ex. "French", "Japanese".
+| `url_path` | Chemin relatif au préfixe CTAN (juste `hyph-fr.tex`).
+| `sha256`   | SHA-256 hex (64 chars) du fichier pinné.
+| `license`  | Identifiant SPDX si possible : `LPPL-1.3c`, `MIT`, `LGPL-2.1-or-later`.
+| `pinned`   | Date ISO `YYYY-MM-DD` de la version pinnée.
+| `embedded` | `Bool` — `true` pour les 7 langues compilées dans le binaire.
+| `size`     | Taille en octets (informatif, validé à l'install).
+|===
+
+=== Préfixe d'URL
+
+[source]
+----
+https://mirrors.ctan.org/language/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/
+----
+
+Override par variable d'environnement `CTAN_MIRROR`. Exemples :
+
+* `CTAN_MIRROR=https://ctan.crest.fr/tex-archive`
+* `CTAN_MIRROR=https://intra.aloli.fr/mirrors/ctan`
+
+L'URL effective est construite par concaténation du miroir + chemin
+relatif du `url_path`.
+
+=== Exemple concret (5 langues)
+
+[source,crystal]
+----
+# src/asciidoctor_pdf/hyphenation/manifest.cr
+module AsciidoctorPdf::Hyphenation
+  record PatternMeta,
+    name : String,
+    url_path : String,
+    sha256 : String,
+    license : String,
+    pinned : String,
+    embedded : Bool,
+    size : Int32
+
+  MANIFEST = {
+    "fr" => PatternMeta.new(
+      name:     "French",
+      url_path: "hyph-fr.tex",
+      sha256:   "4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b",
+      license:  "LPPL-1.3c",
+      pinned:   "2023-08-15",
+      embedded: true,
+      size:     45056,
+    ),
+    "en-us" => PatternMeta.new(
+      name:     "English (US)",
+      url_path: "hyph-en-us.tex",
+      sha256:   "1f2e3d4c5b6a7980abcdef0123456789fedcba9876543210aabbccddeeff0011",
+      license:  "LPPL-1.3c",
+      pinned:   "2023-08-15",
+      embedded: true,
+      size:     38912,
+    ),
+    "ja" => PatternMeta.new(
+      name:     "Japanese",
+      url_path: "hyph-ja.tex",
+      sha256:   "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+      license:  "MIT",
+      pinned:   "2024-02-03",
+      embedded: false,
+      size:     93184,
+    ),
+    "ar" => PatternMeta.new(
+      name:     "Arabic",
+      url_path: "hyph-ar.tex",
+      sha256:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      license:  "LPPL-1.3c",
+      pinned:   "2023-09-22",
+      embedded: false,
+      size:     27648,
+    ),
+    "zh" => PatternMeta.new(
+      name:     "Chinese (simplified)",
+      url_path: "hyph-zh-latn-pinyin.tex",
+      sha256:   "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+      license:  "LPPL-1.3c",
+      pinned:   "2023-12-01",
+      embedded: false,
+      size:     12288,
+    ),
+    # ... 75 autres langues
+  } of String => PatternMeta
+end
+----
+
+== Cas d'erreur
+
+[cols="1,2,1,3"]
+|===
+| Scénario | Détection | Exit | Comportement
+
+| Réseau down (`hyph install` / `hyph available`)
+| `Socket::ConnectError` / timeout 30 s
+| 3
+| Message : `error: cannot reach <url>: connection refused`. Suggère
+  `--offline` pour `available`.
+
+| SHA-256 mismatch
+| Comparaison après download complet
+| 4
+| Fichier temporaire *supprimé*. Message : `error: sha256 mismatch for
+  hyph-<lang>.tex: expected <a>, got <b>`. Aucune écriture dans le XDG.
+
+| Langue inconnue (pas au manifest, pas de `--sha256`)
+| Lookup `MANIFEST[lang]?`
+| 5
+| Message : `error: language '<lang>' not in manifest; pass --sha256
+  <hash> to install at your own risk`.
+
+| XDG read-only / permission refusée
+| `File::AccessDeniedError` à l'écriture
+| 8
+| Message : `error: cannot write to <path>: permission denied`. Suggère
+  `chmod` ou `XDG_CONFIG_HOME=<other>`.
+
+| Fichier corrompu (contenu non-TeX)
+| Absence de `\patterns{` ET `\hyphenation{`
+| 7
+| Fichier temporaire *supprimé*. Message : `error: downloaded file
+  doesn't look like a TeX hyphenation file (no \patterns{ or
+  \hyphenation{ found)`.
+
+| Fichier > 1 Mo
+| `Content-Length` ou stream tronqué à 1 Mo + 1 octet
+| 6
+| Téléchargement avorté. Message : `error: refusing to download
+  hyph-<lang>.tex: size exceeds 1 MiB limit`.
+
+| Argument langue malformé
+| Regex `^[a-z]{2,3}(-[a-z0-9]{2,8})?$`
+| 2
+| Message : `error: invalid language code '<lang>'; expected BCP 47
+  short form (e.g. fr, en-us, zh-hans)`.
+
+| Pattern absent (remove)
+| `File.exists?` faux dans XDG
+| 10
+| Message : `error: '<lang>' is not installed`. (Embarqué seul = pas
+  installé).
+
+| Suppression d'un embarqué
+| Embarqué = true ET pas d'override XDG
+| 11
+| Message : `error: cannot remove embedded pattern '<lang>'; embedded
+  patterns ship with the binary`.
+
+| Déjà installé (sans `--force`)
+| `File.exists?` vrai dans XDG
+| 9
+| Message : `error: '<lang>' already installed; pass --force to
+  overwrite`.
+|===
+
+== Tests d'intégration à prévoir
+
+[cols="3,3"]
+|===
+| Scénario | Assertion
+
+| `hyph list` sans patterns installés
+| Sortie liste les 7 langues embarquées, source = `embedded`, exit 0.
+
+| `hyph list -j`
+| JSON valide, parsable par `JSON.parse`, contient au moins 7 entrées.
+
+| `hyph list` avec un fichier `./hyphenation/hyph-fr.tex`
+| FR apparaît avec `source: project` et `overrides: embedded`.
+
+| `hyph available -o`
+| Sortie statique = MANIFEST, exit 0, *aucune* socket ouverte (mock).
+
+| `hyph available` réseau coupé
+| Exit 3, warning affiché, repli sur MANIFEST embarqué.
+
+| `hyph install ja` (mock HTTP 200, SHA-256 OK)
+| Fichier écrit dans XDG, exit 0, `hyph list` voit `installed`.
+
+| `hyph install ja` (mock SHA-256 KO)
+| Exit 4, fichier *absent* du XDG, fichier temporaire absent de `/tmp`.
+
+| `hyph install xx` (langue absente du manifest, sans `--sha256`)
+| Exit 5, aucun téléchargement effectué.
+
+| `hyph install xx --sha256 <hash> --from <url>` (mock OK)
+| Fichier écrit, exit 0.
+
+| `hyph install ja` (fichier mock de 2 Mo)
+| Exit 6, fichier absent, message DoS.
+
+| `hyph install ja` (fichier mock sans `\patterns{`)
+| Exit 7, fichier absent, message anti-injection.
+
+| `hyph install ja` deux fois sans `--force`
+| 2^e^ appel exit 9.
+
+| `hyph install ja -f`
+| 2^e^ appel écrit, exit 0.
+
+| `hyph remove ja`
+| Fichier supprimé du XDG, exit 0.
+
+| `hyph remove fr` (embarqué)
+| Exit 11, embarqué intact.
+
+| `hyph update ja` (SHA-256 distant identique au local)
+| Exit 0, message `up-to-date`, mtime XDG inchangé.
+
+| `hyph update -a`
+| Toutes les langues XDG re-téléchargées.
+
+| `hyph update` sans argument ni `-a`
+| Exit 2, message d'usage.
+
+| `hyph show fr` après commit projet
+| Affiche `Source: project`, `Overrides: embedded`.
+
+| `hyph help install`
+| Affiche les flags `--from`, `--sha256`, `--force`, `--dry-run` avec
+  leurs shorts.
+
+| `hyph foobar`
+| Exit 2, liste les 7 sous-commandes valides.
+
+| `CTAN_MIRROR=https://example.org/m hyph available -r`
+| Requête HTTP vers `https://example.org/m/...` (vérifié sur mock).
+
+| Cascade : projet > XDG > embarqué
+| Avec FR dans les 3 emplacements, `hyph show fr` retourne le projet.
+|===
+
+== Plan d'implémentation par commits
+
+Estimation en demi-journées (DJ) calendaires Philippe seul.
+
+[cols="1,3,1,1"]
+|===
+| # | Commit | Effort | Sortie
+
+| 1
+| `feat(hyph): squelette manifest.cr avec 7 langues embarquées` —
+  record `PatternMeta`, MANIFEST initial, helpers `embedded?`,
+  `manifested?`.
+| 1 DJ
+| Pas de CLI encore. Specs unitaires sur les helpers.
+
+| 2
+| `feat(hyph): cascade de résolution et helper Hyphenation.find(lang)` —
+  parcours projet > XDG > embarqué > nil + warning log.
+| 1 DJ
+| Helper testable hors CLI. Mock du FS.
+
+| 3
+| `feat(cli): sous-commande hyph list + help` — parsing args, format
+  texte + JSON, refus sous-commande inconnue, sortie `hyph help`.
+| 1 DJ
+| Premier point d'entrée CLI. Tests d'intégration via
+  `Process.run`.
+
+| 4
+| `feat(hyph): downloader HTTP avec garde-fous (taille 1 Mo, sniff
+  TeX)` — module `Hyphenation::Downloader`, isolé pour mock facile.
+| 1 DJ
+| Pas encore branché à la CLI. Specs avec serveur HTTP local
+  (`HTTP::Server`).
+
+| 5
+| `feat(cli): hyph install + show + manifest lookup` — CTAN_MIRROR,
+  `--from`/`--sha256`/`--force`/`--dry-run`, vérification SHA-256, exit
+  codes 3/4/5/6/7/8/9.
+| 1.5 DJ
+| Première install fonctionnelle. Specs d'intégration sur tous les
+  exit codes.
+
+| 6
+| `feat(cli): hyph available avec cache 7j et --offline/--refresh-cache`
+| 1 DJ
+| Cache dans
+  `${XDG_CACHE_HOME:-~/.cache}/asciidoctor-pdf/hyph-available.json`.
+
+| 7
+| `feat(cli): hyph remove + hyph update [-a]` — refus embarqué, no-op
+  si SHA identique.
+| 0.5 DJ
+| Boucle minimale sur le XDG.
+
+| 8
+| `docs(hyph): README section + entrée doc Antora + lien depuis aide
+  CLI` — exemples pour les 5 cas d'usage canoniques.
+| 0.5 DJ
+| Doc utilisateur livrée.
+
+| 9
+| `chore(hyph): seed manifest avec ~80 langues CTAN` — un script
+  one-shot `bin/seed-manifest` (non commité dans le binaire final) qui
+  parcourt CTAN une fois et génère le contenu de `MANIFEST`.
+| 1 DJ
+| MANIFEST complet, SHA-256 figés. Script jeté ensuite.
+
+| 10
+| `test(hyph): suite d'intégration complète sur tous les exit codes` —
+  table de tests dérivée de la section précédente.
+| 1 DJ
+| Spec verte en CI.
+|===
+
+*Total estimé : 9,5 demi-journées* (~5 jours pleins).
+
+== Conventions ALOLI couvertes
+
+[cols="3,1"]
+|===
+| Convention | Statut
+
+| `<cli> help [<sub>]` obligatoire
+| OK (`hyph help`)
+
+| Tout flag long a un short
+| OK (`-j`, `-r`, `-o`, `-u`, `-s`, `-f`, `-n`, `-y`, `-a`)
+
+| Refus explicite des sous-commandes inconnues
+| OK (exit 2 + liste valide)
+
+| XDG strict, pas de `~/.asciidoctor-pdf/`
+| OK (`${XDG_CONFIG_HOME:-~/.config}/asciidoctor-pdf/`)
+
+| Branche `production`
+| Travail effectué sur `production`
+
+| Listes ordonnées AsciiDoc en `0.` répété
+| OK dans ce document
+
+| Pas de Co-Authored-By
+| OK
+|===

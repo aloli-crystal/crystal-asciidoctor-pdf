@@ -3,6 +3,62 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.69 — 2026-06-03
+
+=== Fixed
+
+* **French NBSP wiped out before reaching the wrapper.** The
+  whitespace-normalization regex in `InlineRenderer.parse`
+  (`gsub(/\s+/, " ")`) treated U+00A0 (NBSP) as ordinary
+  whitespace (PCRE2 in Unicode mode classifies NBSP under `\s`).
+  Result: every NBSP freshly inserted by
+  `apply_french_typography` (before `:`, `;`, `!`, `?`, `»`) was
+  immediately replaced with an ASCII space one step later, and
+  `wrap_segments` would happily break the line on it. The
+  Imprimerie nationale rule wasn't honored — `deploy : il`
+  could be split into `deploy` on one line and `: il` on the
+  next.
+
+  The regex is now `gsub(/[^\S\x{00A0}]+/, " ")` — “all
+  whitespace EXCEPT NBSP”. NBSPs are now preserved through the
+  pipeline and reach `wrap_segments` (which already only split
+  on strict ASCII space).
+
+=== Added
+
+* **Structured paragraph composition engine
+  (`ParagraphComposer`).** Refactor of `wrap_segments` which
+  now delegates to a new module
+  `src/asciidoctor_pdf/paragraph_composer.cr` modelling the
+  text stream as TeX-style tokens: `Box` (a word or NBSP-bound
+  group, fixed non-breakable width), `Glue` (elastic space,
+  legal break-point), `Penalty` (forced/forbidden/conditional
+  break). The `compose_first_fit` algorithm faithfully
+  reproduces the historical greedy behavior — 217/217 specs
+  pass. Immediate benefit: NBSP non-breakability is guaranteed
+  by construction (NBSPs are absorbed into the neighboring Box
+  and can no longer be break-points).
+
+  Reference: Knuth & Plass, *Breaking Paragraphs into Lines*,
+  Software Practice & Experience, vol. 11, p. 1119-1184, 1981.
+
+  This structure is the typed foundation for the upcoming
+  milestones: J2 (Liang hyphenation patterns for FR/EN/DE/ES/
+  IT/PT/NL embedded + `hyph` CLI sub-command for additional
+  languages), J3 (Knuth-Plass algorithm — global paragraph
+  optimization minimizing badness), J4 (PDF output via the
+  native `Tw` operator from ISO 32000-1 § 9.3.3).
+
+=== Documentation
+
+* **`doc/CLI_HYPH_SPEC.adoc`**: specification of the upcoming
+  `hyph` CLI sub-command (7 sub-commands: `list`, `available`,
+  `install`, `remove`, `update`, `show`, `help`). `tlmgr` (TeX
+  Live Manager) inspiration — no automatic runtime download,
+  mandatory SHA-256 verification against an embedded manifest,
+  resolution cascade project → XDG → embedded. Implementation
+  later, independent of the composer chantier.
+
 == v2.3.24.68 — 2026-06-02
 
 === Fixed
