@@ -20,33 +20,55 @@ module AsciidoctorPDF
 
     CTAN_PREFIX = "https://mirrors.ctan.org/language/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/"
 
+    # Metadata for a language excluded from MANIFEST for
+    # licensing reasons. Carries the URL and the expected
+    # SHA-256 just like `ManifestEntry`, so that a user who
+    # accepts the licensing risk (via `hyph install --force`)
+    # still gets the integrity check on download.
+    record ExcludedEntry,
+      reason : String,
+      url : String,
+      sha256 : String,
+      size : Int32
+
     # Languages excluded from MANIFEST because their upstream
     # source file does not declare a free-software license.
     # Distributing them via this shard's manifest would put
     # downstream users in a legally ambiguous position. They
     # remain available from CTAN itself if the user explicitly
-    # acknowledges the licensing risk.
+    # acknowledges the risk.
     #
-    # The CLI consults this table BEFORE the manifest. When a
-    # user runs `asciidoctor-pdf hyph install <lang>` for one
-    # of these languages, the install is refused with the
-    # explanatory message stored here.
+    # The CLI consults this table BEFORE the manifest:
     #
-    # Values are diagnostic messages in English (the lingua
+    #   - `hyph install <lang>` without `--force` (or `-f`) is
+    #     refused with the explanatory message stored here.
+    #   - `hyph install <lang> --force` proceeds: a warning is
+    #     printed on stderr, then download proceeds with
+    #     SHA-256 verification using the hash stored here.
+    #
+    # `reason` is a diagnostic message in English (the lingua
     # franca of free-software licensing discussions).
     EXCLUDED_LANGS = {
-      "mn-cyrl-x-lmc" => "License field is `NONE` in the upstream " \
-                         "source file (https://github.com/hyphenation/tex-hyphen, " \
-                         "hyph-mn-cyrl-x-lmc.tex). Without an explicit " \
-                         "free-software license grant, redistribution " \
-                         "is legally ambiguous and we exclude this " \
-                         "language from our manifest.",
-      "ro" => "License field is `[None]` in the upstream " \
-              "source file (https://github.com/hyphenation/tex-hyphen, " \
-              "hyph-ro.tex). Without an explicit free-software " \
-              "license grant, redistribution is legally " \
-              "ambiguous and we exclude this language from " \
-              "our manifest.",
+      "mn-cyrl-x-lmc" => ExcludedEntry.new(
+        reason: "License field is `NONE` in the upstream source file " \
+                "(https://github.com/hyphenation/tex-hyphen, " \
+                "hyph-mn-cyrl-x-lmc.tex). Without an explicit " \
+                "free-software license grant, redistribution is legally " \
+                "ambiguous and we exclude this language from our manifest.",
+        url: "#{CTAN_PREFIX}hyph-mn-cyrl-x-lmc.tex",
+        sha256: "192fa0887ca631595c38cac1b30025badb3d86a82359e68c97efd825a8d15143",
+        size: 5528,
+      ),
+      "ro" => ExcludedEntry.new(
+        reason: "License field is `[None]` in the upstream source file " \
+                "(https://github.com/hyphenation/tex-hyphen, " \
+                "hyph-ro.tex). Without an explicit free-software license " \
+                "grant, redistribution is legally ambiguous and we " \
+                "exclude this language from our manifest.",
+        url: "#{CTAN_PREFIX}hyph-ro.tex",
+        sha256: "6f09c53cc65cb6fcf4435396371c49bf50aaa88e40af7931a9e6bccc405f1fab",
+        size: 4958,
+      ),
     }
 
     MANIFEST = {

@@ -3,6 +3,59 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.80 — 2026-06-03
+
+=== Added
+
+* **`hyph install <lang> --force` bypasses license-undeclared
+  exclusion.** Languages in `EXCLUDED_LANGS` (currently
+  `mn-cyrl-x-lmc`, `ro`) can now be installed if the user
+  explicitly accepts the legal risk by passing `--force`
+  (or `-f`). Without `--force`, the previous refusal stays in
+  place (exit `10`).
+
+  The `--force` flag thus widens its meaning: it now signals
+  “I accept all risks” — including ambiguous licensing, in
+  addition to its historical role of overwriting an existing
+  install.
+
+  With `--force` enabled:
+
+  0. Warning on `stderr` recalling the recorded reason.
+  0. Download from the effective mirror (GitHub by default,
+     see below).
+  0. SHA-256 verification **still active** against the hash
+     stored in `EXCLUDED_LANGS` — an attacker serving a
+     malicious file would still be detected.
+
+  Associated refactor: `EXCLUDED_LANGS` is no longer a plain
+  `Hash(String, String)` but a `Hash(String, ExcludedEntry)`
+  (new record) with `reason`, `url`, `sha256`, `size`. The
+  symmetry with `ManifestEntry` enables the same integrity
+  check.
+
+* **HTTP 301/302/303/307/308 redirect-following in
+  `hyph install`.** New private function
+  `http_get_following_redirects` (up to 5 hops) resolving
+  `Location` headers (including relative ones via
+  `URI#resolve`). Crystal's stdlib `HTTP::Client.get` does
+  not follow redirects automatically — and CTAN mirrors
+  `mirrors.ctan.org` typically respond with 307 to a
+  geographic mirror.
+
+=== Changed
+
+* **Effective download URL switches to the GitHub mirror by
+  default.** The manifest still references the canonical
+  CTAN URL (for documentation purposes), but `hyph install`
+  rewrites that URL to point to the stable GitHub mirror:
+  `https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/`.
+  The main CTAN mirror (`mirrors.ctan.org`) now returns
+  `404` on these paths (observed in this session: redirect
+  to `ctan.mines-albi.fr` which returns 404). Users can
+  override via env vars `HYPH_MIRROR` or `CTAN_MIRROR`, or
+  via `--from` explicit.
+
 == v2.3.24.79 — 2026-06-03
 
 === Added

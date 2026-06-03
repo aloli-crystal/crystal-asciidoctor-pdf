@@ -1,4 +1,5 @@
 require "http/client"
+require "uri"
 require "digest/sha256"
 require "json"
 require "./hyphenation"
@@ -429,6 +430,66 @@ module AsciidoctorPDF
       end
     end
 
+    # Mirror GitHub officiel des patterns hyph-utf8. Stable, sans
+    # redirection contrairement à CTAN. Le manifest référence
+    # l'URL CTAN canonique pour des raisons documentaires (c'est
+    # bien la source officielle), mais en pratique l'install
+    # transforme cette URL pour pointer vers GitHub. L'utilisateur
+    # peut surcharger via les variables d'environnement
+    # `HYPH_MIRROR` ou `CTAN_MIRROR`, ou via `--from` explicit.
+    GITHUB_HYPH_MIRROR = "https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/"
+
+    # Construit l'URL effective de téléchargement à partir d'une
+    # URL canonique (typiquement extraite du manifest). Priorité :
+    #
+    # 1. `HYPH_MIRROR` env var → préfixe override
+    # 2. `CTAN_MIRROR` env var → préfixe override
+    # 3. `GITHUB_HYPH_MIRROR` par défaut (CTAN principal renvoie
+    #    désormais des 404 sur ces chemins, à confirmer avec
+    #    l'équipe hyph-utf8)
+    #
+    # Le nom de fichier (`hyph-<lang>.tex`) est extrait de l'URL
+    # canonique et concaténé au préfixe choisi.
+    private def self.resolve_install_url(canonical : String) : String
+      filename = canonical.rpartition('/')[2]
+      mirror = ENV["HYPH_MIRROR"]? || ENV["CTAN_MIRROR"]? || GITHUB_HYPH_MIRROR
+      mirror = mirror + "/" unless mirror.ends_with?('/')
+      mirror + filename
+    end
+
+    # Télécharge le contenu d'une URL en suivant les redirections
+    # HTTP 301 / 302 / 303 / 307 / 308 (jusqu'à `max_redirects`
+    # sauts). Stdlib Crystal `HTTP::Client.get` ne suit PAS les
+    # redirects automatiquement — or les miroirs CTAN
+    # (`mirrors.ctan.org`) répondent typiquement en 307 vers un
+    # miroir géographique. Résolution relative des URLs via
+    # `URI#resolve` pour gérer les Location header sans schéma.
+    private def self.http_get_following_redirects(url : String, max_redirects : Int32 = 5) : String
+      current_url = url
+      max_redirects.times do |attempt|
+        result = HTTP::Client.get(current_url) do |response|
+          case response.status_code
+          when 200..299
+            {body: response.body_io.gets_to_end, next_url: nil}
+          when 301, 302, 303, 307, 308
+            loc = response.headers["Location"]?
+            raise "Redirect (#{response.status_code}) without Location header" unless loc
+            absolute = loc.starts_with?("http") ? loc : URI.parse(current_url).resolve(loc).to_s
+            {body: nil, next_url: absolute}
+          else
+            raise "HTTP #{response.status_code} #{response.status_message}"
+          end
+        end
+        if (body = result[:body])
+          return body
+        end
+        if (next_url = result[:next_url])
+          current_url = next_url
+        end
+      end
+      raise "Too many redirects (max #{max_redirects}) starting from #{url}"
+    end
+
     private def self.cmd_install(args : Array(String)) : Nil
       lang = nil.as(String?)
       sha256_arg = nil.as(String?)
@@ -458,21 +519,35 @@ module AsciidoctorPDF
         exit EXIT_USAGE
       end
 
-      # Refuse les langues exclues du manifest pour cause de
-      # licence non déclarée. Message en anglais (lingua franca
-      # des discussions de licensing libre).
-      if (reason = Hyphenation::EXCLUDED_LANGS[lang]?) && from_url.nil?
-        STDERR.puts "Refusing to install `#{lang}`: #{reason}"
+      # Langues exclues du manifest pour cause de licence non
+      # déclarée. Sans --force : refus avec message diagnostique
+      # en anglais (lingua franca du licensing libre). Avec
+      # --force : warning + install procède en utilisant les
+      # métadonnées stockées dans EXCLUDED_LANGS (URL + SHA-256
+      # vérifié après téléchargement). Ainsi l'utilisateur qui
+      # accepte le risque juridique garde le bénéfice de la
+      # vérification d'intégrité.
+      excluded_entry = nil.as(Hyphenation::ExcludedEntry?)
+      if (excluded = Hyphenation::EXCLUDED_LANGS[lang]?) && from_url.nil?
+        unless force
+          STDERR.puts "Refusing to install `#{lang}`: #{excluded.reason}"
+          STDERR.puts ""
+          STDERR.puts "If you have independently verified the licensing situation"
+          STDERR.puts "and still want to install this language, pass --force (-f)"
+          STDERR.puts "to bypass this check. SHA-256 verification will still happen"
+          STDERR.puts "against the hash stored in our records:"
+          STDERR.puts "  asciidoctor-pdf hyph install #{lang} --force"
+          exit EXIT_MANIFEST_MISSING
+        end
+        STDERR.puts "WARNING: installing `#{lang}` despite undeclared license."
+        STDERR.puts "Reason recorded:"
+        STDERR.puts "  #{excluded.reason}"
         STDERR.puts ""
-        STDERR.puts "If you have independently verified the licensing situation and"
-        STDERR.puts "still want to install this language, you can bypass the manifest"
-        STDERR.puts "by providing both --from <URL> and --sha256 <HASH> explicitly:"
-        STDERR.puts "  asciidoctor-pdf hyph install #{lang} --from <URL> --sha256 <HASH>"
-        exit EXIT_MANIFEST_MISSING
+        excluded_entry = excluded
       end
 
       entry = Hyphenation::MANIFEST[lang]?
-      expected_sha = sha256_arg || entry.try &.sha256
+      expected_sha = sha256_arg || entry.try(&.sha256) || excluded_entry.try(&.sha256)
 
       unless expected_sha
         STDERR.puts "Erreur : la langue `#{lang}` n'est pas dans le manifest."
@@ -480,7 +555,15 @@ module AsciidoctorPDF
         exit EXIT_MANIFEST_MISSING
       end
 
-      url = from_url || entry.try &.url
+      url = if from_url
+              # `--from` : URL exacte fournie par l'utilisateur,
+              # pas de résolution mirror.
+              from_url
+            elsif (canonical = entry.try(&.url) || excluded_entry.try(&.url))
+              resolve_install_url(canonical)
+            else
+              nil
+            end
       unless url
         STDERR.puts "Erreur : pas d'URL pour `#{lang}` (manifest absent et `--from` non fourni)."
         exit EXIT_USAGE
@@ -495,13 +578,7 @@ module AsciidoctorPDF
 
       puts "Téléchargement de hyph-#{lang}.tex depuis #{url}..."
       content = begin
-        HTTP::Client.get(url) do |response|
-          unless response.success?
-            STDERR.puts "Erreur HTTP : #{response.status_code} #{response.status_message}"
-            exit EXIT_NETWORK
-          end
-          response.body_io.gets_to_end
-        end
+        http_get_following_redirects(url)
       rescue ex
         STDERR.puts "Erreur réseau : #{ex.message}"
         exit EXIT_NETWORK

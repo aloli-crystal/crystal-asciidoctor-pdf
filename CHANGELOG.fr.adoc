@@ -3,6 +3,62 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.80 — 2026-06-03
+
+=== Ajouté
+
+* **`hyph install <lang> --force` bypasse l'exclusion pour
+  licence non déclarée.** Les langues présentes dans
+  `EXCLUDED_LANGS` (actuellement `mn-cyrl-x-lmc`, `ro`)
+  peuvent maintenant être installées si l'utilisateur a
+  explicitement accepté le risque juridique en passant
+  `--force` (ou `-f`). Sans `--force`, le refus précédent
+  reste en place (exit `10`).
++
+  Le flag `--force` étend ainsi sa sémantique : il signifie
+  « j'assume tous les risques » — y compris la licence
+  ambiguë, en plus de son rôle historique d'écrasement d'une
+  installation existante.
++
+  Avec `--force` activé :
++
+  0. Warning sur `stderr` rappelant la raison enregistrée.
+  0. Download depuis le miroir effectif (GitHub par défaut,
+     voir ci-dessous).
+  0. Vérification SHA-256 **toujours active** contre le hash
+     stocké dans `EXCLUDED_LANGS` — un attaquant qui
+     servirait un fichier malicieux serait toujours détecté.
++
+  Refactor associé : `EXCLUDED_LANGS` n'est plus un
+  `Hash(String, String)` simple mais un
+  `Hash(String, ExcludedEntry)` (nouveau record) avec
+  `reason`, `url`, `sha256`, `size`. La symétrie avec
+  `ManifestEntry` autorise la même vérification d'intégrité.
+
+* **Suivi des redirects HTTP 301/302/303/307/308 dans
+  `hyph install`.** Nouvelle fonction privée
+  `http_get_following_redirects` (jusqu'à 5 sauts) qui résout
+  les `Location` headers (y compris relatifs via `URI#resolve`).
+  La stdlib Crystal `HTTP::Client.get` ne suit pas les
+  redirects automatiquement — or les miroirs CTAN
+  `mirrors.ctan.org` répondent typiquement en 307 vers un
+  miroir géographique.
+
+=== Changé
+
+* **URL effective de téléchargement bascule sur le mirror
+  GitHub par défaut.** Le manifest continue à référencer
+  l'URL CTAN canonique (à fins documentaires), mais
+  `hyph install` transforme cette URL pour pointer vers le
+  mirror GitHub stable :
+  `https://raw.githubusercontent.com/hyphenation/tex-hyphen/master/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/`.
+  Le miroir CTAN principal (`mirrors.ctan.org`) retourne
+  désormais des `404` sur ces chemins (constaté lors de cette
+  session : redirection vers `ctan.mines-albi.fr` qui retourne
+  404). L'utilisateur peut surcharger via les variables
+  d'environnement `HYPH_MIRROR` ou `CTAN_MIRROR`, ou via
+  `--from` explicit.
+
 == v2.3.24.79 — 2026-06-03
 
 === Ajouté
