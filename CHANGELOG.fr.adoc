@@ -3,6 +3,72 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.75 — 2026-06-03
+
+=== Ajouté
+
+* **Justification CJK via `Tc` (« 両端揃え / 两端对齐 »).**
+  Les paragraphes purement chinois / japonais / coréen — qui
+  ne contiennent aucun espace ASCII — sont désormais justifiés
+  au bord droit en étirant l'espace entre chaque glyphe via
+  l'opérateur PDF natif `Tc` (Character Spacing,
+  ISO 32000-1 § 9.3.2), conformément à la convention
+  typographique sino-japonaise.
++
+  Détection : la ligne ne contient aucun espace ASCII (`n_spaces
+  == 0`), `target_w` est défini, `font_cjk` est chargée, et au
+  moins 2 glyphes CJK sont reconnus par `font_cjk.has_glyph?`.
+  La justification reste active même quand l'`align` reçu est
+  `left` (cas des paragraphes CJK tenant sur une seule ligne,
+  donc « dernière ligne du paragraphe » du point de vue du
+  composer — exception explicite à la règle « dernière ligne
+  en gauche » pour respecter la convention CJK).
++
+  Calcul : `extra_per_cjk_glyph = (target_w - natural_w) /
+  (n_cjk - 1)`. Garde-fou à 75 % de la largeur d'un glyphe CJK
+  typique (`中`) pour éviter les pathologies (2 glyphes seuls
+  sur une ligne très large). 75 % est plus permissif que le
+  50 % d'un premier POC : la convention CJK accepte couramment
+  des étirements jusqu'à ~100 %, et le seuil bloquait des
+  lignes japonaises courtes légitimes.
++
+  Correction simultanée du calcul de `natural_w` : la police
+  principale (Noto Sans Latin) ne contenait pas les glyphes
+  CJK et retournait 0 / ε pour eux, sous-estimant `natural_w`
+  et faussant ensuite tous les calculs de justification mixte.
+  On délègue désormais à `text_with_emoji_segments` la
+  segmentation par police puis on somme avec la bonne fonte
+  (`font_cjk` pour les runs `:cjk`, `font` pour les runs
+  `:text`).
++
+  `draw_text_run` accepte un paramètre optionnel
+  `cjk_char_spacing` (défaut `0.0`) qui se propage au
+  `page.text(..., char_spacing:)` dans la branche `:cjk`.
+  L'avancement du curseur Crystal compense le `Tc` cumulé du
+  moteur PDF : `cursor += string_width + (n - 1) ×
+  cjk_char_spacing` pour pointer à la fin VISUELLE du dernier
+  glyphe (le `Tc` ajouté par PDF après le dernier glyphe est
+  invisible — reset automatique par le shard `pdf` à la fin du
+  `page.text`).
++
+  Vérification visuelle (`/tmp/cjk-test.adoc`) :
++
+  - Avant : ligne chinois xMax=476 (loin du bord droit 559),
+    ligne japonais xMax=386.
+  - Après : ligne chinois xMax=559.28 (= bord droit `target_w`),
+    ligne japonais xMax=559.28 (= bord droit). Parfaitement
+    justifiées.
++
+  Limite reconnue : le `ParagraphComposer.tokenize` actuel
+  traite chaque chaîne CJK comme un seul Box (split sur espace
+  ASCII uniquement), ce qui force les paragraphes CJK longs à
+  rester sur une seule ligne (le composer ne peut pas casser).
+  La vraie justification CJK multi-lignes demanderait de
+  splitter au tokenize par glyphe avec des Glue souples entre
+  chaque — gros refactor à venir si besoin réel se manifeste.
+  Le rail `Tc` actuel suffit pour la majorité des cas
+  pratiques (un paragraphe court en chinois ou japonais).
+
 == v2.3.24.74 — 2026-06-03
 
 === Ajouté

@@ -3675,7 +3675,27 @@ module AsciidoctorPDF
       # qui force une ligne courte seule sur une page large)
       # produit naturellement un étirement visible mais correct.
       extra_per_space = 0.0
-      if align == "justify" && (tw = target_w)
+      # `extra_per_cjk_glyph` (v2.3.24.75) : étirement à appliquer
+      # entre chaque glyphe CJK quand la ligne ne contient AUCUN
+      # espace ASCII (cas typique : « 中文两端对齐 ») mais qu'on
+      # doit quand même justifier. Émis via l'opérateur PDF `Tc`
+      # (ISO 32000-1 § 9.3.2), convention typographique chinoise/
+      # japonaise/coréenne dite « 両端揃え / 两端对齐 ». Tc
+      # s'applique à tous les glyphes — pour les lignes mixtes
+      # (CJK + latin avec espaces), on conserve l'étirement des
+      # espaces ASCII (`extra_per_space` / `Tw` / `TJ`) et le CJK
+      # n'est pas étiré entre glyphes.
+      extra_per_cjk_glyph = 0.0
+      # Calcul de `natural_w` / `n_spaces` est utile dans deux cas :
+      # (a) `align == justify` → on étire les espaces ASCII (chemin
+      # habituel), (b) la ligne ne contient AUCUN espace ASCII mais
+      # est en CJK pur et `target_w` est défini → on étire entre les
+      # glyphes CJK via `Tc` (convention typographique 両端揃え,
+      # même si la ligne est la dernière du paragraphe — les
+      # paragraphes CJK pure sont systématiquement justifiés au
+      # bord droit en typographie sino-japonaise).
+      needs_metric = (align == "justify" || target_w) && target_w
+      if needs_metric && (tw = target_w)
         natural_w = 0.0
         n_spaces = 0
         segments.each do |seg|
@@ -3685,12 +3705,60 @@ module AsciidoctorPDF
             font_name = resolve_inline_font(seg)
             font = get_font(font_name)
             eff_size = seg.sup || seg.sub ? font_size * 0.75 : (seg.kbd ? font_size * 0.9 : font_size)
-            natural_w += font.string_width(seg.text, eff_size)
+            # Mesure précise par run : la police principale (Noto
+            # Sans Latin) ne contient pas les glyphes CJK et
+            # retourne 0 / ε pour eux, ce qui sous-estimait
+            # `natural_w` et faussait `extra_per_cjk_glyph` (bloqué
+            # par le garde-fou car « candidat » = très grand).
+            # On délègue à `text_with_emoji_segments` la
+            # segmentation par police et on somme les widths avec
+            # la bonne fonte selon le `kind`.
+            if seg.text.each_char.any? { |c| c.ord >= 0x3000 } && font_cjk
+              softened = seg.text.gsub(' ', ' ')
+              text_with_emoji_segments(softened).each do |(kind, val)|
+                if kind == :cjk
+                  natural_w += font_cjk.not_nil!.string_width(val, eff_size)
+                else
+                  natural_w += font.string_width(val, eff_size)
+                end
+              end
+            else
+              natural_w += font.string_width(seg.text, eff_size)
+            end
             n_spaces += seg.text.count(' ')
           end
         end
-        if n_spaces > 0 && tw > natural_w
+        if n_spaces > 0 && tw > natural_w && align == "justify"
           extra_per_space = (tw - natural_w) / n_spaces
+        elsif n_spaces == 0 && tw > natural_w && (cjk_f = font_cjk)
+          # Pas d'espace ASCII : tentative justification CJK. On
+          # compte les glyphes que la police CJK peut rendre dans
+          # la ligne entière, et on calcule un Tc qui les étire à
+          # parts égales sur target_w.
+          n_cjk = 0
+          segments.each do |seg|
+            next if seg.image_path
+            next if seg.text.empty?
+            seg.text.each_char do |c|
+              next if c.ord < 0x3000
+              n_cjk += 1 if cjk_f.has_glyph?(c)
+            end
+          end
+          if n_cjk > 1
+            candidate = (tw - natural_w) / (n_cjk - 1)
+            # Garde-fou : on n'étire pas un glyphe CJK de plus de
+            # 75 % de sa largeur (la ligne deviendrait illisible
+            # — typique : 2 glyphes seuls sur une ligne très large).
+            # 75 % est plus permissif que les 50 % d'un premier
+            # POC : la convention typographique CJK accepte
+            # couramment des étirements jusqu'à ~100 % (un blanc
+            # entre glyphes de la taille d'un glyphe). 75 % reste
+            # conservateur tout en débloquant les lignes courtes
+            # comme le hiragana qui contient moins de glyphes
+            # qu'une ligne en idéogrammes purs.
+            typical_cjk_w = cjk_f.string_width("中", font_size)
+            extra_per_cjk_glyph = candidate if candidate <= typical_cjk_w * 0.75
+          end
         end
       end
 
@@ -3833,8 +3901,18 @@ module AsciidoctorPDF
                 current_x += space_w + extra_per_space
               end
               next if part.empty?
-              draw_text_run(page, part, current_x, eff_y, font_name, eff_font_size)
-              current_x += font.string_width(part, eff_font_size)
+              draw_text_run(page, part, current_x, eff_y, font_name, eff_font_size, cjk_char_spacing: extra_per_cjk_glyph)
+              # Pour un run CJK : avancer aussi du Tc cumulé (le moteur
+              # PDF ajoute `n × Tc` à sa position interne, mais comme
+              # chaque page.text fait un nouveau BT/ET avec Td absolu,
+              # notre curseur Crystal doit refléter la fin VISUELLE
+              # du draw — `string_width + (n - 1) × Tc`).
+              part_w = font.string_width(part, eff_font_size)
+              if extra_per_cjk_glyph > 0
+                cjk_count = part.each_char.count { |c| c.ord >= 0x3000 }
+                part_w += (cjk_count - 1) * extra_per_cjk_glyph if cjk_count > 1
+              end
+              current_x += part_w
             end
           end
         else
@@ -3854,7 +3932,7 @@ module AsciidoctorPDF
             prefix_w = font.string_width(" ", eff_font_size)
             current_x += prefix_w + extra_per_space
             rest = seg.text[1..]
-            draw_text_run(page, rest, current_x, eff_y, font_name, eff_font_size)
+            draw_text_run(page, rest, current_x, eff_y, font_name, eff_font_size, cjk_char_spacing: extra_per_cjk_glyph)
             current_x += font.string_width(rest, eff_font_size)
             # Espaces internes restants (très rares pour les badges
             # puisque le composer fragmente — mais on couvre).
@@ -3863,7 +3941,7 @@ module AsciidoctorPDF
           else
             # Route through `draw_text_run` so emojis & unrenderable chars
             # get the same treatment as the rest of the engine.
-            draw_text_run(page, seg.text, current_x, eff_y, font_name, eff_font_size)
+            draw_text_run(page, seg.text, current_x, eff_y, font_name, eff_font_size, cjk_char_spacing: extra_per_cjk_glyph)
             # Avancement horizontal : la mesure est faite à `eff_font_size`,
             # plus une petite réserve pour kbd/button/mark/mono afin que
             # les encadrés ne se touchent pas du segment suivant.
@@ -4225,7 +4303,7 @@ module AsciidoctorPDF
     # glyphes pour ces codepoints. Le curseur X avance de la largeur
     # exacte de chaque segment (texte ou drapeau) pour que les runs
     # suivants soient positionnés correctement.
-    private def draw_text_run(page : PDF::Page, text : String, x : Float64, y : Float64, font_name : String, font_size : Float64) : Nil
+    private def draw_text_run(page : PDF::Page, text : String, x : Float64, y : Float64, font_name : String, font_size : Float64, cjk_char_spacing : Float64 = 0.0) : Nil
       font = get_font(font_name)
       cursor = x
       flag_w = InlineFlags.flag_width(font_size)
@@ -4278,10 +4356,28 @@ module AsciidoctorPDF
               # pour les segments suivants. Le sanitize WinAnsi
               # n'intervient pas — la police CJK couvre par
               # définition les caractères concernés.
+              #
+              # Si `cjk_char_spacing > 0` (mode justify CJK sans
+              # espaces ASCII), on émet via `page.text(..., char_spacing:)`
+              # qui pose l'opérateur PDF natif `Tc` (ISO 32000-1
+              # § 9.3.2). Le moteur PDF translate le curseur de
+              # `glyph_w + cjk_char_spacing` après chaque glyphe.
+              # On avance notre curseur Crystal de `string_width +
+              # (n - 1) × spacing` pour qu'il pointe à la position
+              # *visuelle* finale du dernier glyphe (le Tc ajouté
+              # par PDF après le dernier glyphe est invisible — il
+              # n'affecte que le prochain Tj/TJ, qui sera reset à
+              # 0 par le shard pdf).
               cjk_font = font_cjk.not_nil!
               page.font(cjk_font, size: font_size)
-              page.text(value2, at: {cursor, y})
-              cursor += cjk_font.string_width(value2, font_size)
+              if cjk_char_spacing > 0
+                page.text(value2, at: {cursor, y}, char_spacing: cjk_char_spacing)
+                n_chars = value2.size
+                cursor += cjk_font.string_width(value2, font_size) + (n_chars - 1) * cjk_char_spacing
+              else
+                page.text(value2, at: {cursor, y})
+                cursor += cjk_font.string_width(value2, font_size)
+              end
               # Remet la police principale du run.
               set_font(page, font_name, font_size)
             else
