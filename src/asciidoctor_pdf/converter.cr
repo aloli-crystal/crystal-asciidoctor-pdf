@@ -620,12 +620,25 @@ module AsciidoctorPDF
 
       source = node.source
       language = node.attr("language") || ""
-      lines = source.split("\n")
       font_size = @theme.code_font_size
       line_h = font_size * 1.4
       padding = @theme.code_padding
       highlight = @theme.code_highlight_enabled && !language.empty?
       bottom_limit = @margin + 20.0
+
+      # Soft-wrap des lignes trop longues (v2.3.24.88). Un bloc
+      # `[source,…]` est rendu verbatim et ne se justifie pas ; mais
+      # une ligne plus large que l'encadré (commande shell avec UUID
+      # + flags, p. ex. `beryl scan aloli/<uuid> --provider=… --dns
+      # --write --hostname=…`) débordait HORS PAGE et se faisait
+      # rogner. On la replie désormais aux caractères charnières
+      # (espace en priorité, puis `/ - = ,`, comme la coupure douce
+      # des codespans inline) pour qu'elle reste intégralement
+      # visible dans l'encadré. Aucun caractère n'est injecté : une
+      # coupure sur espace consomme l'espace, une coupure sur
+      # charnière garde la charnière sur la ligne du haut.
+      avail_w = @content_width - 2 * padding
+      lines = soft_wrap_code_lines(source.split("\n"), font_size, avail_w)
 
       total_h = lines.size * line_h + (2 * padding) + @theme.code_margin_top + @theme.code_margin_bottom
 
@@ -638,6 +651,74 @@ module AsciidoctorPDF
       end
 
       ""
+    end
+
+    # Replie les lignes de code dont la largeur dépasse `avail_w`
+    # (largeur interne de l'encadré). Les lignes qui tiennent sont
+    # conservées telles quelles. Pour les autres, on coupe aux
+    # caractères charnières (espace en priorité, puis `/`, `-`, `=`,
+    # `,`) au plus près de la limite, et on poursuit sur une ligne
+    # de continuation (sans indentation ni caractère injecté, pour
+    # préserver le copier-coller). Une ligne sans aucune charnière
+    # (jeton unique très long, ex. base64) est coupée net en dernier
+    # recours — toujours préférable au rognage hors page.
+    private def soft_wrap_code_lines(lines : Array(String), font_size : Float64, avail_w : Float64) : Array(String)
+      font = get_font(@fn_mono)
+      result = [] of String
+      lines.each do |line|
+        if line.empty? || font.string_width(line, font_size) <= avail_w
+          result << line
+        else
+          rest = line
+          # Garde-fou anti-boucle : au plus une coupure par caractère.
+          guard = line.size + 1
+          while guard > 0 && font.string_width(rest, font_size) > avail_w
+            guard -= 1
+            head_end, tail_start = code_wrap_cut(rest, font, font_size, avail_w)
+            break if head_end <= 0
+            result << rest[0...head_end]
+            rest = rest[tail_start..]
+          end
+          result << rest unless rest.empty?
+        end
+      end
+      result
+    end
+
+    # Détermine où couper `rest` pour que le début tienne dans
+    # `avail_w`. Renvoie `{head_end, tail_start}` (indices de
+    # caractères) : le haut est `rest[0...head_end]`, le bas
+    # `rest[tail_start..]`.
+    private def code_wrap_cut(rest : String, font : PDF::Fonts::Base, font_size : Float64, avail_w : Float64) : Tuple(Int32, Int32)
+      # Plus grand préfixe qui tient (recherche dichotomique).
+      lo = 1
+      hi = rest.size
+      while lo < hi
+        mid = (lo + hi + 1) // 2
+        if font.string_width(rest[0...mid], font_size) <= avail_w
+          lo = mid
+        else
+          hi = mid - 1
+        end
+      end
+      maxfit = lo
+
+      # Recherche d'une charnière en remontant depuis `maxfit`.
+      i = maxfit
+      while i >= 1
+        c = rest[i - 1]
+        if c == ' '
+          # Coupe sur espace : on le consomme (séparateur).
+          return {i - 1, i}
+        elsif c == '/' || c == '-' || c == '=' || c == ','
+          # Coupe après la charnière : elle reste en haut.
+          return {i, i}
+        end
+        i -= 1
+      end
+
+      # Aucune charnière : coupe nette à la limite.
+      {maxfit, maxfit}
     end
 
     # Render a code block that fits entirely on the current page.

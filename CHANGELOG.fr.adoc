@@ -1,3 +1,37 @@
+== v2.3.24.88 — 2026-06-04
+
+=== Ajouté
+
+* **Soft-wrap des lignes trop longues dans les blocs `[source,…]`.**
+  Un bloc de code est rendu verbatim et ne se justifie pas, mais
+  une ligne plus large que l'encadré (typiquement une commande
+  shell avec UUID complet + flags, ex. `beryl scan aloli/<uuid>
+  --provider=scaleway --dns --write --hostname=…`) débordait
+  jusqu'À SORTIR DE LA PAGE et se faisait rogner — la fin de la
+  commande devenait invisible.
++
+  Ces lignes sont désormais repliées aux caractères charnières
+  (espace en priorité, puis `/`, `-`, `=`, `,` — la même logique
+  que la coupure douce des codespans inline) au plus près du bord
+  de l'encadré, et poursuivies sur une ligne de continuation. Toute
+  la commande reste visible. Aucun caractère n'est injecté (pas de
+  `\` ni d'indentation) : une coupure sur espace consomme l'espace,
+  une coupure sur charnière garde la charnière sur la ligne du
+  haut — le copier-coller reste fidèle. Une ligne sans aucune
+  charnière (jeton unique très long) est coupée net en dernier
+  recours, toujours préférable au rognage.
++
+  La hauteur de l'encadré et la pagination s'ajustent
+  automatiquement (le pliage a lieu avant le calcul de hauteur),
+  donc un bloc qui gagne des lignes par pliage reste correctement
+  encadré et peut basculer sur la page suivante si besoin.
+
+=== Vérification
+
+README beryl FR + EN : la commande `beryl scan` du scénario
+Scaleway (UUID + 4 flags), qui sortait de la page (fin à 635 pt
+pour un bord à 595), tient désormais entièrement dans l'encadré
+sur deux lignes. 0 anomalie pdf-audit, 261 specs verts.
 == v2.3.24.87 — 2026-06-04
 
 === Corrigé
