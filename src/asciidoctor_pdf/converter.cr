@@ -3618,6 +3618,40 @@ module AsciidoctorPDF
     # (J3). Bénéfice immédiat : les espaces insécables (NBSP) sont
     # absorbés dans la Box voisine et garantis insécables —
     # « deploy : il » ne peut plus être cassé sur le `:`.
+    # Cache des natural_width calculés par le composer pour chaque
+    # liste de segments rendue (v2.3.24.84 bis). Indexé par
+    # `object_id` de l'Array(InlineSegment) puisqu'on ne peut pas
+    # changer la signature publique de `wrap_segments` (appelée par
+    # 15+ call-sites) ni passer un paramètre supplémentaire à
+    # `render_segment_line` sans casser leur cascade.
+    #
+    # Le renderer consulte ce cache dans `render_segment_line` pour
+    # utiliser la vraie largeur naturelle (avec paddings codespan/
+    # kbd/mark calculés par le composer) au lieu de la recalculer
+    # via `font.string_width` qui sous-estime (oublie les paddings
+    # inter-segments). Sans ça, `extra_per_space = (tw -
+    # natural_w_renderer) / n_spaces` était trop grand en
+    # justification ⇒ la ligne s'étirait au-delà de `target_w` ⇒
+    # débordement 4-8 pt observé sur le README beryl.
+    #
+    # Pourquoi un cache `object_id` et pas un paramètre ? Le
+    # `natural_width` est LA source de vérité : c'est sur cette
+    # mesure que le composer a décidé les coupures de ligne, donc
+    # le renderer DOIT s'aligner dessus (recalculer à l'identique
+    # côté renderer serait fragile — il faudrait répliquer
+    # exactement la logique de padding de `tokenize`). On l'indexe
+    # par `object_id` de l'Array(InlineSegment) plutôt que par un
+    # paramètre supplémentaire à `render_segment_line`, dont la
+    # signature est partagée par 15+ call-sites.
+    #
+    # Le cache n'est PAS vidé entre paragraphes (lecture non
+    # destructive `[]?` — cf. `render_segment_line`) : une ligne
+    # peut être rendue plusieurs fois (essai de pagination avorté).
+    # Il croît donc sur la durée du document, borné au nombre de
+    # lignes (quelques Ko), et est libéré avec l'instance du
+    # converter (une par document).
+    @line_natural_widths : Hash(UInt64, Float64) = {} of UInt64 => Float64
+
     private def wrap_segments(
       segments : Array(InlineSegment),
       width : Float64,
@@ -3671,7 +3705,17 @@ module AsciidoctorPDF
       # le paragraphe entier). Voir `paragraph_composer.cr`
       # compose_knuth_plass pour la logique du garde-fou.
       lines = ParagraphComposer.compose_knuth_plass(tokens, width)
-      lines.map(&.segments)
+      # Renvoie les segments tout en mémorisant le `natural_width`
+      # calculé par le composer (incluant les paddings codespan/
+      # kbd/mark) pour chaque ligne. Le renderer le récupère via
+      # `@line_natural_widths` et l'utilise pour calculer un
+      # `extra_per_space` JUSTE en justification (sinon il
+      # sous-estime natural_w et étire la ligne trop loin).
+      lines.map do |line|
+        segs = line.segments
+        @line_natural_widths[segs.object_id] = line.natural_width
+        segs
+      end
     end
 
     # Rend une ligne de segments inline sur la page PDF.
@@ -3724,6 +3768,23 @@ module AsciidoctorPDF
       # bord droit en typographie sino-japonaise).
       needs_metric = (align == "justify" || target_w) && target_w
       if needs_metric && (tw = target_w)
+        # Si le composer a déjà calculé la largeur naturelle pour
+        # cette liste de segments (cf. `wrap_segments`), on l'utilise
+        # — sa mesure inclut les paddings codespan/kbd/mark que le
+        # calcul naïf ci-dessous ignore. Sinon (appelants qui
+        # construisent des segments à la volée sans passer par
+        # `wrap_segments`), on retombe sur le calcul classique.
+        #
+        # Lecture NON destructive (`[]?`, pas `delete`) : une même
+        # ligne peut être rendue plusieurs fois (essai de mise en
+        # page avorté avant un saut de page, puis rendu réel). Un
+        # `delete` libérerait l'entrée dès le 1er passage et le 2ᵉ
+        # retomberait sur le calcul naïf (sous-estimé ⇒ sur-
+        # étirement ⇒ `huge_gap`). Le cache croît donc sur la durée
+        # du document, mais borné au nombre total de lignes (quelques
+        # milliers d'entrées × ~16 octets = quelques Ko) — il est
+        # libéré avec l'instance du converter (une par document).
+        composer_natural_w = @line_natural_widths[segments.object_id]?
         natural_w = 0.0
         n_spaces = 0
         segments.each do |seg|
@@ -3755,6 +3816,15 @@ module AsciidoctorPDF
             end
             n_spaces += seg.text.count(' ')
           end
+        end
+        # Si le composer nous a donné la VRAIE natural_width, on
+        # l'utilise. Garde-fou : on ne la prend que si elle est
+        # supérieure à notre calcul (le composer inclut des paddings
+        # que nous n'avons pas comptés) ET inférieure à 1.5×
+        # natural_w (sanity check : valeur aberrante ⇒ on garde
+        # notre calcul).
+        if composer_natural_w && composer_natural_w > natural_w && composer_natural_w < natural_w * 1.5 + 100.0
+          natural_w = composer_natural_w
         end
         if n_spaces > 0 && tw > natural_w && align == "justify"
           candidate = (tw - natural_w) / n_spaces
@@ -4577,20 +4647,38 @@ module AsciidoctorPDF
     ) : Float64?
       return nil unless native_renderable?(text)
 
-      softened = text.gsub(' ', ' ')
-      printable = safe_text(softened, font_name)
       font = get_font(font_name)
       set_font(page, font_name, font_size)
+      space_w = font.string_width(" ", font_size)
+
+      # Split sur ESPACE ASCII STRICT (v2.3.24.84 bis — fix
+      # débordement `mot<NBSP>:`). Le NBSP (U+00A0) reste DANS
+      # les morceaux : il n'est JAMAIS un point de
+      # justification. Convention typographique française :
+      # seul l'espace ASCII entre deux mots est étirable ; le
+      # NBSP entre `mot` et `:` (ou `;`, `!`, `?`) est
+      # insécable ET de largeur FIXE.
+      #
+      # `split_ascii_keep_nbsp` remplace le NBSP par un espace
+      # ASCII pour le rendu (glyphe visible) APRÈS le split :
+      # sa largeur reste donc naturelle, sans `extra`. Avant ce
+      # fix, le `gsub` NBSP→espace était fait AVANT le split, le
+      # NBSP devenait un séparateur, et un `extra_tj` était
+      # inséré entre `source` et `:` — poussant le `:` de
+      # quelques points au-delà de la marge droite (3 cas
+      # observés sur le README beryl : `source :`, `il lit`,
+      # `via l'API`).
+      parts = split_ascii_keep_nbsp(text).map { |p| safe_text(p, font_name) }
 
       if page.composite_font?
-        # TJ array : on émet chaque mot séparément, entrecoupé
-        # d'un espace ASCII puis d'un déplacement `extra_tj`.
-        # Les espaces eux-mêmes restent dans la chaîne (largeur
-        # naturelle space_w consommée par le glyph), le delta
-        # vient s'ajouter pour matérialiser l'élargissement justify.
+        # TJ array : on émet chaque morceau séparément,
+        # entrecoupé d'un espace ASCII puis d'un déplacement
+        # `extra_tj`. Seuls les espaces ASCII (jointures
+        # inter-morceaux) reçoivent l'`extra` ; les NBSP,
+        # désormais inclus DANS les morceaux, gardent leur
+        # largeur naturelle.
         extra_tj = -extra_per_space * 1000.0 / font_size
         runs = [] of PDF::Page::TextRun
-        parts = printable.split(' ')
         parts.each_with_index do |part, i|
           if i > 0
             runs << " "
@@ -4600,14 +4688,37 @@ module AsciidoctorPDF
         end
         page.text_positioned(runs, at: {x, y})
       else
-        # Polices simples : `Tw` natif suffit.
-        page.text(printable, at: {x, y}, word_spacing: extra_per_space)
+        # Police simple : positionnement manuel plutôt que
+        # `Tw`. `Tw` (ISO 32000-1 § 9.3.3) s'applique à TOUS
+        # les octets 32, y compris les espaces issus du NBSP
+        # qu'on vient de convertir — ce qui réintroduirait
+        # l'`extra` sur un espace censé être insécable. On
+        # dessine chaque morceau et on avance `cx` à la main,
+        # en n'ajoutant l'`extra` qu'aux jointures ASCII.
+        cx = x
+        parts.each_with_index do |part, i|
+          cx += space_w + extra_per_space if i > 0
+          next if part.empty?
+          page.text(part, at: {cx, y})
+          cx += font.string_width(part, font_size)
+        end
       end
 
-      # Largeur consommée = string width naturelle + extra · nb_espaces.
-      # Identique pour les deux chemins puisque le rendu visuel
-      # est équivalent (Tw et TJ produisent le même placement).
-      font.string_width(printable, font_size) + extra_per_space * printable.count(' ')
+      # Largeur consommée : somme des morceaux (NBSP-espaces
+      # naturels inclus) + (space_w + extra) par jointure ASCII.
+      n_joins = parts.size - 1
+      total_parts = parts.sum { |p| font.string_width(p, font_size) }
+      total_parts + (space_w + extra_per_space) * n_joins
+    end
+
+    # Split un texte sur les espaces ASCII (U+0020) uniquement,
+    # puis remplace les NBSP (U+00A0) restants par des espaces
+    # ASCII DANS chaque morceau (pour le rendu — glyphe
+    # visible). Le NBSP n'est donc jamais un séparateur de
+    # justification : il garde sa largeur naturelle et reste
+    # collé à ses voisins (convention `mot<NBSP>:`).
+    private def split_ascii_keep_nbsp(text : String) : Array(String)
+      text.split(' ').map(&.gsub(' ', ' '))
     end
 
     # Découpe un texte en lignes selon la largeur disponible.

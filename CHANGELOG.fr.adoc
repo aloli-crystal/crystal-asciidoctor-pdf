@@ -1,3 +1,72 @@
+== v2.3.24.85 — 2026-06-04
+
+=== Corrigé
+
+* **Débordement du `:` français (`mot<NBSP>:`) hors marge droite.**
+  Bug racine dans `try_native_justified_text` : le NBSP (U+00A0)
+  était converti en espace ASCII *avant* le `split(' ')`, ce qui
+  en faisait un point de justification. Un `extra_tj` (étirement)
+  était alors inséré entre `source` et `:` dans `source<NBSP>:`,
+  poussant le `:` au-delà de la marge.
++
+  Conformément à la convention typographique (confirmée : en
+  français `mot<NBSP>:<espace>`, seul l'espace APRÈS le `:` est
+  justifiable ; le NBSP est insécable ET de largeur fixe ; en
+  anglais `mot:<espace>`, idem), le split se fait désormais sur
+  l'espace ASCII STRICT. Le NBSP reste DANS les morceaux et n'est
+  converti en espace (pour le rendu du glyphe) qu'APRÈS le split —
+  sa largeur reste donc naturelle, sans `extra`. Nouvelle méthode
+  `split_ascii_keep_nbsp`. La branche police simple (`Tw`) passe
+  au positionnement manuel pour la même raison (`Tw` s'applique à
+  TOUS les octets 32, NBSP-convertis inclus).
+
+* **Sur-étirement / débordement par désalignement de mesure
+  composer ↔ renderer.**
+  `compose_knuth_plass` calcule un `natural_width` par ligne qui
+  INCLUT les paddings codespan/kbd/mark — c'est sur cette mesure
+  que les coupures de ligne ont été décidées. Le renderer
+  recalculait sa propre largeur via `font.string_width` SANS ces
+  paddings, donc sous-estimée : `extra_per_space = (tw -
+  natural_w) / n_spaces` devenait trop grand ⇒ lignes sur-étirées
+  (gaps de 20-30 pt) ou mots débordant la marge.
++
+  Le renderer consulte désormais le `natural_width` du composer
+  (source de vérité) via un cache `@line_natural_widths` indexé
+  par `object_id` de la ligne, renseigné dans `wrap_segments`.
+  Lecture non-destructive (une ligne peut être rendue plusieurs
+  fois lors d'un essai de pagination). Garde-fou : la valeur n'est
+  adoptée que si elle est supérieure au calcul local et dans une
+  borne raisonnable.
+
+* **Knuth-Plass : `ratio < 0` rejeté (pas de compression).**
+  Le seuil de shrink passe de -1.0 à 0.0 : aucune compression
+  d'espace n'est tolérée. Toute ligne en débordement est rejetée,
+  forçant le composer à casser plus haut (l'élément débordant part
+  sur la ligne suivante, la précédente s'étire par stretch
+  positif). Un Box atomique `mot<NBSP>:` trop large pour la ligne
+  courante est ainsi systématiquement poussé à la ligne suivante,
+  jamais comprimé ni coupé.
+
+=== Impact
+
+PDF du README beryl (FR et EN), mesuré par `pdf-audit` v0.2.1 :
+**0 anomalie** typographique (7 pages, 2794 mots FR / 2776 mots
+EN). Point de départ de la session : 11 anomalies.
+
+Aucune régression sur les autres exemples (x-form-audit-iso27001
+passe même de 8 à 7 anomalies pré-existantes, liées aux layouts
+de champs `[x-form]`).
+
+=== Note d'implémentation
+
+Le cache `@line_natural_widths` indexé par `object_id` est un
+compromis localisé (éviter de changer la signature de
+`render_segment_line`, partagée par 15+ call-sites). La sûreté
+repose sur l'écrasement-à-l'écriture (`wrap_segments` réécrit
+l'entrée juste avant le rendu) et un garde-fou de plausibilité.
+Un refactor vers un identifiant séquentiel reste possible si le
+besoin s'en fait sentir.
+
 == v2.3.24.84 — 2026-06-04
 
 === Corrigé
