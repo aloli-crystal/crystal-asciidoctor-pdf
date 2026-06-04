@@ -791,21 +791,31 @@ module AsciidoctorPDF
       label_offset = @theme.admonition_border_width + 4.0
       label_gap = 8.0
       label_space = [60.0, label_offset + text_width(label_text, @fn_body_bold, label_size) + label_gap].max
-      content_w = @content_width - label_space - padding
-
-      segments = parse_inline(html)
-      lines = wrap_segments_full(segments, content_w, font_size)
-      # Ligne vide de secours (réserve une hauteur pour un bloc sans
-      # texte). natural_width 0 → justification ignorée (n_spaces 0).
-      lines = [ParagraphComposer::Line.new([] of InlineSegment, 0.0, 0.0, 0)] if lines.empty?
-      block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
-
       # Mode encadré : option A (rôle `boxed` sur le bloc) OU option B
       # (`theme.admonition_boxed: true`). L'ombre + le cadre + la
       # bande gauche + le label sont tous *à l'intérieur* du
       # rectangle entourant. `total_h` inclut alors l'offset d'ombre
       # pour réserver l'espace.
       boxed = node.has_role?("boxed") || @theme.admonition_boxed
+
+      # Largeur de la zone de texte. Le bord DROIT du texte :
+      #   - admonition encadrée : insé de `padding` pour ne pas
+      #     toucher la bordure droite du cadre (à @margin +
+      #     @content_width) ;
+      #   - admonition simple (bande gauche seule, cas par défaut) :
+      #     atteint la marge droite de page comme un paragraphe
+      #     ordinaire — pas de bordure à droite, donc pas de raison
+      #     d'insérer un retrait (la justification rejoignait sinon
+      #     un bord « fantôme » ~8 pt avant la marge, défaut visuel
+      #     signalé sur le README beryl).
+      right_inset = boxed ? padding : 0.0
+      content_w = @content_width - label_space - right_inset
+
+      segments = parse_inline(html)
+      lines = wrap_segments(segments, content_w, font_size)
+      lines = [[] of InlineSegment] if lines.empty?
+      block_h = [lines.size * line_h + (2 * padding), font_size * 2 + (2 * padding)].max
+
       shadow_offset = boxed && @theme.admonition_box_shadow_enabled ? @theme.admonition_box_shadow_offset : 0.0
       total_h = block_h + @theme.admonition_margin_top + @theme.admonition_margin_bottom + shadow_offset
 
@@ -847,8 +857,8 @@ module AsciidoctorPDF
       last_idx = lines.size - 1
       lines.each_with_index do |line, idx|
         line_align = idx == last_idx ? "left" : @theme.base_text_align
-        render_segment_line(page, line.segments, @margin + label_space, y, font_size,
-          target_w: content_w, align: line_align, composer_natural_w: line.natural_width)
+        render_segment_line(page, line, @margin + label_space, y, font_size,
+          target_w: content_w, align: line_align)
         y -= line_h
       end
 
@@ -1435,8 +1445,8 @@ module AsciidoctorPDF
         content_w = @content_width - @theme.list_indent - indent
 
         segments = parse_inline(html)
-        lines = wrap_segments_full(segments, content_w, font_size)
-        lines = [ParagraphComposer::Line.new([] of InlineSegment, 0.0, 0.0, 0)] if lines.empty?
+        lines = wrap_segments(segments, content_w, font_size)
+        lines = [[] of InlineSegment] if lines.empty?
         total_h = lines.size * line_h + @theme.list_item_spacing
         check_page_break(total_h)
 
@@ -1453,8 +1463,8 @@ module AsciidoctorPDF
         last_idx = lines.size - 1
         lines.each_with_index do |line, i|
           line_align = i == last_idx ? "left" : @theme.base_text_align
-          render_segment_line(page, line.segments, x_text, @current_y - font_size, font_size,
-            target_w: content_w, align: line_align, composer_natural_w: line.natural_width)
+          render_segment_line(page, line, x_text, @current_y - font_size, font_size,
+            target_w: content_w, align: line_align)
           @current_y -= line_h
         end
         @current_y -= @theme.list_item_spacing
@@ -3552,7 +3562,7 @@ module AsciidoctorPDF
       line_h : Float64,
     ) : Nil
       segments = parse_inline(html)
-      lines = wrap_segments_full(segments, width, font_size)
+      lines = wrap_segments(segments, width, font_size)
       # Pour justify : on alimente `target_w` (largeur cible) sur
       # toutes les lignes sauf la dernière (la dernière reste
       # alignée à gauche pour ne pas étirer un texte court orphelin).
@@ -3561,8 +3571,8 @@ module AsciidoctorPDF
       last_idx = lines.size - 1
       lines.each_with_index do |line, idx|
         line_align = idx == last_idx ? "left" : @theme.base_text_align
-        render_segment_line(page, line.segments, x, @current_y - font_size, font_size,
-          target_w: width, align: line_align, composer_natural_w: line.natural_width)
+        render_segment_line(page, line, x, @current_y - font_size, font_size,
+          target_w: width, align: line_align)
         @current_y -= line_h
       end
     end
@@ -3622,22 +3632,11 @@ module AsciidoctorPDF
     # (J3). Bénéfice immédiat : les espaces insécables (NBSP) sont
     # absorbés dans la Box voisine et garantis insécables —
     # « deploy : il » ne peut plus être cassé sur le `:`.
-    # Variante de `wrap_segments` qui conserve les objets `Line`
-    # complets du composer (segments + `natural_width` + ratio).
-    # Les chemins qui JUSTIFIENT (paragraphe, item de liste, liste
-    # de définition) l'utilisent pour transmettre le vrai
-    # `natural_width` à `render_segment_line` via le paramètre
-    # `composer_natural_w`. Ce `natural_width` est LA source de
-    # vérité : c'est sur lui que le composer a décidé les coupures
-    # de ligne (il inclut les paddings codespan/kbd/mark). Le
-    # renderer DOIT s'aligner dessus — le recalculer naïvement via
-    # `font.string_width` le sous-estimerait (paddings oubliés),
-    # gonflant `extra_per_space` ⇒ débordement / `huge_gap`.
-    private def wrap_segments_full(
+    private def wrap_segments(
       segments : Array(InlineSegment),
       width : Float64,
       font_size : Float64,
-    ) : Array(ParagraphComposer::Line)
+    ) : Array(Array(InlineSegment))
       # Résout l'hyphenator pour la langue du document.
       # Renvoie `nil` si la langue est inconnue / absente : le
       # composer fonctionne alors sans césure (comportement
@@ -3685,20 +3684,7 @@ module AsciidoctorPDF
       # > MAX_KP_RATIO ⇒ fallback automatique sur first-fit pour
       # le paragraphe entier). Voir `paragraph_composer.cr`
       # compose_knuth_plass pour la logique du garde-fou.
-      ParagraphComposer.compose_knuth_plass(tokens, width)
-    end
-
-    # Découpe une liste de segments en lignes (n'expose que les
-    # segments, sans les métriques). Conserve la signature
-    # historique utilisée par la majorité des call-sites (titres,
-    # marqueurs de liste, etc.) qui ne justifient pas et n'ont donc
-    # pas besoin du `natural_width`.
-    private def wrap_segments(
-      segments : Array(InlineSegment),
-      width : Float64,
-      font_size : Float64,
-    ) : Array(Array(InlineSegment))
-      wrap_segments_full(segments, width, font_size).map(&.segments)
+      ParagraphComposer.compose_knuth_plass(tokens, width).map(&.segments)
     end
 
     # Rend une ligne de segments inline sur la page PDF.
@@ -3713,7 +3699,6 @@ module AsciidoctorPDF
       font_size : Float64,
       target_w : Float64? = nil,
       align : String = "left",
-      composer_natural_w : Float64? = nil,
     ) : Nil
       # Justify : calcule l'espace inutilisé sur la ligne et le
       # distribue entre les espaces inter-mots. Les espaces
@@ -3752,17 +3737,9 @@ module AsciidoctorPDF
       # bord droit en typographie sino-japonaise).
       needs_metric = (align == "justify" || target_w) && target_w
       if needs_metric && (tw = target_w)
-        # `composer_natural_w` (paramètre) : largeur naturelle
-        # exacte calculée par le composer pour cette ligne — elle
-        # inclut les paddings codespan/kbd/mark et c'est sur elle
-        # que les coupures de ligne ont été décidées. Fournie par
-        # les chemins qui justifient (paragraphe, item de liste,
-        # liste de définition) via `wrap_segments_full`. Quand elle
-        # est absente (appelants non justifiants), on retombe sur le
-        # calcul local ci-dessous.
         natural_w = 0.0
         n_spaces = 0
-        segments.each do |seg|
+        segments.each_with_index do |seg, seg_idx|
           if seg.image_path
             natural_w += seg.image_width || (font_size * 1.2)
           elsif !seg.text.empty?
@@ -3790,16 +3767,42 @@ module AsciidoctorPDF
               natural_w += font.string_width(seg.text, eff_size)
             end
             n_spaces += seg.text.count(' ')
+
+            # Padding de badge RÉELLEMENT rendu — réplique EXACTE
+            # de la condition de rendu (cf. plus bas, « Padding
+            # inter-segments pour les badges »). Le padding
+            # codespan/kbd/mark n'est ajouté au curseur QUE si le
+            # segment suivant ne « colle » pas (ni espace, ni
+            # ponctuation finale) ET n'est pas lui-même un mono
+            # contigu (fragments d'un codespan coupé). En comptant
+            # ici EXACTEMENT les mêmes paddings, `natural_w` égale
+            # la largeur effectivement dessinée (notée `R`), donc la
+            # justification `extra = (tw - natural_w) / n_spaces`
+            # remplit la ligne PILE jusqu'à `target_w`.
+            #
+            # Si on comptait les paddings INCONDITIONNELLEMENT (comme
+            # `tokenize` le fait pour la décision de coupure), on
+            # sur-estimerait `natural_w` ⇒ `extra` trop petit ⇒
+            # ligne justifiée qui s'arrête AVANT la marge (défaut
+            # visuel signalé sur le README beryl). À l'inverse, ne
+            # rien compter sous-estimerait ⇒ débordement. Le calcul
+            # conditionnel est le seul exact. NB : le composer garde
+            # SA mesure gonflée (inconditionnelle) pour casser de
+            # façon conservatrice et garantir `R <= target_w`.
+            next_seg = segments[seg_idx + 1]?
+            next_clings = if (nx = next_seg) && !nx.text.empty?
+                            fc = nx.text[0]
+                            fc == ' ' || ".,;:!?)]}»".includes?(fc)
+                          else
+                            true
+                          end
+            next_is_mono = next_seg && next_seg.mono && !next_seg.kbd
+            unless next_clings || next_is_mono
+              natural_w += 4.0 if seg.kbd || seg.button
+              natural_w += 2.0 if seg.mark
+              natural_w += @theme.codespan_padding_x if seg.mono && !seg.kbd
+            end
           end
-        end
-        # Si le composer nous a donné la VRAIE natural_width, on
-        # l'utilise. Garde-fou : on ne la prend que si elle est
-        # supérieure à notre calcul (le composer inclut des paddings
-        # que nous n'avons pas comptés) ET inférieure à 1.5×
-        # natural_w (sanity check : valeur aberrante ⇒ on garde
-        # notre calcul).
-        if composer_natural_w && composer_natural_w > natural_w && composer_natural_w < natural_w * 1.5 + 100.0
-          natural_w = composer_natural_w
         end
         if n_spaces > 0 && tw > natural_w && align == "justify"
           candidate = (tw - natural_w) / n_spaces

@@ -1,3 +1,52 @@
+== v2.3.24.87 — 2026-06-04
+
+=== Corrigé
+
+* **Justification : les lignes atteignent à nouveau la marge
+  droite.** Le calcul de `natural_w` (largeur naturelle d'une
+  ligne, base de `extra_per_space = (target_w - natural_w) /
+  n_spaces`) côté renderer comptait les paddings de badge
+  (codespan/kbd/mark) de façon INCONDITIONNELLE, comme le fait
+  `tokenize` pour la décision de coupure. Or le rendu ne les
+  ajoute que CONDITIONNELLEMENT (pas entre deux fragments d'un
+  même codespan, ni avant un caractère collant). `natural_w`
+  était donc SUR-estimée ⇒ `extra_per_space` trop petit ⇒ les
+  lignes justifiées s'arrêtaient quelques points AVANT la marge
+  (défaut visuel signalé sur de nombreux items de liste et
+  paragraphes du README beryl).
++
+  Le renderer applique désormais EXACTEMENT la même condition que
+  le rendu (`next_clings` / `next_is_mono`) pour compter les
+  paddings : `natural_w` égale alors la largeur réellement
+  dessinée, et la ligne se remplit pile jusqu'à `target_w`. Le
+  composer conserve sa mesure gonflée (inconditionnelle) pour
+  casser de façon conservatrice — garantissant l'absence de
+  débordement.
+
+* **Admonition simple : le texte atteint la marge droite.** La
+  largeur de contenu d'une admonition retirait un `padding` à
+  DROITE même en l'absence de cadre. Pour une admonition simple
+  (bande de couleur à gauche seule, cas par défaut), il n'y a
+  pas de bordure droite : le texte rejoint désormais la marge de
+  page comme un paragraphe ordinaire. Le retrait droit n'est
+  conservé que pour la variante encadrée (`boxed`).
+
+=== Nettoyage interne
+
+* Suppression du threading `composer_natural_w` / méthode
+  `wrap_segments_full` introduits en v2.3.24.86 : le
+  `natural_width` exact étant désormais recalculé localement et
+  correctement par le renderer (paddings conditionnels), la
+  valeur du composer n'a plus besoin d'être transmise.
+  Retour à un unique `wrap_segments`.
+
+=== Vérification
+
+Rendu validé avec poppler (`pdftotext -bbox`, référence
+indépendante) : sur le README beryl FR et EN, les lignes
+justifiées atteignent la marge droite (559 pt) avec des espaces
+inter-mots uniformes (~3-5 pt). La NOTE de la page 1 atteint
+désormais la marge.
 == v2.3.24.86 — 2026-06-04
 
 === Modifié (refactor interne, rendu inchangé)
