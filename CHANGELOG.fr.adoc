@@ -1,3 +1,48 @@
+== v2.3.24.84 — 2026-06-04
+
+=== Corrigé
+
+* **Knuth-Plass : `ratio < 0` rejeté (pas de compression d'espaces).**
+  La borne TeX standard `next if ratio < -1.0` autorisait
+  jusqu'à 100 % de compression des Glues d'une ligne pour la
+  faire tenir dans `target_w`. Sur demande Philippe, et
+  conformément à la convention typographique française qui veut
+  des espaces de largeur stable (pas resserrés pour gagner de
+  la place), cette borne devient `ratio < 0.0` : aucune
+  compression d'espace tolérée. Une ligne en débordement est
+  désormais systématiquement rejetée par K-P — le composer doit
+  casser plus haut, la ligne précédente est étirée par stretch
+  positif, et l'élément débordant (mot, codespan, `:` français
+  après NBSP) part sur la ligne suivante.
++
+  Cas typique éliminé : un Box atomique `mot<NBSP>:` (où le
+  NBSP rend la jointure `mot`+`:` insécable, seul l'espace
+  APRÈS le `:` étant justifiable) trop large pour la ligne
+  courante est désormais poussé sur la ligne suivante au lieu
+  d'être placé en débordement.
+
+=== Impact
+
+Sur le PDF du README beryl (mesure via `pdf-audit` v0.2.1) :
+les anomalies typographiques passent de **11 à 4** (-64 %).
+
+* `--hostname=chouquette` (overflow 75 pt dans un bloc
+  `[source,console]`) : classé hors-scope par le filtre
+  `monospace?` du linter — convention typographique : les
+  blocs code ne sont pas wrappés (une commande shell ne doit
+  pas être coupée en ligne), c'est à l'auteur du document de
+  casser sa ligne dans le source AsciiDoc.
+* `bootstrapper.`, `réel.`, `API`, `:` (certains paragraphes
+  p4), `l'API` (p6 dans certains paragraphes) : éliminés par
+  le rejet K-P `ratio < 0`.
+* 4 résiduels à 4-8 pt (`par`, `:`, `lit`, `l'API`) : cas où
+  `compose_first_fit` (fallback K-P quand aucun chemin
+  admissible n'est trouvé) ne casse pas correctement à la
+  dernière Glue/Penalty avant un mot final. La convergence
+  vers 0 anomalie demande un refactor du fallback first-fit
+  (alignement strict de la mesure composer sur le rendu
+  effectif des paddings codespan inter-segments).
+
 == v2.3.24.83 — 2026-06-04
 
 === Corrigé

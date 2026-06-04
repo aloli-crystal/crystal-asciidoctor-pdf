@@ -681,10 +681,20 @@ module AsciidoctorPDF
                     0.0
                   end
 
-          # Seuils TeX par défaut : tolerance = 10 en stretch,
-          # -1 en shrink (au-delà = ligne pathologique, on
-          # passe au breakpoint suivant).
-          next if ratio > 10.0 || ratio < -1.0
+          # Seuils (v2.3.24.84 — durcis sur demande Philippe) :
+          # tolerance = 10 en stretch (= TeX standard), 0 en
+          # shrink. Aucune compression d'espace tolérée — toute
+          # ligne en débordement doit être rejetée pour forcer
+          # le composer à casser plus haut (la ligne précédente
+          # sera étirée par stretch positif, l'élément débordant
+          # part sur la ligne suivante).
+          #
+          # En particulier : un Box atomique `mot<NBSP>:` trop
+          # large pour la ligne courante (typographie française :
+          # le NBSP entre le mot et le `:` est insécable, seul
+          # l'espace après le `:` est justifiable) est désormais
+          # systématiquement poussé sur la ligne suivante.
+          next if ratio > 10.0 || ratio < 0.0
 
           # Badness = 100 · |ratio|³ (formule TeX, TeXbook ch. 12).
           badness = 100.0 * (ratio.abs ** 3)
