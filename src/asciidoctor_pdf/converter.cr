@@ -662,24 +662,37 @@ module AsciidoctorPDF
     # préserver le copier-coller). Une ligne sans aucune charnière
     # (jeton unique très long, ex. base64) est coupée net en dernier
     # recours — toujours préférable au rognage hors page.
-    private def soft_wrap_code_lines(lines : Array(String), font_size : Float64, avail_w : Float64) : Array(String)
+    # Replie les lignes de code trop longues. Renvoie des paires
+    # `{texte, continuation?}` : `continuation? == true` marque un
+    # fragment issu d'un repli (toutes les lignes d'un repli SAUF la
+    # première). Le renderer y dessine un marqueur « ↳ » d'avertissement.
+    #
+    # Un `WARNING` est aussi émis sur stderr pour CHAQUE ligne source
+    # repliée : le copier-coller du PDF embarquera un saut de ligne
+    # (la commande ne sera pas exécutable telle quelle), donc l'auteur
+    # est invité à raccourcir la ligne dans le source s'il le peut.
+    private def soft_wrap_code_lines(lines : Array(String), font_size : Float64, avail_w : Float64) : Array(Tuple(String, Bool))
       font = get_font(@fn_mono)
-      result = [] of String
+      result = [] of Tuple(String, Bool)
       lines.each do |line|
         if line.empty? || font.string_width(line, font_size) <= avail_w
-          result << line
+          result << {line, false}
         else
+          preview = line.size > 64 ? "#{line[0, 64]}…" : line
+          STDERR.puts "asciidoctor: WARNING: ligne de code repliée (trop longue pour l'encadré) — le copier-coller insérera un saut de ligne : #{preview}"
           rest = line
+          first = true
           # Garde-fou anti-boucle : au plus une coupure par caractère.
           guard = line.size + 1
           while guard > 0 && font.string_width(rest, font_size) > avail_w
             guard -= 1
             head_end, tail_start = code_wrap_cut(rest, font, font_size, avail_w)
             break if head_end <= 0
-            result << rest[0...head_end]
+            result << {rest[0...head_end], !first}
+            first = false
             rest = rest[tail_start..]
           end
-          result << rest unless rest.empty?
+          result << {rest, !first} unless rest.empty?
         end
       end
       result
@@ -736,7 +749,7 @@ module AsciidoctorPDF
     end
 
     # Render a code block that fits entirely on the current page.
-    private def render_code_block_simple(lines : Array(String), language : String, font_size : Float64, line_h : Float64, padding : Float64, highlight : Bool) : Nil
+    private def render_code_block_simple(lines : Array(Tuple(String, Bool)), language : String, font_size : Float64, line_h : Float64, padding : Float64, highlight : Bool) : Nil
       check_page_break(lines.size * line_h + (2 * padding) + @theme.code_margin_top + @theme.code_margin_bottom)
       page = @current_page.not_nil!
       @current_y -= @theme.code_margin_top
@@ -746,8 +759,8 @@ module AsciidoctorPDF
       draw_code_language_label(page, language, font_size, padding)
 
       y = @current_y - padding - font_size
-      lines.each do |line|
-        render_code_line(page, line, y, font_size, padding, highlight, language)
+      lines.each do |(text, cont)|
+        render_code_line(page, text, y, font_size, padding, highlight, language, cont)
         y -= line_h
       end
 
@@ -755,7 +768,7 @@ module AsciidoctorPDF
     end
 
     # Render a code block that may span multiple pages.
-    private def render_code_block_paginated(lines : Array(String), language : String, font_size : Float64, line_h : Float64, padding : Float64, highlight : Bool, bottom_limit : Float64) : Nil
+    private def render_code_block_paginated(lines : Array(Tuple(String, Bool)), language : String, font_size : Float64, line_h : Float64, padding : Float64, highlight : Bool, bottom_limit : Float64) : Nil
       # Start a new page if the current page can't even fit a few lines
       min_first_chunk = padding + font_size + 3 * line_h + padding + @theme.code_margin_top
       check_page_break(min_first_chunk)
@@ -788,8 +801,8 @@ module AsciidoctorPDF
 
         # Render lines
         y = @current_y - padding - font_size
-        chunk_lines.each do |line|
-          render_code_line(page, line, y, font_size, padding, highlight, language)
+        chunk_lines.each do |(text, cont)|
+          render_code_line(page, text, y, font_size, padding, highlight, language, cont)
           y -= line_h
         end
 
@@ -826,8 +839,12 @@ module AsciidoctorPDF
       page.text(language, at: {lang_x, @current_y - font_size * 0.75})
     end
 
-    # Render a single line of code text.
-    private def render_code_line(page : PDF::Page, line : String, y : Float64, font_size : Float64, padding : Float64, highlight : Bool, language : String) : Nil
+    # Render a single line of code text. `continuation` signale une
+    # ligne issue d'un repli (cf. `soft_wrap_code_lines`) : on dessine
+    # alors un marqueur « ↳ » d'avertissement dans la gouttière gauche.
+    private def render_code_line(page : PDF::Page, line : String, y : Float64, font_size : Float64, padding : Float64, highlight : Bool, language : String, continuation : Bool = false) : Nil
+      draw_code_continuation_marker(page, y, font_size) if continuation
+
       if highlight
         tokens = SyntaxHighlighter.tokenize(line, language)
         x = @margin + padding
@@ -842,6 +859,35 @@ module AsciidoctorPDF
         page.fill_color(@theme.code_font_color)
         page.text(line, at: {@margin + padding, y})
       end
+    end
+
+    # Dessine le marqueur de continuation « ↳ » d'une ligne de code
+    # repliée, dans la gouttière gauche de l'encadré (entre le bord
+    # `@margin` et le début du texte `@margin + padding`). Tracé
+    # VECTORIEL (deux segments + tête de flèche) — pas un glyphe :
+    #   - aucune dépendance à la couverture de la police mono ;
+    #   - n'appartient PAS au flux de texte, donc absent du
+    #     copier-coller (le lecteur n'embarque que le code, pas le
+    #     marqueur).
+    # Couleur d'avertissement (ambre) configurable via le thème.
+    private def draw_code_continuation_marker(page : PDF::Page, y : Float64, font_size : Float64) : Nil
+      gx = @margin + 2.5
+      top = y + font_size * 0.48
+      corner = y + 1.0
+      arm = 3.5
+      page.stroke_color(@theme.code_wrap_marker_color)
+      page.line_width(0.6)
+      # Crochet « ↳ » : descend puis part à droite.
+      page.move_to(gx, top)
+      page.line_to(gx, corner)
+      page.line_to(gx + arm, corner)
+      page.stroke
+      # Petite tête de flèche pointant à droite.
+      page.move_to(gx + arm, corner)
+      page.line_to(gx + arm - 2.0, corner + 1.6)
+      page.move_to(gx + arm, corner)
+      page.line_to(gx + arm - 2.0, corner - 1.6)
+      page.stroke
     end
 
     # =========================================================================

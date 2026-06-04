@@ -132,15 +132,16 @@ module AsciidoctorPDF
         when "list_item_spacing" then theme.list_item_spacing = parse_float(value, theme.list_item_spacing)
         when "list_marker_color" then theme.list_marker_color = value.as_s? || theme.list_marker_color
           # Code
-        when "code_font_family"      then theme.code_font_family = value.as_s? || theme.code_font_family
-        when "code_font_size"        then theme.code_font_size = parse_float(value, theme.code_font_size)
-        when "code_background_color" then theme.code_background_color = value.as_s? || theme.code_background_color
-        when "code_border_color"     then theme.code_border_color = value.as_s? || theme.code_border_color
-        when "code_border_width"     then theme.code_border_width = parse_float(value, theme.code_border_width)
-        when "code_padding"          then theme.code_padding = parse_float(value, theme.code_padding)
-        when "code_margin_top"       then theme.code_margin_top = parse_float(value, theme.code_margin_top)
-        when "code_margin_bottom"    then theme.code_margin_bottom = parse_float(value, theme.code_margin_bottom)
-        when "code_font_color"       then theme.code_font_color = value.as_s? || theme.code_font_color
+        when "code_font_family"       then theme.code_font_family = value.as_s? || theme.code_font_family
+        when "code_font_size"         then theme.code_font_size = parse_float(value, theme.code_font_size)
+        when "code_background_color"  then theme.code_background_color = value.as_s? || theme.code_background_color
+        when "code_border_color"      then theme.code_border_color = value.as_s? || theme.code_border_color
+        when "code_border_width"      then theme.code_border_width = parse_float(value, theme.code_border_width)
+        when "code_padding"           then theme.code_padding = parse_float(value, theme.code_padding)
+        when "code_margin_top"        then theme.code_margin_top = parse_float(value, theme.code_margin_top)
+        when "code_margin_bottom"     then theme.code_margin_bottom = parse_float(value, theme.code_margin_bottom)
+        when "code_font_color"        then theme.code_font_color = value.as_s? || theme.code_font_color
+        when "code_wrap_marker_color" then theme.code_wrap_marker_color = value.as_s? || theme.code_wrap_marker_color
           # Admonitions
         when "admonition_border_width"         then theme.admonition_border_width = parse_float(value, theme.admonition_border_width)
         when "admonition_padding"              then theme.admonition_padding = parse_float(value, theme.admonition_padding)

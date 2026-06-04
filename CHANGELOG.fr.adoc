@@ -1,3 +1,31 @@
+== v2.3.24.90 — 2026-06-04
+
+=== Ajouté
+
+* **Avertissement sur les lignes de code repliées.** Une ligne de
+  bloc `[source,…]` repliée automatiquement (v2.3.24.88) reste sur
+  deux lignes à l'écran, mais son copier-coller embarque un saut de
+  ligne — la commande n'est alors pas exécutable telle quelle.
+  Double signalement désormais :
++
+  0. **Marqueur visuel** : un petit crochet « ↳ » ambre est dessiné
+     dans la gouttière gauche de l'encadré, au début de chaque ligne
+     de continuation. Tracé VECTORIEL (deux segments + tête de
+     flèche), donc (a) aucune dépendance à la couverture de la
+     police mono, et (b) ABSENT du copier-coller — le lecteur ne
+     récupère que le code, jamais le marqueur. Couleur configurable
+     via le thème (`code_wrap_marker_color`, ambre par défaut).
+  0. **`WARNING` à la génération** : un message stderr est émis pour
+     chaque ligne source repliée (« le copier-coller insérera un
+     saut de ligne »), invitant l'auteur à raccourcir la ligne dans
+     le source AsciiDoc s'il le souhaite.
+
+=== Note
+
+Les lignes de bloc `[source,…]` ne sont — et n'ont jamais été —
+justifiées : elles sont rendues en chasse fixe (mono), alignées à
+gauche, espaces d'origine préservés. Seule la prose (y compris les
+codespans inline qu'elle contient) est justifiée.
 == v2.3.24.89 — 2026-06-04
 
 === Corrigé

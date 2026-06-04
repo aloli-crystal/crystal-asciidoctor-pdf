@@ -119,6 +119,11 @@ module AsciidoctorPDF
     property code_margin_top : Float64 = 6.0
     property code_margin_bottom : Float64 = 6.0
     property code_font_color : String = "333333"
+    # Couleur du marqueur « ↳ » signalant une ligne de code repliée
+    # automatiquement (trop longue pour l'encadré). Ambre par défaut
+    # (couleur d'avertissement) : alerte le lecteur que la ligne a
+    # été coupée et que le copier-coller insérera un saut de ligne.
+    property code_wrap_marker_color : String = "f0ad4e"
 
     # --- Admonitions ---
     property admonition_border_width : Float64 = 2.0
