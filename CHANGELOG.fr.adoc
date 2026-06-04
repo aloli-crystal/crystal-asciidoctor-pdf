@@ -1,3 +1,41 @@
+== v2.3.24.86 — 2026-06-04
+
+=== Modifié (refactor interne, rendu inchangé)
+
+* **Suppression du cache `@line_natural_widths` indexé par
+  `object_id`.** La v2.3.24.85 transmettait le `natural_width`
+  exact du composer au renderer via un cache `Hash(UInt64,
+  Float64)` indexé par l'`object_id` de la ligne — un compromis
+  fonctionnel mais fragile (réutilisation d'adresse possible
+  après GC, croissance mémoire sur la durée du document).
++
+  Le `natural_width` est désormais passé **explicitement** en
+  paramètre `composer_natural_w` à `render_segment_line`. Nouvelle
+  méthode `wrap_segments_full` qui conserve les objets `Line`
+  complets du composer (segments + `natural_width`) ; les 3
+  chemins qui justifient (paragraphe, item de liste, liste de
+  définition) l'utilisent. `wrap_segments` devient un mince
+  wrapper (`wrap_segments_full(...).map(&.segments)`) pour les
+  ~9 call-sites non justifiants (titres, marqueurs) qui n'ont
+  pas besoin de la métrique.
++
+  Rendu **strictement identique** à la v2.3.24.85 (positions de
+  tous les mots byte-exactes, vérifié sur le README beryl :
+  2794 mots FR / 2776 EN, 0 anomalie). Le fichier perd 25 lignes
+  nettes (-76 / +51) : plus court et sans variable d'instance
+  partagée.
+
+=== Pourquoi ce refactor
+
+L'approche `object_id` avait été retenue pour ne pas toucher la
+signature de `render_segment_line` (partagée par 12 call-sites).
+En constatant que seuls 3 d'entre eux justifient réellement
+(passent `target_w` + `align`), il devient trivial de threader la
+vraie valeur uniquement là où elle compte, via un paramètre
+optionnel `composer_natural_w : Float64? = nil` (rétro-compatible
+pour les 9 autres). On élimine ainsi le *code smell* sans aucun
+changement de rendu.
+
 == v2.3.24.85 — 2026-06-04
 
 === Corrigé
