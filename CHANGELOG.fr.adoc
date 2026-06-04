@@ -1,3 +1,24 @@
+== v2.3.24.89 — 2026-06-04
+
+=== Corrigé
+
+* **Soft-wrap des blocs `[source,…]` : priorité à l'espace
+  (frontière d'argument).** Le pliage v2.3.24.88 prenait la
+  charnière la plus à droite, ce qui pouvait scinder un flag :
+  `… --write --` puis `hostname=chouquette` (le `--hostname`
+  coupé en deux). On coupe désormais EN PRIORITÉ à l'espace le
+  plus à droite qui tient — chaque argument/flag reste entier :
++
+  ....
+  beryl scan aloli/9783705f-f86f-4bf7-88ad-4c92b920e9ba --provider=scaleway --dns --write
+  --hostname=chouquette
+  ....
++
+  Les charnières `/ - = ,` ne servent plus qu'en second recours,
+  lorsqu'un JETON UNIQUE est lui-même plus large que l'encadré
+  (UUID, chemin ou hash sans espace) — exactement comme la
+  coupure douce des codespans inline. Coupe nette à la limite en
+  tout dernier recours.
 == v2.3.24.88 — 2026-06-04
 
 === Ajouté

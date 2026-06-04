@@ -703,21 +703,35 @@ module AsciidoctorPDF
       end
       maxfit = lo
 
-      # Recherche d'une charnière en remontant depuis `maxfit`.
+      # Priorité 1 — ESPACE (frontière d'argument). On coupe à
+      # l'espace le plus à droite qui tient : c'est de loin la
+      # coupure la plus lisible pour une commande shell, car elle
+      # garde chaque argument/flag entier (`--hostname=chouquette`
+      # ne doit pas être scindé en `--` + `hostname=…`). On le
+      # consomme (séparateur).
+      i = maxfit
+      while i >= 1
+        if rest[i - 1] == ' '
+          return {i - 1, i}
+        end
+        i -= 1
+      end
+
+      # Priorité 2 — CHARNIÈRE `/ - = ,`. Atteinte seulement si la
+      # portion ne contient AUCUN espace (un jeton unique plus large
+      # que l'encadré : UUID, chemin, hash). On coupe après la
+      # charnière la plus à droite (elle reste sur la ligne du haut),
+      # comme la coupure douce des codespans inline.
       i = maxfit
       while i >= 1
         c = rest[i - 1]
-        if c == ' '
-          # Coupe sur espace : on le consomme (séparateur).
-          return {i - 1, i}
-        elsif c == '/' || c == '-' || c == '=' || c == ','
-          # Coupe après la charnière : elle reste en haut.
+        if c == '/' || c == '-' || c == '=' || c == ','
           return {i, i}
         end
         i -= 1
       end
 
-      # Aucune charnière : coupe nette à la limite.
+      # Priorité 3 — aucune charnière : coupe nette à la limite.
       {maxfit, maxfit}
     end
 
