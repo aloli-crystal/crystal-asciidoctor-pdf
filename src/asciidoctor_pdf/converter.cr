@@ -638,7 +638,13 @@ module AsciidoctorPDF
       # coupure sur espace consomme l'espace, une coupure sur
       # charnière garde la charnière sur la ligne du haut.
       avail_w = @content_width - 2 * padding
-      lines = soft_wrap_code_lines(source.split("\n"), font_size, avail_w)
+      # `node.lineno` pointe la ligne du délimiteur ouvrant (`----`) ;
+      # le contenu du bloc commence à la ligne suivante. On passe donc
+      # `lineno + 1` comme numéro de ligne source du PREMIER morceau de
+      # code, pour que les avertissements de repli citent la bonne
+      # ligne du fichier `.adoc`.
+      content_first_lineno = node.lineno.try { |l| l + 1 }
+      lines = soft_wrap_code_lines(source.split("\n"), font_size, avail_w, content_first_lineno)
 
       total_h = lines.size * line_h + (2 * padding) + @theme.code_margin_top + @theme.code_margin_bottom
 
@@ -670,16 +676,19 @@ module AsciidoctorPDF
     # Un `WARNING` est aussi émis sur stderr pour CHAQUE ligne source
     # repliée : le copier-coller du PDF embarquera un saut de ligne
     # (la commande ne sera pas exécutable telle quelle), donc l'auteur
-    # est invité à raccourcir la ligne dans le source s'il le peut.
-    private def soft_wrap_code_lines(lines : Array(String), font_size : Float64, avail_w : Float64) : Array(Tuple(String, Bool))
+    # est invité à raccourcir la ligne — ou à ajouter une continuation
+    # propre à son langage (`\` en shell) — dans le source. Le message
+    # cite le NUMÉRO DE LIGNE `.adoc` (via `content_first_lineno`, issu
+    # de `node.lineno` + 1) plutôt que de recopier le code.
+    private def soft_wrap_code_lines(lines : Array(String), font_size : Float64, avail_w : Float64, content_first_lineno : Int32? = nil) : Array(Tuple(String, Bool))
       font = get_font(@fn_mono)
       result = [] of Tuple(String, Bool)
-      lines.each do |line|
+      lines.each_with_index do |line, idx|
         if line.empty? || font.string_width(line, font_size) <= avail_w
           result << {line, false}
         else
-          preview = line.size > 64 ? "#{line[0, 64]}…" : line
-          STDERR.puts "asciidoctor: WARNING: ligne de code repliée (trop longue pour l'encadré) — le copier-coller insérera un saut de ligne : #{preview}"
+          where = content_first_lineno ? "(ligne #{content_first_lineno + idx})" : "(numéro de ligne indisponible — activez sourcemap)"
+          STDERR.puts "asciidoctor: WARNING: ligne de code repliée : trop longue pour l'encadré #{where}"
           rest = line
           first = true
           # Garde-fou anti-boucle : au plus une coupure par caractère.

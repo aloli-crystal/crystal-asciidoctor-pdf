@@ -1,3 +1,25 @@
+== v2.3.24.91 — 2026-06-04
+
+=== Modifié
+
+* **Le `WARNING` de repli de code cite le NUMÉRO DE LIGNE source.**
+  Le message v2.3.24.90 recopiait le début de la ligne, peu utile.
+  Il indique désormais directement la ligne du fichier `.adoc` :
++
+  ----
+  asciidoctor: WARNING: ligne de code repliée : trop longue pour l'encadré (ligne 280)
+  ----
++
+  L'auteur localise immédiatement la ligne et décide quoi faire
+  (raccourcir, ou ajouter une continuation propre à son langage —
+  un `\` en shell).
+
+* **`sourcemap` activé par défaut.** Nécessaire pour que chaque
+  bloc parsé porte son numéro de ligne (`node.lineno`).
+  Surchargeable via `-a sourcemap=false`. Le numéro de ligne du
+  contenu d'un bloc délimité est `node.lineno + 1` (la ligne du
+  délimiteur ouvrant `----` plus un) ; on y ajoute l'index du
+  morceau replié dans le bloc.
 == v2.3.24.90 — 2026-06-04
 
 === Ajouté

@@ -85,6 +85,12 @@ options = {"docfile" => input_file, "outfile" => output_file} of String => Strin
 attributes.each { |k, v| options[k] = v }
 user_config.merge_into(options)
 
+# Active `sourcemap` par défaut : chaque bloc parsé porte alors son
+# numéro de ligne source (`node.lineno`), ce qui permet aux
+# avertissements (p. ex. « ligne de code repliée ») de pointer la
+# ligne exacte du fichier `.adoc`. Surchargeable par l'utilisateur
+# via `-a sourcemap=false`.
+options["sourcemap"] = "true" unless options.has_key?("sourcemap")
 doc = Asciidoctor.load_file(input_file, options)
 
 # Résolution du thème, par ordre de priorité décroissante :
