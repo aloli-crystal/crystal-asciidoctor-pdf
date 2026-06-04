@@ -1,3 +1,36 @@
+== v2.3.24.83 — 2026-06-04
+
+=== Corrigé
+
+* **Compensation des paddings de badges dans le calcul du
+  composer.** Le `ParagraphComposer` ne savait pas que le rendu
+  ajoute `codespan_padding_x` (typiquement 2 pt), `+4 pt`
+  pour `kbd`/`button` ou `+2 pt` pour `mark` à `current_x`
+  après chaque badge (cf. `render_segment_line` ~ ligne 4031,
+  fix J4.A v2.3.24.73). Conséquence : les lignes contenant des
+  codespans étaient comptées légèrement plus courtes que leur
+  rendu réel, et certains mots débordaient de la marge droite
+  de 1 à 16 pt.
++
+  Détecté grâce au tout nouveau `aloli-crystal/pdf-audit`
+  (v0.1.0) qui a remonté 42 `margin_overflow` sur le PDF du
+  README beryl. Le fix consiste à gonfler la mesure de la Box
+  du segment dans le bloc de mesure de `tokenize` (cf.
+  `converter.cr#wrap_segments`) du même montant que ce que le
+  renderer ajoute en aval. Conservateur : compte un padding
+  même pour les codespans adjacents (où la compensation est en
+  réalité nulle) — surestimation acceptable car évite tout
+  débordement.
+
+  Vérification après fix :
++
+  - `pdf-audit lint beryl.pdf` : 67 → 33 anomalies
+  - `margin_overflow` : 42 → 20 (les 20 restants sont des
+    ponctuations finales `:`, `→`, courts mots dont la mesure
+    de pdf2text accuse ±1-3 pt d'imprécision)
+  - `stuck_words` : 6 → 0
+  - Gold compare sur les 53 README de prod-crystal : 0 projet
+    ne perd de page, `beryl-recipes` en gagne 1 (compactification).
 = Journal des modifications
 :toc: left
 :toc-title: Versions

@@ -3640,21 +3640,36 @@ module AsciidoctorPDF
         # retournerait 0 / ε (Noto Sans Latin ne contient pas
         # les glyphes CJK). Cohérent avec la stratégie de rendu
         # qui bascule sur `font_cjk` dans `draw_text_run`.
-        if text.size == 1 && (c = text[0]) && c.ord >= 0x3000 && (cjk_f = font_cjk) && cjk_f.has_glyph?(c)
-          cjk_f.string_width(text, font_size)
-        else
-          get_font(resolve_inline_font(seg)).string_width(text, font_size)
+        base_w = if text.size == 1 && (c = text[0]) && c.ord >= 0x3000 && (cjk_f = font_cjk) && cjk_f.has_glyph?(c)
+                   cjk_f.string_width(text, font_size)
+                 else
+                   get_font(resolve_inline_font(seg)).string_width(text, font_size)
+                 end
+
+        # Compensation codespan : le rendu ajoute
+        # `codespan_padding_x` à `current_x` après chaque
+        # codespan/kbd/button/mark pour que le BG ne touche pas le
+        # prochain caractère (cf. `render_segment_line` ligne ~4030).
+        # Le composer ne voit pas ce padding et accepte donc des
+        # lignes qui débordent de quelques points la marge. On
+        # gonfle la mesure de la Box pour anticiper ce padding —
+        # conservateur (sur-estime pour les codespans adjacents),
+        # mais évite les `margin_overflow` détectés par pdf-audit
+        # sur le README beryl (42 occurrences au 2026-06-04 avant
+        # ce fix).
+        if seg.mono && !seg.kbd && !@theme.codespan_background_color.empty?
+          base_w += @theme.codespan_padding_x
         end
+        base_w += 4.0 if seg.kbd || seg.button
+        base_w += 2.0 if seg.mark
+
+        base_w
       end
       # Knuth-Plass par défaut depuis v2.3.24.82 (2026-06-04) :
       # ré-introduit avec un garde-fou emergency (|adjustment_ratio|
       # > MAX_KP_RATIO ⇒ fallback automatique sur first-fit pour
       # le paragraphe entier). Voir `paragraph_composer.cr`
-      # compose_knuth_plass pour la logique du garde-fou. La
-      # baseline visuelle générée par `tools/generate-pdfs-gold.sh`
-      # sur les 53 README de prod-crystal sert de validation
-      # contre les régressions visuelles introduites par ce
-      # changement de moteur.
+      # compose_knuth_plass pour la logique du garde-fou.
       lines = ParagraphComposer.compose_knuth_plass(tokens, width)
       lines.map(&.segments)
     end
