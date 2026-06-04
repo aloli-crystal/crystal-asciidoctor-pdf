@@ -3,6 +3,84 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.82 — 2026-06-04
+
+=== Added
+
+* **Phase 2 — typographic quality approaches LaTeX.** Four
+  correlated blocks delivered in the same session after putting
+  in place a visual test suite (53 baseline gold PDFs).
+  Non-regression verification: no project loses a page, 2
+  (`asciiart`, `beryl-recipes`) gain one.
+
+  **Block A — `tools/compare-pdfs-gold.sh`**: comparison
+  script between 2 gold PDF folders. Compares manifest
+  SHA-256s to identify changed projects, then for each
+  extracts word bbox (`pdftotext -bbox-layout`) and counts
+  words whose position has moved. Exits `0` if identical,
+  `1` otherwise — usable in CI / pre-merge.
+
+  **Block B — Re-enable Liang hyphenation in `first-fit`.**
+  Silent regression discovered before K-P: hyphenation wasn't
+  acting, `Penalty.flagged` produced by `tokenize` were
+  ignored by `compose_first_fit`. The breakpoint-selection
+  loop now walks `current` backwards to find the rightmost
+  breakpoint — a `Penalty.flagged` (hyphenation) wins over the
+  preceding `Glue` if more to the right. The hyphen is
+  suffixed to the line's last segment via
+  `ends_on_hyphen=true` / `hyphen_w`. `finalize_line`
+  extended to accept these two parameters (symmetry with
+  `finalize_kp_line`).
+
+  Verification on French `pouvoir`: “doit pou-voir
+  intervenir” — legitimate hyphenation applied.
+
+  **Block C — Knuth-Plass on by default with emergency
+  guardrail.** `wrap_segments` repointed to
+  `compose_knuth_plass`. After the optimal backtrace,
+  `MAX_KP_RATIO = 3.0` (= 300 % of nominal stretch): if AT
+  LEAST ONE line has `|adjustment_ratio|` exceeding that
+  threshold, K-P falls back to `compose_first_fit` for the
+  whole paragraph (which has its own `max_extra_factor = 2.5`
+  guardrail renderer-side). Without this guardrail K-P
+  accepted pathological layouts (words scattered across large
+  whitespace — regression observed 2026-06-04 on the beryl
+  README). With it, K-P brings its global benefits (balanced
+  lines, leveraging hyphenation `Penalty`, fewer *rivers*)
+  without accepting extreme cases.
+
+  Validation on beryl README:
+
+  - “avant” and “deploy” correctly separated ✓
+  - “FreeBSD 15 via mfsBSD-in-QEMU” on one line ✓
+  - “bootstrapper” at end of line, no overflow ✓
+  - “l'arborescence :” on line 1 ✓
+
+  **Block D — Soft break in long inline codespans.** New
+  constant `CODESPAN_HINGE_CHARS = "/-=,"` and helper
+  `split_at_codespan_hinges` that fragments a codespan word
+  AFTER each hinge character. `tokenize` emits
+  `Penalty(width=0, cost=200, flagged=false)` between
+  fragments — `compose_first_fit`/`compose_knuth_plass` can
+  break a long command like `beryl scan aloli/9783...
+  --provider=…` there rather than letting it overflow the
+  margin. Cost `200` non-infinite: discourages unnecessary
+  breaks but allows them when needed. The breakpoint
+  selection loop in `compose_first_fit` now accepts ANY
+  `Penalty` with `cost < INFINITY` (flagged → hyphen,
+  non-flagged → clean break).
+
+  Corollary: removed Liang hyphenation on `mono` segments.
+  An identifier `beryl` must NEVER be hyphenated to
+  `be-ryl` (the hyphen would change its meaning). Soft
+  hinge break is the only one allowed for codespans.
+
+  Renderer corollary: no `codespan_padding_x` between two
+  adjacent `mono` segments — they form the continuation of
+  the same codespan split into fragments. Without this
+  exception, a 2 pt gap appeared between `aloli/` and
+  `9783705f-`, rendering the codespan unreadable.
+
 == v2.3.24.81 — 2026-06-04
 
 === Fixed

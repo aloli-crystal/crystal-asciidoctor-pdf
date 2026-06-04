@@ -3646,15 +3646,16 @@ module AsciidoctorPDF
           get_font(resolve_inline_font(seg)).string_width(text, font_size)
         end
       end
-      # Revert urgent v2.3.24.81 (2026-06-04) : repointé sur
-      # `compose_first_fit` après régressions visuelles sur le
-      # README beryl (cf. CHANGELOG.fr.adoc) — Knuth-Plass
-      # acceptait des layouts avec étirement excessif et des
-      # débordements de marge sans garde-fou. Le code Knuth-Plass
-      # reste disponible (`compose_knuth_plass`) en vue d'une
-      # ré-introduction propre avec garde-fou emergency + suite
-      # de tests visuels.
-      lines = ParagraphComposer.compose_first_fit(tokens, width)
+      # Knuth-Plass par défaut depuis v2.3.24.82 (2026-06-04) :
+      # ré-introduit avec un garde-fou emergency (|adjustment_ratio|
+      # > MAX_KP_RATIO ⇒ fallback automatique sur first-fit pour
+      # le paragraphe entier). Voir `paragraph_composer.cr`
+      # compose_knuth_plass pour la logique du garde-fou. La
+      # baseline visuelle générée par `tools/generate-pdfs-gold.sh`
+      # sur les 53 README de prod-crystal sert de validation
+      # contre les régressions visuelles introduites par ce
+      # changement de moteur.
+      lines = ParagraphComposer.compose_knuth_plass(tokens, width)
       lines.map(&.segments)
     end
 
@@ -4015,7 +4016,16 @@ module AsciidoctorPDF
                         else
                           true # dernier segment de la ligne — pas de padding
                         end
-          unless next_clings
+          # Pas de padding entre 2 segments mono adjacents : ils
+          # forment visuellement la suite d'un même codespan
+          # (cas des fragments produits par
+          # `split_at_codespan_hinges` du composer pour la
+          # coupure douce des codespans longs type
+          # `beryl scan aloli/9783...`). Sans cette exception,
+          # un trou de `codespan_padding_x` apparaissait entre
+          # `aloli/` et `9783705f-` rendant le codespan illisible.
+          next_is_mono = next_seg && next_seg.mono && !next_seg.kbd
+          unless next_clings || next_is_mono
             current_x += 4.0 if seg.kbd || seg.button
             current_x += 2.0 if seg.mark
             current_x += @theme.codespan_padding_x if seg.mono && !seg.kbd

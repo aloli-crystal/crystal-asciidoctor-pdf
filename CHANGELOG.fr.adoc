@@ -3,6 +3,87 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.82 — 2026-06-04
+
+=== Ajouté
+
+* **Phase 2 — qualité typographique se rapproche de LaTeX.**
+  Quatre blocs corrélés livrés dans la même session après mise
+  en place d'une suite de tests visuels (53 PDFs gold de
+  baseline). Vérification de non-régression : aucun projet ne
+  perd de page, 2 (`asciiart`, `beryl-recipes`) en gagnent.
++
+  **Bloc A — `tools/compare-pdfs-gold.sh`** : script de
+  comparaison entre 2 dossiers de PDFs gold. Compare les
+  SHA-256 du manifest pour identifier les projets changés,
+  puis pour chacun extrait les bbox des mots
+  (`pdftotext -bbox-layout`) et compte les mots dont la
+  position a bougé. Exit `0` si tout identique, `1` sinon —
+  utilisable en CI / pré-merge.
++
+  **Bloc B — Réactivation de la césure Liang en `first-fit`.**
+  Régression silencieuse découverte avant K-P : la césure
+  n'agissait pas, les `Penalty.flagged` produites par
+  `tokenize` étaient ignorées par `compose_first_fit`. La
+  boucle de choix de breakpoint parcourt désormais `current`
+  à l'envers pour trouver le breakpoint le plus à droite —
+  une `Penalty.flagged` (césure) gagne sur la `Glue`
+  précédente si elle est plus à droite. Le tiret est suffixé
+  au dernier segment de la ligne via `ends_on_hyphen=true` /
+  `hyphen_w`. `finalize_line` étendue pour accepter ces deux
+  paramètres (symétrie avec `finalize_kp_line`).
++
+  Vérification sur `pouvoir` français : « doit pou-voir
+  intervenir » — césure légitime appliquée.
++
+  **Bloc C — Knuth-Plass actif par défaut avec garde-fou
+  emergency.** `wrap_segments` repointé sur
+  `compose_knuth_plass`. Après la backtrace optimale,
+  `MAX_KP_RATIO = 3.0` (= étirement de 300 % du stretch
+  nominal) : si AU MOINS UNE ligne a un `|adjustment_ratio|`
+  dépassant ce seuil, K-P retombe sur `compose_first_fit`
+  pour le paragraphe entier (qui a son propre garde-fou
+  `max_extra_factor = 2.5` côté renderer). Sans ce garde-fou,
+  K-P acceptait des layouts pathologiques (mots éparpillés
+  sur de larges blancs — régression observée le 2026-06-04
+  sur le README beryl). Avec lui, K-P apporte ses bénéfices
+  globaux (lignes équilibrées, exploitation des `Penalty` de
+  césure, moins de *rivers*) sans accepter les cas extrêmes.
++
+  Validation sur README beryl :
++
+  - « avant » et « deploy » correctement séparés ✓
+  - « FreeBSD 15 via mfsBSD-in-QEMU » sur une ligne ✓
+  - « bootstrapper » en fin de ligne, pas de débordement ✓
+  - « l'arborescence : » sur ligne 1 ✓
++
+  **Bloc D — Coupure douce dans les codespans inline longs.**
+  Nouvelle constante `CODESPAN_HINGE_CHARS = "/-=,"` et
+  helper `split_at_codespan_hinges` qui fragmente un mot
+  codespan APRÈS chaque caractère charnière. Le `tokenize`
+  émet `Penalty(width=0, cost=200, flagged=false)` entre
+  fragments — `compose_first_fit`/`compose_knuth_plass`
+  peuvent y casser une longue commande type
+  `beryl scan aloli/9783... --provider=…` plutôt que de la
+  laisser déborder de la marge. Coût `200` non infini :
+  décourage la coupure inutile mais l'autorise quand
+  nécessaire. La boucle de choix de breakpoint dans
+  `compose_first_fit` accepte désormais TOUTE `Penalty` avec
+  `cost < INFINITY` (flagged → tiret, non-flagged → coupure
+  sèche).
++
+  Corollaire : suppression de la césure Liang sur les
+  segments `mono`. Un identifiant `beryl` ne doit JAMAIS être
+  césuré en `be-ryl` (le tiret changerait son sens). La
+  coupure douce sur charnières est la seule autorisée pour
+  les codespans.
++
+  Corollaire renderer : pas de `codespan_padding_x` entre deux
+  segments `mono` adjacents — ils forment la suite d'un même
+  codespan splitté en fragments. Sans cette exception, un trou
+  de 2 pt apparaissait entre `aloli/` et `9783705f-`, rendant
+  le codespan illisible.
+
 == v2.3.24.81 — 2026-06-04
 
 === Corrigé

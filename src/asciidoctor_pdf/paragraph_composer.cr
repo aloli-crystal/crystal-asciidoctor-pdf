@@ -43,6 +43,34 @@ module AsciidoctorPDF
     # inter-balises (constaté 2026-06-04 sur le README beryl).
     CLINGING_CHARS = ".,;:!?)]}»'  "
 
+    # Caractères « charnières » des codespans inline (segments
+    # `mono`) qui autorisent une coupure douce : `/`, `-`, `=`,
+    # `,`. Sont insérées des Penalty non-flagged à coût élevé
+    # (`CODESPAN_BREAK_COST`) après chaque occurrence — coût
+    # élevé pour décourager la coupure si une autre est possible,
+    # mais non infini pour permettre la coupure d'une longue
+    # commande type `beryl scan aloli/9783... --provider=…`
+    # plutôt que de la laisser déborder de la marge.
+    CODESPAN_HINGE_CHARS = "/-=,"
+    CODESPAN_BREAK_COST  = 200.0
+
+    # Découpe un word de codespan APRÈS chaque caractère charnière.
+    # Le caractère charnière reste collé au fragment qui le contient
+    # (à gauche, donc le fragment qui le précédait dans le source).
+    # Ex : `aloli/abc-def` → `["aloli/", "abc-", "def"]`.
+    private def self.split_at_codespan_hinges(word : String) : Array(String)
+      result = [] of String
+      start = 0
+      word.each_char_with_index do |c, idx|
+        if CODESPAN_HINGE_CHARS.includes?(c)
+          result << word[start..idx]
+          start = idx + 1
+        end
+      end
+      result << word[start..] if start < word.size
+      result
+    end
+
     # Largeur fixe non-cassable : un mot, un groupe de mots reliés
     # par NBSP, ou une image inline. `segment` est l'`InlineSegment`
     # à dessiner (les attributs de style sont préservés).
@@ -204,16 +232,42 @@ module AsciidoctorPDF
           # émise ci-dessus, pas de Box à produire.
           next if word.empty?
 
-          # Tentative de césure (J2 : structure typée seulement —
-          # les Penalty intermédiaires sont ignorées par
-          # `compose_first_fit` ; elles seront consommées par
-          # `compose_knuth_plass` à J3 pour distribuer
-          # globalement les coupures de paragraphe).
-          positions = if hyphenator
+          # Tentative de césure Liang. PAS pour les segments
+          # mono (codespan) : un identifiant `beryl` ne doit
+          # JAMAIS être césuré en `be-ryl` car le tiret
+          # changerait son sens (`beryl` ≠ `be-ryl`). Pour les
+          # codespans longs qui dépassent la marge, on utilise
+          # la coupure douce sur les caractères charnières
+          # (cf. `split_at_codespan_hinges` ci-dessus) qui ne
+          # pose PAS de tiret.
+          positions = if hyphenator && !seg.mono
                         try_hyphenate(word, hyphenator)
                       else
                         [] of Int32
                       end
+
+          # Coupure douce pour les codespans inline : pour les
+          # segments `mono`, on splitte le mot aux caractères
+          # charnières (`/`, `-`, `=`, `,`) et on insère une
+          # Penalty non-flagged à coût élevé entre chaque
+          # fragment. La Penalty sert de breakpoint potentiel à
+          # `compose_first_fit` quand une longue commande inline
+          # type `beryl scan aloli/9783... --provider=…` ne tient
+          # pas sur une ligne — sans cette coupure douce, le
+          # codespan déborderait silencieusement dans la marge.
+          if seg.mono && positions.empty?
+            codespan_frags = split_at_codespan_hinges(word)
+            if codespan_frags.size > 1
+              codespan_frags.each_with_index do |frag, i|
+                if i > 0
+                  tokens << Penalty.new(0.0, CODESPAN_BREAK_COST, false)
+                end
+                frag_w = measure.call(seg, frag)
+                tokens << Box.new(frag_w, clone_segment(seg, frag))
+              end
+              next
+            end
+          end
 
           if positions.empty?
             word_w = measure.call(seg, word)
@@ -412,22 +466,72 @@ module AsciidoctorPDF
         case tok
         when Penalty
           if tok.cost <= NEG_INFINITY
-            lines << finalize_line(current, target_w)
+            lines << finalize_line(current, target_w, false, 0.0)
             current = [] of Token
             current_width = 0.0
+          else
+            # Penalty intermédiaire (césure flagged ou hint
+            # de coupure douce) : enregistrée dans `current`
+            # pour servir de breakpoint potentiel si une Box
+            # suivante fait dépasser `target_w`. Sa `width` ne
+            # contribue PAS à `current_width` tant qu'on ne
+            # casse pas dessus.
+            current << tok
           end
-          # Penalty intermédiaire : ignoré en J1.
         when Box
           # Si la Box ferait dépasser et qu'on a déjà du contenu :
-          # casser la ligne, en consommant le Glue trailing.
+          # casser la ligne au meilleur breakpoint disponible.
+          # Priorité (du plus à droite vers le plus à gauche) :
+          # une Penalty flagged dans le dernier mot (= césure
+          # Liang) > la dernière Glue (= cassure inter-mots
+          # standard).
           if current_width + tok.width > target_w && !current.empty?
-            if (last = current.last?) && last.is_a?(Glue)
-              current_width -= last.width
-              current.pop
+            # Cherche le breakpoint le plus à droite. Trois types
+            # acceptés (par ordre d'apparition dans le source) :
+            # - Glue : cassure inter-mots standard
+            # - Penalty flagged (cost = 50) : césure Liang. Pose
+            #   un tiret au dernier segment de la ligne.
+            # - Penalty non-flagged (cost = 200) : coupure douce
+            #   codespan. Casse sans tiret. Coût élevé pour
+            #   décourager les coupures inutiles, mais non infini
+            #   pour permettre la coupure d'une longue commande.
+            break_idx = -1
+            is_hyphen = false
+            j = current.size - 1
+            while j >= 0
+              ct = current[j]
+              if ct.is_a?(Penalty)
+                if ct.cost < INFINITY
+                  break_idx = j
+                  is_hyphen = ct.flagged
+                  break
+                end
+                # Penalty interdite (cost = INFINITY) : skip.
+              elsif ct.is_a?(Glue)
+                break_idx = j
+                is_hyphen = false
+                break
+              end
+              j -= 1
             end
-            lines << finalize_line(current, target_w)
-            current = [] of Token
+
+            if break_idx >= 0
+              hyphen_w = is_hyphen ? current[break_idx].as(Penalty).width : 0.0
+              line_tokens = current[0..break_idx - 1]
+              rest_tokens = current[(break_idx + 1)..]
+              lines << finalize_line(line_tokens, target_w, is_hyphen, hyphen_w)
+              current = rest_tokens.to_a
+            else
+              # Pas de breakpoint trouvé : force-break à plat
+              # (mot unique qui dépasse seul la largeur cible).
+              lines << finalize_line(current, target_w, false, 0.0)
+              current = [] of Token
+            end
+
             current_width = 0.0
+            current.each do |t|
+              current_width += t.width unless t.is_a?(Penalty)
+            end
           end
           current << tok
           current_width += tok.width
@@ -440,7 +544,7 @@ module AsciidoctorPDF
         end
       end
 
-      lines << finalize_line(current, target_w) unless current.empty?
+      lines << finalize_line(current, target_w, false, 0.0) unless current.empty?
       lines
     end
 
@@ -649,8 +753,32 @@ module AsciidoctorPDF
         prev_bp = bp
       end
 
+      # Garde-fou emergency (v2.3.24.82, 2026-06-04) : si la
+      # solution K-P optimale globale produit AU MOINS UNE ligne
+      # avec un étirement excessif (|ratio| > `MAX_KP_RATIO`),
+      # on retombe sur first-fit qui a son propre garde-fou
+      # `max_extra_factor` côté renderer (basculement en `left`
+      # pour la ligne pathologique). Sans cette protection, K-P
+      # accepte des layouts où les mots sont éparpillés sur de
+      # larges blancs (régression observée le 2026-06-04 sur le
+      # README beryl : « FreeBSD 15 » cassé, lignes très étalées,
+      # mots débordant la marge).
+      #
+      # Seuil empirique 3.0 = stretch de 300 % du nominal. Au
+      # delà, on perd la qualité visuelle ; en dessous, K-P reste
+      # supérieur à first-fit (lignes équilibrées, moins de
+      # rivers, exploitation des Penalty de césure).
+      if lines.any? { |l| l.adjustment_ratio.abs > MAX_KP_RATIO }
+        return compose_first_fit(tokens, target_w)
+      end
+
       lines
     end
+
+    # Seuil au-delà duquel K-P retombe sur first-fit pour le
+    # paragraphe entier (cf. `compose_knuth_plass`). 3.0 ≈ 300 %
+    # du stretch nominal.
+    MAX_KP_RATIO = 3.0
 
     # Construit une `Line` Knuth-Plass : comme `finalize_line`
     # (first-fit), plus l'injection du tiret de césure `-` à la
@@ -710,7 +838,20 @@ module AsciidoctorPDF
       )
     end
 
-    private def self.finalize_line(tokens : Array(Token), target_w : Float64) : Line
+    # Finalise une ligne. `ends_on_hyphen = true` indique que la
+    # ligne a été cassée sur une Penalty.flagged (césure Liang),
+    # auquel cas un tiret `-` est suffixé au texte du dernier
+    # segment et `hyphen_w` est ajouté à `natural_width`.
+    # Les Penalty intermédiaires non-terminales (issues du
+    # tokenize avec hyphenator) sont silencieusement skippées
+    # — elles servent juste de marqueurs de breakpoint pour
+    # `compose_first_fit`/`compose_knuth_plass`.
+    private def self.finalize_line(
+      tokens : Array(Token),
+      target_w : Float64,
+      ends_on_hyphen : Bool,
+      hyphen_w : Float64,
+    ) : Line
       segments = [] of InlineSegment
       natural_width = 0.0
       total_stretch = 0.0
@@ -754,8 +895,19 @@ module AsciidoctorPDF
           natural_width += tok.width
           preceded_by_glue = false
         when Penalty
-          # Pas attendu dans une ligne finalisée en J1 — skip.
+          # Penalty intermédiaire (césure flagged ou coupure douce
+          # codespan) embarquée dans `current` par
+          # `compose_first_fit` pour servir de breakpoint
+          # potentiel. Pas de contribution à `natural_width` ni
+          # aux segments — seule la pose éventuelle du tiret de
+          # césure se fait en aval via `ends_on_hyphen`.
         end
+      end
+
+      if ends_on_hyphen && !segments.empty?
+        last = segments.last
+        segments[segments.size - 1] = clone_segment(last, last.text + "-")
+        natural_width += hyphen_w
       end
 
       adj = if n_spaces > 0 && total_stretch > 0 && target_w > natural_width
