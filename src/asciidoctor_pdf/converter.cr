@@ -3008,11 +3008,18 @@ module AsciidoctorPDF
       raw = doc.attr("title-page")
       case raw
       when nil
-        @theme.title_page_enabled
+        # Défaut aligné sur asciidoctor standard : une page de garde
+        # n'est produite QUE pour un livre (`:doctype: book`). Un
+        # `article` (doctype par défaut) n'en a pas — son titre est
+        # rendu en haut de la première page, suivi directement du
+        # contenu. `title_page_enabled` reste un interrupteur maître
+        # du thème (permet de tout désactiver, même pour un livre).
+        # Pour FORCER une page de garde sur un article : `:title-page:`.
+        @theme.title_page_enabled && doc.doctype == "book"
       when "false", "off", "no", "0"
         false
       else
-        true
+        true # `:title-page:` explicite ⇒ page de garde même en article
       end
     end
 

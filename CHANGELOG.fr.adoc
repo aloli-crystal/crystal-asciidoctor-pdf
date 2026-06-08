@@ -1,3 +1,28 @@
+== v2.3.24.93 — 2026-06-08
+
+=== Modifié
+
+* **Page de garde alignée sur asciidoctor standard.** Une page de
+  garde n'est désormais produite QUE pour un livre
+  (`:doctype: book`) ou lorsqu'un `:title-page:` explicite est posé.
+  Un `article` (doctype par défaut) n'a plus de page de garde
+  automatique : son titre est rendu en haut de la première page,
+  suivi directement du contenu — comportement standard d'AsciiDoc.
++
+  Auparavant, le défaut de thème `title_page_enabled: true`
+  s'appliquait à TOUS les documents, intercalant une page de garde
+  même pour de courts articles (le contenu se retrouvait en page 2).
+  `title_page_enabled` reste un interrupteur maître (désactive la
+  page de garde même pour un livre).
++
+  Pour conserver une page de garde sur un article : ajouter
+  `:title-page:` dans l'en-tête du document.
+
+=== Migration
+
+Les articles qui s'appuyaient sur la page de garde automatique
+doivent ajouter `:title-page:` à leur en-tête pour la conserver
+(p. ex. le README de beryl).
 == v2.3.24.92 — 2026-06-04
 
 === Corrigé
