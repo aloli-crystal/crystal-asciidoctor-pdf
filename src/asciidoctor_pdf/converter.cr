@@ -1796,6 +1796,22 @@ module AsciidoctorPDF
           draw_text_run(page, line, tx, ty, font_name, font_size)
         end
 
+        # Lien cliquable : le rendu de cellule affiche du texte brut
+        # (`strip_inline_markup`), mais si le contenu portait un lien
+        # (`<a href="…">`), on superpose une annotation URI sur la
+        # zone de texte. Couvre le cas courant « cellule = URL ». On
+        # se limite aux URI externes (http/https/ftp/mailto) ; les
+        # ancres internes (`#id`) relèvent d'un autre type d'annotation.
+        if (lm = (cell.text || "").match(/href="([^"]+)"/)) && !lines.empty?
+          href = lm[1]
+          if href.includes?("://") || href.starts_with?("mailto:")
+            page.link_uri(
+              rect: {x + padding, block_top_y - lines.size * line_h, x + cw - padding, block_top_y},
+              uri: href,
+            )
+          end
+        end
+
         x += cw
       end
 

@@ -1,3 +1,26 @@
+== v2.3.24.94 — 2026-06-08
+
+=== Corrigé / Ajouté
+
+* **URL nues correctement liées** (via `crystal-asciidoctor`
+  ~> 2.0.26.9). Une URL auto-détectée (`https://exemple.fr`)
+  produisait un `href` tronqué au scheme (`https://`) avec le
+  domaine renvoyé dans le texte. Le parser corrige le `href`
+  complet ; l'URL s'affiche et pointe désormais correctement.
+
+* **Liens cliquables dans les cellules de tableau.** Le rendu de
+  cellule affiche du texte brut (`strip_inline_markup`) ; on
+  superpose maintenant une annotation `/URI` sur la zone de texte
+  d'une cellule qui contient un lien externe (http/https/ftp/
+  mailto). Couvre le cas courant « cellule = URL ».
+
+=== Limite connue (shard `pdf`)
+
+Sur un document d'UNE SEULE PAGE, les annotations de lien (aussi
+bien inline que de tableau) ne sont pas écrites dans le PDF : les
+objets-annotations sont enregistrés pendant la sérialisation de la
+page, trop tard dans l'ordre de collecte du writer. Les documents
+multi-pages ne sont pas affectés. À corriger dans le shard `pdf`.
 == v2.3.24.93 — 2026-06-08
 
 === Modifié

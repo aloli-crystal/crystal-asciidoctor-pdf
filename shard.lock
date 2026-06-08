@@ -10,7 +10,7 @@ shards:
 
   crystal-asciidoctor:
     git: https://github.com/aloli-crystal/crystal-asciidoctor.git
-    version: 2.0.26.8
+    version: 2.0.26.9
 
   crystal-rouge:
     git: https://github.com/aloli-crystal/crystal-rouge.git
