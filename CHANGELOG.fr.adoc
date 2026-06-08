@@ -14,13 +14,21 @@
   d'une cellule qui contient un lien externe (http/https/ftp/
   mailto). Couvre le cas courant « cellule = URL ».
 
-=== Limite connue (shard `pdf`)
+Les liens sont cliquables aussi bien sur un document d'une seule
+page que multi-pages (vérifié sur les octets bruts du PDF : la page
+porte un `/Annots` référençant les annotations `/URI`).
 
-Sur un document d'UNE SEULE PAGE, les annotations de lien (aussi
-bien inline que de tableau) ne sont pas écrites dans le PDF : les
-objets-annotations sont enregistrés pendant la sérialisation de la
-page, trop tard dans l'ordre de collecte du writer. Les documents
-multi-pages ne sont pas affectés. À corriger dans le shard `pdf`.
+== v2.3.24.95 — 2026-06-08
+
+=== Corrigé (documentation)
+
+* Retrait d'une note erronée du CHANGELOG v2.3.24.94 affirmant que
+  les liens ne fonctionnaient pas sur les documents d'une seule
+  page. C'était un faux positif d'une vérification `qpdf --qdf`
+  défaillante : l'inspection des octets bruts confirme que la page
+  porte bien son `/Annots` et que les URLs sont cliquables, quel
+  que soit le nombre de pages.
+
 == v2.3.24.93 — 2026-06-08
 
 === Modifié
