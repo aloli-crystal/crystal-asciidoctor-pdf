@@ -1670,14 +1670,18 @@ module AsciidoctorPDF
         @current_y -= (font_size - 1) * 1.4
       end
 
-      # En-têtes
-      if node.has_header_option
-        node.rows.head.each do |row|
-          render_table_row(row, col_widths, col_count, font_size, line_h, padding,
-            font_name: @fn_body_bold,
-            font_color: @theme.table_header_font_color,
-            bg_color: @theme.table_header_background_color)
-        end
+      # En-têtes. On se fie à `rows.head` (peuplé par le parser
+      # quand une ligne d'en-tête est détectée) PLUTÔT qu'à
+      # `has_header_option` : ce dernier ne reflète pas toujours
+      # l'option `options="header"` (cas vécu : `rows.head` contenait
+      # « Plateforme | Url » mais `has_header_option` valait `false`,
+      # d'où un en-tête parsé mais jamais rendu). Si une ligne
+      # d'en-tête existe, on la rend.
+      node.rows.head.each do |row|
+        render_table_row(row, col_widths, col_count, font_size, line_h, padding,
+          font_name: @fn_body_bold,
+          font_color: @theme.table_header_font_color,
+          bg_color: @theme.table_header_background_color)
       end
 
       # Corps du tableau avec alternance de couleurs
@@ -3190,6 +3194,15 @@ module AsciidoctorPDF
     end
 
     private def title_page_toc_enabled?(doc : Asciidoctor::Document) : Bool
+      # `x-title-page-toc` (et le défaut de thème `x_title_page_with_toc`)
+      # ne décident que de l'EMPLACEMENT de la TOC (sur la page de
+      # garde), pas de sa PRÉSENCE. Celle-ci reste gouvernée par
+      # l'attribut standard `toc` : un document qui le désactive
+      # (`:toc!:`) ne doit avoir AUCUNE table des matières, y compris
+      # sur la page de garde. Sans ce garde-fou, un `:toc!:` restait
+      # sans effet quand la config globale posait `x-title-page-toc`.
+      return false unless doc.attr?("toc")
+
       attr = doc.attr("x-title-page-toc")
       case attr
       when nil
@@ -3247,11 +3260,28 @@ module AsciidoctorPDF
       end
       title_total_height = title_lines.size * title_line_height
 
-      # Sous-titre
+      # Sous-titre — REPLIÉ sur plusieurs lignes si trop long
+      # (auparavant rendu en un seul `draw_text_run` qui débordait
+      # hors page). Même mécanique que le titre et que le sous-titre
+      # du mode inline : parse inline + `wrap_segments` +
+      # `render_segment_line`, en suivant l'alignement du titre.
+      # Bas du bloc titre+sous-titre, qui détermine la position du
+      # séparateur. Sans sous-titre : offset fixe sous le titre.
+      title_block_bottom_y = title_y - title_total_height - 30.0
       if (subtitle = doc.attr("subtitle"))
-        set_font(page, @fn_body, @theme.subtitle_font_size)
-        page.fill_color(@theme.subtitle_font_color)
-        draw_text_run(page, decode_html_entities(subtitle), @margin, title_y - title_total_height - 10.0, @fn_body, @theme.subtitle_font_size)
+        sub_size = @theme.subtitle_font_size
+        sub_segments = parse_inline(subtitle).map { |s| force_color(s, @theme.subtitle_font_color) }
+        sub_lines = wrap_segments(sub_segments, @content_width, sub_size)
+        sub_y = title_y - title_total_height - 10.0 - sub_size
+        sub_lines.each do |line|
+          x = title_line_x(line, sub_size, @fn_body, align)
+          render_segment_line(page, line, x, sub_y, sub_size)
+          sub_y -= sub_size * 1.4
+        end
+        # Le séparateur passe SOUS la dernière ligne du sous-titre
+        # (et non à un offset fixe qui le ferait traverser un
+        # sous-titre replié sur plusieurs lignes).
+        title_block_bottom_y = sub_y - 2.0
       end
 
       # Auteur
@@ -3268,11 +3298,10 @@ module AsciidoctorPDF
         draw_text_run(page, decode_html_entities(revdate), @margin, @page_height * 0.35 - @theme.author_font_size - 8.0, @fn_body, @theme.base_font_size)
       end
 
-      # Ligne de séparation
+      # Ligne de séparation, sous le bloc titre+sous-titre.
       page.stroke_color("cccccc")
       page.line_width(1.0)
-      sep_y = title_y - title_total_height - 30.0
-      page.line({@margin, sep_y}, {@margin + @content_width, sep_y})
+      page.line({@margin, title_block_bottom_y}, {@margin + @content_width, title_block_bottom_y})
       page.stroke
     end
 

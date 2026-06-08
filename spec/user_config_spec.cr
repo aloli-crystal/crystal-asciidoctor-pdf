@@ -106,12 +106,14 @@ describe AsciidoctorPDF::UserConfig do
       target = {"toc" => "left", "docfile" => "test.adoc"} of String => String
       cfg.merge_into(target)
 
-      target["toc"].should eq("left")          # déjà présent, intact
-      target["pdf-page-size"].should eq("A4")  # ajouté par user config
+      target["toc"].should eq("left") # déjà présent, intact
+      # Ajouté par la config en SOFT-SET (suffixe `@`) : c'est un
+      # défaut que l'en-tête du document pourra surcharger.
+      target["pdf-page-size"].should eq("A4@")
       target["docfile"].should eq("test.adoc") # intact
     end
 
-    it "ajoute auteur/email/organization si absents" do
+    it "ajoute auteur/email/organization (en soft-set) si absents" do
       cfg = AsciidoctorPDF::UserConfig.from_yaml(<<-YAML)
         author: Philippe
         email: p@aloli.fr
@@ -120,9 +122,12 @@ describe AsciidoctorPDF::UserConfig do
 
       target = {} of String => String
       cfg.merge_into(target)
-      target["author"].should eq("Philippe")
-      target["email"].should eq("p@aloli.fr")
-      target["organization"].should eq("ALOLI")
+      # Soft-set (`@` final) : le document garde la priorité s'il
+      # définit ses propres méta. L'@ interne de l'email est intact,
+      # seul le marqueur final est ajouté.
+      target["author"].should eq("Philippe@")
+      target["email"].should eq("p@aloli.fr@")
+      target["organization"].should eq("ALOLI@")
     end
 
     it "respecte un author déjà présent" do

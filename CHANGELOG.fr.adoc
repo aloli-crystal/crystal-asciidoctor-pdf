@@ -1,3 +1,40 @@
+== v2.3.24.92 — 2026-06-04
+
+=== Corrigé
+
+* **`:toc!:` désactive bien toute table des matières.** Deux causes :
++
+  0. La config globale (`~/.config/.../config.yml`) injectait ses
+     attributs (`toc`, `x-title-page-toc`…) en HARD-SET, verrouillant
+     l'attribut : un `:toc!:` dans un document restait sans effet.
+     `UserConfig#merge_into` les passe désormais en SOFT-SET (suffixe
+     `@`, convention asciidoctor) — la config fournit des DÉFAUTS que
+     l'en-tête du document peut surcharger.
+  0. `title_page_toc_enabled?` ne consultait que `x-title-page-toc`
+     (emplacement de la TOC), jamais `toc` (présence). Il retourne
+     maintenant `false` dès que `toc` est désactivé — pas de TOC sur
+     la page de garde non plus.
+
+* **Sous-titre de page de garde replié.** `render_title_page_standard`
+  rendait le sous-titre en un seul `draw_text_run` qui débordait hors
+  page. Il est désormais replié (`wrap_segments` + `render_segment_line`,
+  comme le titre et le sous-titre du mode inline), et la ligne de
+  séparation se place SOUS la dernière ligne du sous-titre (au lieu
+  d'un offset fixe qui la traversait).
+
+* **En-tête de tableau rendu.** Le rendu testait `has_header_option`,
+  qui pouvait valoir `false` alors même que le parser avait peuplé
+  `rows.head` (cas `options="header"` avec ligne d'en-tête + ligne
+  vide). On se fie désormais à `rows.head` : si une ligne d'en-tête
+  existe, elle est rendue (fond + gras).
+
+=== Connu (hors de ce shard)
+
+* L'autolien d'une URL suivie d'un espace dans une cellule produit
+  un `href` tronqué (`https://`) côté parser crystal-asciidoctor —
+  à corriger dans ce shard.
+* pdf-audit signale des `huge_gap` à l'intérieur des cellules de
+  tableau (faux positifs : il ne modélise pas les colonnes).
 == v2.3.24.91 — 2026-06-04
 
 === Modifié

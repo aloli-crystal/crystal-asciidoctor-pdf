@@ -166,19 +166,30 @@ module AsciidoctorPDF
     # `Hash(String, String)`.
     def merge_into(target : Hash(String, String)) : Nil
       @attributes.each do |k, v|
-        target[k] = v.to_s unless target.has_key?(k)
+        target[k] = soft(v.to_s) unless target.has_key?(k)
       end
 
       # Méta auteur — uniquement si non déjà fournies par le doc
       if (a = @author) && !a.empty? && !target.has_key?("author")
-        target["author"] = a
+        target["author"] = soft(a)
       end
       if (e = @email) && !e.empty? && !target.has_key?("email")
-        target["email"] = e
+        target["email"] = soft(e)
       end
       if (o = @organization) && !o.empty? && !target.has_key?("organization")
-        target["organization"] = o
+        target["organization"] = soft(o)
       end
+    end
+
+    # Marque une valeur d'attribut comme SOFT-SET (suffixe `@`,
+    # convention asciidoctor) : la config globale fournit ainsi des
+    # DÉFAUTS que l'en-tête du document peut surcharger. Sans le `@`,
+    # l'attribut serait verrouillé (`attribute_overrides` côté
+    # parser) et un document ne pourrait pas le redéfinir — c'est ce
+    # qui faisait qu'un `:toc!:` dans un `.adoc` restait sans effet
+    # quand la config posait `toc: macro`. Idempotent.
+    private def soft(value : String) : String
+      value.ends_with?('@') ? value : "#{value}@"
     end
 
     # Répertoire HOME, avec un fallback raisonnable si la variable
