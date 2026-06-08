@@ -1,3 +1,26 @@
+== v2.3.24.97 — 2026-06-08
+
+=== Corrigé (markup inline dans les cellules de tableau)
+
+* **Les codespans `` `…` ``, le gras, l'italique et les liens sont
+  désormais rendus AVEC leur style dans les cellules de tableau.**
+  Auparavant `render_table_row` aplatissait chaque cellule via
+  `strip_inline_markup` : un mot de passe écrit `` `qwertyuiop` ``
+  s'affichait en texte courant, sans police monospace ni fond grisé
+  — donnant l'impression que « le code n'était pas affiché ».
++
+  La cellule passe maintenant par le même pipeline que les
+  paragraphes : `parse_inline` → `wrap_segments` →
+  `render_segment_line`. Le gras des en-têtes / pieds est propagé
+  aux segments via `copy_with` (la police étant choisie par segment
+  par `resolve_inline_font`), et la couleur de rangée est injectée
+  comme couleur de segment par défaut. Nouveau helper
+  `measure_segment_line` pour l'alignement `halign=center|right`.
++
+  Préservé : en-têtes en gras, liens cliquables (annotation `/URI`),
+  césure des mots longs en colonne étroite. 2 specs d'intégration
+  ajoutées (codespan mono + coexistence en-tête gras / corps mono).
+
 == v2.3.24.96 — 2026-06-08
 
 === Corrigé (logo de page de garde `:title-logo-image:`)

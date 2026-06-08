@@ -1713,6 +1713,34 @@ module AsciidoctorPDF
     # `rowspan` n'est pas encore visuellement géré (la cellule occupe
     # une seule rangée et le cell suivant remplit la position que le
     # span aurait laissée libre — comportement minimaliste sûr).
+    # Largeur naturelle d'une ligne de segments inline, en points.
+    # Reproduit EXACTEMENT la mesure de `wrap_segments` (compensation
+    # codespan/kbd/button/mark, CJK via `font_cjk`) afin d'aligner
+    # correctement les cellules de tableau en `halign=center|right`.
+    private def measure_segment_line(segments : Array(InlineSegment), font_size : Float64) : Float64
+      w = 0.0
+      segments.each do |seg|
+        if seg.image_path
+          w += seg.image_width || (font_size * 1.2)
+        elsif !seg.text.empty?
+          base_w =
+            if seg.text.size == 1 && (c = seg.text[0]) && c.ord >= 0x3000 &&
+               (cjk_f = font_cjk) && cjk_f.has_glyph?(c)
+              cjk_f.string_width(seg.text, font_size)
+            else
+              get_font(resolve_inline_font(seg)).string_width(seg.text, font_size)
+            end
+          if seg.mono && !seg.kbd && !@theme.codespan_background_color.empty?
+            base_w += @theme.codespan_padding_x
+          end
+          base_w += 4.0 if seg.kbd || seg.button
+          base_w += 2.0 if seg.mark
+          w += base_w
+        end
+      end
+      w
+    end
+
     private def render_table_row(
       row,
       col_widths : Array(Float64),
@@ -1728,8 +1756,15 @@ module AsciidoctorPDF
       # Calculer les largeurs effectives par cellule (colspan), et
       # wrapper le texte dans cette largeur pour mesurer la hauteur de
       # la rangée.
+      # Une rangée d'en-tête / de pied est en gras : on propage le
+      # gras aux segments (via `copy_with`) plutôt que de forcer la
+      # police globalement, car `render_segment_line` choisit la
+      # police PAR segment (`resolve_inline_font`). De même, on
+      # injecte `font_color` comme couleur de segment par défaut
+      # (l'en-tête a sa propre couleur, distincte du corps).
+      row_bold = font_name == @fn_body_bold
       cell_widths = [] of Float64
-      cell_lines = [] of Array(String)
+      cell_seg_lines = [] of Array(Array(InlineSegment))
       col_idx = 0
       row.each do |cell|
         cs = cell.colspan || 1
@@ -1740,11 +1775,21 @@ module AsciidoctorPDF
         cs = remaining if remaining > 0 && cs > remaining
         cw = (col_idx...col_idx + cs).sum { |k| col_widths[k]? || (@content_width / col_count) }
         cell_widths << cw
-        text = strip_inline_markup(cell.text || "")
-        cell_lines << wrap_text(text, cw - 2 * padding, font_size, font_name)
+        # Markup inline PRÉSERVÉ : on parse les segments (codespan,
+        # gras, italique, lien…) au lieu de les aplatir via
+        # `strip_inline_markup`. Un mot de passe en `` `…` `` garde
+        # ainsi sa police monospace + son fond grisé dans la cellule
+        # (c'était le bug : le code n'était plus rendu « comme du
+        # code » mais en texte courant).
+        segs = parse_inline(cell.text || "").map do |s|
+          s.copy_with(bold: s.bold || row_bold, color: s.color || font_color)
+        end
+        wrapped = wrap_segments(segs, cw - 2 * padding, font_size)
+        wrapped = [[] of InlineSegment] if wrapped.empty?
+        cell_seg_lines << wrapped
         col_idx += cs
       end
-      max_lines = cell_lines.empty? ? 1 : cell_lines.max_of(&.size)
+      max_lines = cell_seg_lines.empty? ? 1 : cell_seg_lines.max_of(&.size)
       row_h = (max_lines * line_h) + (2 * padding)
 
       check_page_break(row_h)
@@ -1767,10 +1812,11 @@ module AsciidoctorPDF
         page.rectangle(x, @current_y - row_h, cw, row_h)
         page.stroke
 
-        # Texte
-        set_font(page, font_name, font_size)
+        # Texte : rendu des segments inline (codespan en mono + fond
+        # grisé, gras, italique, lien…). La police et la couleur sont
+        # portées par chaque segment (cf. boucle de mesure ci-dessus).
         page.fill_color(font_color)
-        lines = cell_lines[ci]
+        lines = cell_seg_lines[ci]
         halign = cell.attr("halign") || "left"
         valign = cell.attr("valign") || "top"
         text_block_h = lines.size * line_h
@@ -1786,14 +1832,14 @@ module AsciidoctorPDF
                       end
 
         lines.each_with_index do |line, li|
-          tw = text_width(line, font_name, font_size)
+          lw = measure_segment_line(line, font_size)
           tx = case halign
-               when "center" then x + (cw - tw) / 2
-               when "right"  then x + cw - tw - padding
+               when "center" then x + (cw - lw) / 2
+               when "right"  then x + cw - lw - padding
                else               x + padding
                end
           ty = block_top_y - font_size - (li * line_h)
-          draw_text_run(page, line, tx, ty, font_name, font_size)
+          render_segment_line(page, line, tx, ty, font_size)
         end
 
         # Lien cliquable : le rendu de cellule affiche du texte brut
