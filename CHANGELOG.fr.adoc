@@ -1,3 +1,38 @@
+== v2.3.24.96 — 2026-06-08
+
+=== Corrigé (logo de page de garde `:title-logo-image:`)
+
+Quatre causes empêchaient l'affichage d'un logo de page de garde.
+
+* **Forme `image:` (simple `:`) prise en charge.** `parse_title_logo_macro`
+  ne retirait que le préfixe `image::` (double `:`, macro bloc). La
+  forme standard d'asciidoctor-pdf — `image:logo.svg[…]` (simple `:`,
+  macro inline) — laissait le préfixe collé au chemin, la résolution
+  échouait et le logo n'apparaissait pas (échec silencieux).
+
+* **Unités de longueur (`pdfwidth=4cm`).** La largeur était parsée
+  par `to_f?` brut : `"4cm".to_f?` = `nil` ⇒ largeur par défaut.
+  Nouveau `parse_logo_length` convertit `cm`/`mm`/`in`/`pt` (et le
+  nombre nu) en points PDF.
+
+* **Résolution des chemins relatifs (`safe=unsafe`).** Le safe mode
+  d'asciidoctor (défaut API `secure`) VIDE `docdir` et relativise
+  `docfile`, rendant impossible la résolution d'un chemin relatif
+  hors du répertoire courant. La CLI force désormais `safe=unsafe`
+  par défaut — comme la CLI `asciidoctor` — pour des fichiers
+  locaux (surchargeable). `resolve_image_path_str` retombe en plus
+  sur le dossier du `docfile`.
+
+* **Positionnement vertical (via `pdf` ~> 1.20.1).** Le rendu SVG
+  décalait les `<rect>` de leur hauteur vers le haut ; un logo en
+  haut de page finissait hors page. Corrigé dans le shard `pdf`.
+
+=== Rappel
+
+Le logo de page de garde n'est rendu que sur une PAGE DE GARDE.
+Un `article` (doctype par défaut) doit donc déclarer `:title-page:`
+dans son en-tête pour qu'une page de garde — et donc le logo —
+soit produite.
 == v2.3.24.94 — 2026-06-08
 
 === Corrigé / Ajouté

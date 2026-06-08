@@ -3441,7 +3441,7 @@ module AsciidoctorPDF
       image_path = resolve_image_path_str(doc, target)
       return 0.0 unless image_path && File.exists?(image_path)
 
-      pdfwidth = (opts["pdfwidth"]? || opts["width"]?).try(&.to_f?) || 200.0
+      pdfwidth = parse_logo_length(opts["pdfwidth"]? || opts["width"]?) || 200.0
       pdfwidth = pdfwidth.clamp(0.0, @content_width)
       align = opts["align"]? || "center"
 
@@ -3475,12 +3475,45 @@ module AsciidoctorPDF
       end
     end
 
+    # Parse une longueur de mise en page avec unité optionnelle
+    # (`4cm`, `40mm`, `1in`, `113pt`, ou nombre nu = points). Renvoie
+    # la valeur en POINTS PDF, ou `nil` si non parsable. Sans cette
+    # conversion, `pdfwidth=4cm` (forme courante d'asciidoctor-pdf)
+    # échouait silencieusement (`"4cm".to_f?` = nil ⇒ largeur par
+    # défaut) et le logo était mal dimensionné.
+    private def parse_logo_length(s : String?) : Float64?
+      return nil unless s
+      v = s.strip.downcase
+      if v.ends_with?("cm")
+        v[0...-2].to_f?.try { |n| n * 28.3464567 }
+      elsif v.ends_with?("mm")
+        v[0...-2].to_f?.try { |n| n * 2.83464567 }
+      elsif v.ends_with?("in")
+        v[0...-2].to_f?.try { |n| n * 72.0 }
+      elsif v.ends_with?("pt")
+        v[0...-2].to_f?
+      else
+        v.to_f?
+      end
+    end
+
     # Parse une valeur d'attribut au format `image::PATH[OPTS]` ou un
     # chemin nu. Retourne `{target, options}`.
     private def parse_title_logo_macro(raw : String) : {String, Hash(String, String)}
       opts = {} of String => String
       s = raw
-      s = s[7..] if s.starts_with?("image::")
+      # Retire le préfixe de macro image, sous ses DEUX formes :
+      #   - `image::cible[…]` (macro bloc, double `:`)
+      #   - `image:cible[…]`  (macro inline, simple `:`) ← forme
+      #     standard d'asciidoctor-pdf pour `:title-logo-image:`
+      # Sans la prise en charge du simple `:`, le préfixe `image:`
+      # restait collé au chemin (`image:logo.svg`), la résolution
+      # échouait et le logo n'apparaissait pas (échec silencieux).
+      if s.starts_with?("image::")
+        s = s[7..]
+      elsif s.starts_with?("image:")
+        s = s[6..]
+      end
       if (idx = s.index('['))
         target = s[0...idx]
         body = s[idx + 1..]
@@ -3500,10 +3533,26 @@ module AsciidoctorPDF
     private def resolve_image_path_str(doc : Asciidoctor::Document, target : String) : String?
       return nil if target.empty?
       return target if File.exists?(target)
-      if (docdir = doc.attr("docdir"))
-        candidate = File.join(docdir, target)
+
+      # Répertoires candidats pour un chemin relatif, dans l'ordre :
+      #   1. `docdir` (répertoire source déclaré),
+      #   2. dossier du `docfile` — fallback indispensable car le
+      #      safe mode d'asciidoctor VIDE souvent `docdir` (« hidden
+      #      in SERVER mode »). Sans ce repli, un `:title-logo-image:`
+      #      ou une `image:` à chemin relatif ne se résolvait que si
+      #      la commande était lancée depuis le dossier du `.adoc`.
+      dirs = [] of String
+      if (docdir = doc.attr("docdir")) && !docdir.empty?
+        dirs << docdir
+      end
+      if (docfile = doc.attr("docfile")) && !docfile.empty?
+        dirs << File.dirname(docfile)
+      end
+
+      dirs.each do |dir|
+        candidate = File.join(dir, target)
         return candidate if File.exists?(candidate)
-        candidate2 = File.join(docdir, "images", target)
+        candidate2 = File.join(dir, "images", target)
         return candidate2 if File.exists?(candidate2)
       end
       nil

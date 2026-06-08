@@ -18,7 +18,7 @@ shards:
 
   emojis:
     git: https://github.com/aloli-crystal/emojis.git
-    version: 0.2.4
+    version: 0.2.5
 
   matrix:
     git: https://github.com/exilor/matrix.git
@@ -26,11 +26,11 @@ shards:
 
   noto-cjk:
     git: https://github.com/aloli-crystal/noto-cjk.git
-    version: 0.1.4
+    version: 0.1.5
 
   pdf:
     git: https://github.com/aloli-crystal/pdf.git
-    version: 1.6.0
+    version: 1.20.1
 
   stumpy_core:
     git: https://github.com/stumpycr/stumpy_core.git

@@ -91,6 +91,16 @@ user_config.merge_into(options)
 # ligne exacte du fichier `.adoc`. Surchargeable par l'utilisateur
 # via `-a sourcemap=false`.
 options["sourcemap"] = "true" unless options.has_key?("sourcemap")
+
+# Safe mode `unsafe` par défaut, comme la CLI `asciidoctor` (et NON
+# le défaut API `secure`). Indispensable ici : en mode `secure`/
+# `server`, asciidoctor VIDE `docdir` et relativise `docfile`, si
+# bien que les chemins relatifs (logo de page de garde, images) ne
+# peuvent plus être résolus que depuis le répertoire courant. En
+# `unsafe`, `docdir` est conservé et l'utilisateur — qui génère un
+# PDF depuis SES propres fichiers locaux — retrouve le comportement
+# attendu. Surchargeable via `-a safe=…` ou l'option `safe`.
+options["safe"] = "unsafe" unless options.has_key?("safe")
 doc = Asciidoctor.load_file(input_file, options)
 
 # Résolution du thème, par ordre de priorité décroissante :
