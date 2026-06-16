@@ -46,7 +46,7 @@ module AsciidoctorPDF
     property base_font_path : String? = File.join(FONTS_DIR, "DejaVuSans.ttf")
     property base_font_bold_path : String? = File.join(FONTS_DIR, "DejaVuSans-Bold.ttf")
     property base_font_italic_path : String? = File.join(FONTS_DIR, "DejaVuSans-Oblique.ttf")
-    property base_font_bold_italic_path : String? = nil
+    property base_font_bold_italic_path : String? = File.join(FONTS_DIR, "DejaVuSans-BoldOblique.ttf")
     property mono_font_path : String? = File.join(FONTS_DIR, "DejaVuSansMono.ttf")
     property mono_font_bold_path : String? = nil
 

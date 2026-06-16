@@ -631,6 +631,29 @@ module AsciidoctorPDF
       end
       candidates << n
 
+      # Précalcule la position du prochain break OBLIGATOIRE après
+      # chaque indice. Un Penalty(cost <= NEG_INFINITY) = saut de
+      # ligne forcé (cf. `+\n` AsciiDoc, `<br>` HTML) : on ne peut
+      # JAMAIS le sauter en passant par-dessus. Si la ligne candidate
+      # `[start_idx, b[` contient un tel break à l'intérieur, la paire
+      # `(a, b)` est inadmissible.
+      #
+      # Sans ce garde-fou, Knuth-Plass voyait le Penalty(-∞) comme un
+      # candidat de coupure facultatif et choisissait la solution avec
+      # les meilleurs demerits — typiquement, sauter le break en
+      # tassant tout sur une ligne large. Bug reproduit dans les
+      # blocs `[quote]` avec hard break `+` à la fin d'une ligne du
+      # source : le break disparaissait silencieusement du PDF.
+      next_forced = Array.new(n + 1, Int32::MAX)
+      (n - 1).downto(0) do |i|
+        t = tokens[i]
+        if t.is_a?(Penalty) && t.cost <= NEG_INFINITY
+          next_forced[i] = i
+        else
+          next_forced[i] = next_forced[i + 1]
+        end
+      end
+
       # `records[b]` mémorise la meilleure façon d'atteindre le
       # breakpoint `b` : total des demerits accumulés, indice
       # du breakpoint précédent, ratio d'ajustement de la ligne
@@ -657,6 +680,11 @@ module AsciidoctorPDF
             start_idx += 1
           end
           next if start_idx >= b
+
+          # Garde-fou hard break : si un Penalty(-∞) existe
+          # strictement à l'intérieur de la ligne candidate
+          # `[start_idx, b[`, on ne peut pas le franchir.
+          next if next_forced[start_idx] < b
 
           line_w = widths[b] - widths[start_idx]
           line_stretch = stretches[b] - stretches[start_idx]

@@ -3,6 +3,62 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.98 — 2026-06-16
+
+=== Fixed
+
+* **Bold-italic invisible in `[quote]` blocks.** Inside a quote
+  block (which forces italic on every segment), any inline bold
+  marker like `*mécanique*` should render as bold-italic — but
+  the bold-italic variant of DejaVu Sans was missing from
+  `data/fonts/`, and the theme's `base_font_bold_italic_path`
+  was set to `nil`. The renderer fell back to Type1
+  `Helvetica-BoldOblique` whose WinAnsi encoding can't draw the
+  non-ASCII glyphs (`é`, `—`, …) that DejaVu produced elsewhere,
+  so the segment was silently dropped — leaving a visible
+  white gap in the line.
+
+  Fix: bundle `DejaVuSans-BoldOblique.ttf` (dejavu-fonts 2.37,
+  same family/license as the three other TTFs already shipped)
+  and point `base_font_bold_italic_path` at it. Bold-italic
+  segments now embed and render as expected.
+
+* **Hard break `+\n` swallowed inside `[quote]` blocks.** Two
+  cascading bugs:
++
+  - `render_indented_block` rebuilt every `InlineSegment`
+    to force italic, but forgot to carry `line_break: seg.line_break`
+    over — so the marker segment that represents `+\n` (text empty,
+    `line_break: true`) lost its flag and became a silently-ignored
+    empty segment.
++
+  - More importantly, `ParagraphComposer.compose_knuth_plass`
+    treated `Penalty(NEG_INFINITY)` as a *candidate* breakpoint
+    rather than as a *mandatory* one. Knuth-Plass would freely
+    consider line-candidate pairs `(a, b)` that crossed over a
+    forced break, picking the option with the lowest demerits —
+    which typically meant skipping the break entirely. The
+    `compose_first_fit` fallback handled forced breaks correctly
+    (since v2.3.24.82, KP is the default for body wrapping,
+    so this bug only surfaced now).
++
+  Fix: precompute `next_forced[i]` = position of the next
+  `Penalty(NEG_INFINITY)` at or after token `i` (O(n) backward
+  scan). Before evaluating a candidate pair, reject it if
+  `next_forced[start_idx] < b` — i.e. a mandatory break lives
+  strictly inside the candidate line. The forced break becomes
+  the only legal `b` to leave from `start_idx`'s region.
+
+=== Notes
+
+* Symptom that triggered the investigation: the
+  « Conseil de fond » page in a real `tmp/strategie-saas.adoc`
+  rendered `*mécanique*` as a blank space inside the quote, and
+  the `+\n` after « PDF signé » in the same paragraph was lost
+  (« PDF signé + » → « PDF signé auditable » as one line).
+  Both fixed; visual diff confirms bold-italic word renders
+  and the forced line break appears.
+
 == v2.3.24.82 — 2026-06-04
 
 === Added

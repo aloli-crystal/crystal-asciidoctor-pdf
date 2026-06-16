@@ -2772,7 +2772,13 @@ module AsciidoctorPDF
               link: seg.link,
               image_path: seg.image_path,
               image_width: seg.image_width,
-              image_height: seg.image_height
+              image_height: seg.image_height,
+              # Sans ce champ, un segment marqueur de hard break (`+\n`
+              # AsciiDoc, généré comme `text: "", line_break: true`)
+              # perdait son `line_break` à la reconstruction et
+              # devenait un segment vide silencieusement ignoré — le
+              # break disparaissait du PDF dans les blocs `[quote]`.
+              line_break: seg.line_break,
             )
           end
         end
