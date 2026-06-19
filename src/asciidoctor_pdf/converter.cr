@@ -117,6 +117,12 @@ module AsciidoctorPDF
     @title_page_toc_index : Int32 = -1
     @title_page_toc_y_start : Float64 = 0.0
 
+    # Répétition d'en-tête de tableau : pendant le rendu d'un tableau
+    # multi-pages, ce hook re-dessine la (les) ligne(s) d'en-tête en haut
+    # de chaque nouvelle page. Posé par `convert_table`, invoqué par
+    # `check_page_break` juste après un saut de page. nil hors tableau.
+    @repeat_table_header : Proc(Nil)? = nil
+
     # Dimensions de la page (A4 par défaut). Surchargeables via le
     # thème (`page_size`, `page_layout`) ou les attributs document
     # `:pdf-page-size:`, `:pdf-page-layout:` au moment de
@@ -1677,32 +1683,44 @@ module AsciidoctorPDF
       # « Plateforme | Url » mais `has_header_option` valait `false`,
       # d'où un en-tête parsé mais jamais rendu). Si une ligne
       # d'en-tête existe, on la rend.
-      node.rows.head.each do |row|
-        render_table_row(row, col_widths, col_count, font_size, line_h, padding,
-          font_name: @fn_body_bold,
-          font_color: @theme.table_header_font_color,
-          bg_color: @theme.table_header_background_color)
-      end
-
-      # Corps du tableau avec alternance de couleurs
-      row_idx = 0
-      node.rows.body.each do |row|
-        bg_color = (row_idx % 2 == 1) ? @theme.table_row_alt_background_color : nil
-        render_table_row(row, col_widths, col_count, font_size, line_h, padding,
-          font_name: @fn_body,
-          font_color: @theme.base_font_color,
-          bg_color: bg_color)
-        row_idx += 1
-      end
-
-      # Pied de tableau
-      unless node.rows.foot.empty?
-        node.rows.foot.each do |row|
+      head_rows = node.rows.head
+      render_head = -> do
+        head_rows.each do |row|
           render_table_row(row, col_widths, col_count, font_size, line_h, padding,
             font_name: @fn_body_bold,
-            font_color: @theme.base_font_color,
-            bg_color: @theme.table_footer_background_color)
+            font_color: @theme.table_header_font_color,
+            bg_color: @theme.table_header_background_color)
         end
+      end
+      render_head.call
+
+      # Tableau multi-pages : on RÉPÈTE l'en-tête en haut de chaque nouvelle
+      # page (via `check_page_break`), pour que les intitulés de colonnes
+      # restent lisibles quand le corps déborde. Désactivé en fin de tableau.
+      @repeat_table_header = render_head unless head_rows.empty?
+      begin
+        # Corps du tableau avec alternance de couleurs
+        row_idx = 0
+        node.rows.body.each do |row|
+          bg_color = (row_idx % 2 == 1) ? @theme.table_row_alt_background_color : nil
+          render_table_row(row, col_widths, col_count, font_size, line_h, padding,
+            font_name: @fn_body,
+            font_color: @theme.base_font_color,
+            bg_color: bg_color)
+          row_idx += 1
+        end
+
+        # Pied de tableau
+        unless node.rows.foot.empty?
+          node.rows.foot.each do |row|
+            render_table_row(row, col_widths, col_count, font_size, line_h, padding,
+              font_name: @fn_body_bold,
+              font_color: @theme.base_font_color,
+              bg_color: @theme.table_footer_background_color)
+          end
+        end
+      ensure
+        @repeat_table_header = nil
       end
 
       @current_y -= @theme.table_margin_bottom
@@ -3796,6 +3814,14 @@ module AsciidoctorPDF
       return unless @current_page
       if @current_y - needed_height < @margin + 20.0
         new_page
+        # Re-dessine l'en-tête du tableau en cours sur la nouvelle page. On
+        # se désarme le temps du re-rendu : `render_table_row` rappelle
+        # `check_page_break`, sinon ce serait une récursion infinie.
+        if cb = @repeat_table_header
+          @repeat_table_header = nil
+          cb.call
+          @repeat_table_header = cb
+        end
       end
     end
 

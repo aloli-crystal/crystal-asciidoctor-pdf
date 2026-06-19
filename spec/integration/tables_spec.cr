@@ -101,4 +101,18 @@ describe "Tables" do
     raw.includes?("Courier").should be_true
     File.delete(pdf)
   end
+
+  it "repeats the header row on every page of a multi-page table" do
+    body = (1..70).map { |i| "| host#{i} | rack#{i}" }.join("\n")
+    adoc = "= Test\n\n" \
+           "[cols=\"1,1\", options=\"header\"]\n|===\n" \
+           "| ZHEADERZ | RACKHEAD\n\n#{body}\n|===\n"
+    pdf = IntegrationHelper.convert(adoc)
+    text = IntegrationHelper.text(pdf)
+    # En-tête répété en haut de CHAQUE page : le tableau (70 lignes)
+    # déborde sur ≥ 2 pages, donc le libellé d'en-tête unique
+    # « ZHEADERZ » doit apparaître au moins deux fois.
+    (text.split("ZHEADERZ").size - 1).should be >= 2
+    File.delete(pdf)
+  end
 end
