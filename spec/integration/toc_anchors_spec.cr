@@ -106,4 +106,37 @@ describe "Integration · TOC anchors" do
       File.delete(path) if File.exists?(path)
     end
   end
+
+  it "places an article doctitle on the SAME page as its TOC" do
+    # Régression : pour un article (pas de page de garde) avec `:toc:`,
+    # la TOC occupait seule la 1re page et le doctitle tombait sur la
+    # page suivante — la TOC apparaissait « sans titre ». Le doctitle
+    # doit désormais coiffer la TOC sur la même première page.
+    source = <<-ADOC
+    = Mon Article
+    Jean Dupont
+
+    :toc:
+
+    == Section Un
+
+    Contenu un.
+
+    == Section Deux
+
+    Contenu deux.
+    ADOC
+
+    path = IntegrationHelper.convert(source)
+    begin
+      page1 = IntegrationHelper.page_text(path, 0)
+      # Le doctitle est bien sur la 1re page…
+      page1.should contain("Mon Article")
+      # … en compagnie de la TOC (son titre + au moins une entrée).
+      page1.should contain("Table des matières")
+      page1.should contain("Section Un")
+    ensure
+      File.delete(path) if File.exists?(path)
+    end
+  end
 end

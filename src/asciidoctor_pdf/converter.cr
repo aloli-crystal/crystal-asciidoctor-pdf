@@ -339,25 +339,41 @@ module AsciidoctorPDF
         end
       end
 
-      # Table des matières (page réservée, sera remplie après le rendu du contenu)
+      # Table des matières + doctitle inline. Trois dispositions selon
+      # le type de document :
+      #
+      #   • Article AVEC TOC : le doctitle (titre + auteur + date) est
+      #     rendu en haut de la 1re page, PUIS la TOC le suit INLINE sur
+      #     cette même page (placement `auto` d'AsciiDoc pour un
+      #     article), et le corps démarre page suivante. Sans ça, la TOC
+      #     occupait seule une page réservée et le doctitle tombait sur
+      #     la page de contenu d'après : la TOC apparaissait « sans
+      #     titre » (bug signalé sur un :toc: left d'article).
+      #   • Livre / page de garde + TOC : la TOC garde sa propre page
+      #     réservée, avec la numérotation de front-matter.
+      #   • Article SANS TOC : juste le doctitle en tête de la 1re page,
+      #     le préambule suit dessous.
       toc_page_index = -1
-      if @theme.toc_enabled && node.attr?("toc") && !title_page_toc_active
+      toc_inline_y_start = nil
+      toc_requested = @theme.toc_enabled && node.attr?("toc") && !title_page_toc_active
+
+      if inline_doctitle && toc_requested
+        render_inline_doctitle(node)
+        toc_page_index = @doc.pages.size - 1 # page courante (celle du titre)
+        toc_inline_y_start = @current_y      # la TOC démarre sous le titre
+        new_page                             # le corps démarre page suivante
+      elsif toc_requested
         toc_page_index = @page_number # index 0-based de la page TOC
         new_page(numbering: front_numbering)
-        # Créer une nouvelle page pour le contenu afin d'éviter que le corps
-        # ne se superpose à la TOC (qui sera rendue en post-traitement)
+        # Nouvelle page pour le contenu afin d'éviter que le corps ne se
+        # superpose à la TOC (qui sera rendue en post-traitement).
         new_page
-      elsif title_rendered
-        # Sans TOC séparée, basculer sur une nouvelle page après la
-        # page de garde pour éviter que le corps ne se superpose au
-        # titre rendu sur la garde.
-        new_page
-      end
-
-      # Doctitle inline (mode sans page de garde) — rendu en H1 sur la
-      # première page de contenu, juste avant le préambule.
-      if inline_doctitle
+      elsif inline_doctitle
         render_inline_doctitle(node)
+      elsif title_rendered
+        # Page de garde sans TOC : nouvelle page pour ne pas superposer
+        # le corps au titre rendu sur la garde.
+        new_page
       end
 
       # Contenu principal
@@ -370,9 +386,11 @@ module AsciidoctorPDF
       # entrées (via `format_page_number`), pas l'index PDF brut.
       assign_displayed_numbers
 
-      # Rendre la table des matières sur la page réservée…
+      # Rendre la table des matières sur la page réservée. `y_start`
+      # est non-nil pour un article (TOC inline sous le doctitle) et
+      # nil pour un livre (TOC en haut de sa page dédiée).
       if toc_page_index >= 0
-        render_toc(toc_page_index)
+        render_toc(toc_page_index, y_start: toc_inline_y_start)
       end
       # …ou directement sur la page de garde quand le mode `x-title-page-toc`
       # est actif. Le titre « Sommaire » a déjà été dessiné par

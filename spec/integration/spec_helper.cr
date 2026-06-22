@@ -114,6 +114,20 @@ module IntegrationHelper
     buf.to_s
   end
 
+  # Like `.text` but limited to a single 0-based page index. Lets a
+  # spec assert WHERE content landed — e.g. an article doctitle must
+  # share its first page with the TOC, not sit on a later page.
+  def self.page_text(pdf_path : String, page_index : Int32) : String
+    reader = PDF::Reader.open(pdf_path)
+    buf = String::Builder.new
+    page = reader.pages[page_index]
+    page.content_streams.each do |bytes|
+      decoded = inflate_if_needed(bytes)
+      extract_text_from_stream(decoded, buf)
+    end
+    buf.to_s
+  end
+
   # Counts the number of `/Subtype /Link` annotations in the raw PDF
   # bytes. This is the cheapest, most font-agnostic way to assert that
   # the TOC entries are clickable: every entry should produce one link

@@ -1,3 +1,25 @@
+== v2.3.24.100 — 2026-06-22
+
+=== Corrigé (article avec `:toc:` — doctitle manquant)
+
+* **Le titre du document (doctitle) apparaît désormais sur la même
+  page que la table des matières, pour un article.** Pour un
+  `article` (doctype par défaut, sans page de garde) demandant une
+  TOC (`:toc:`, `:toc: left`, …), la TOC occupait seule la première
+  page et le doctitle — titre, auteur, date — tombait en haut de la
+  page de contenu suivante : la TOC s'affichait donc « sans titre ».
++
+  `convert_document` rend maintenant le doctitle inline EN TÊTE de la
+  première page, puis réserve le reste de cette page pour la TOC
+  (rendue sous le titre via `render_toc(..., y_start:)`) ; le corps
+  démarre page suivante. Disposition conforme au placement `auto`
+  d'AsciiDoc pour un article (titre → TOC → contenu).
++
+  Inchangé : les livres (`:doctype: book`) et les documents à
+  `:title-page:` explicite conservent leur page de garde et leur TOC
+  dédiée (ou intégrée à la garde via `title-page-toc`). Nouveau
+  helper de test `IntegrationHelper.page_text` + 1 spec de garde.
+
 == v2.3.24.97 — 2026-06-08
 
 === Corrigé (markup inline dans les cellules de tableau)
