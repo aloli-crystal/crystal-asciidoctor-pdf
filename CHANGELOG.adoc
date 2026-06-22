@@ -90,6 +90,469 @@
   Both fixed; visual diff confirms bold-italic word renders
   and the forced line break appears.
 
+== v2.3.24.97 — 2026-06-08
+
+=== Fixed (inline markup in table cells)
+
+* **Codespans `` `…` ``, bold, italic and links are now rendered WITH
+  their style inside table cells.** Previously `render_table_row`
+  flattened every cell through `strip_inline_markup`: a password
+  written `` `qwertyuiop` `` showed up as running text, with no
+  monospace font and no shaded background — giving the impression that
+  "the code wasn't displayed".
++
+  The cell now goes through the same pipeline as paragraphs:
+  `parse_inline` → `wrap_segments` → `render_segment_line`. The bold of
+  headers / footers is propagated to the segments via `copy_with` (the
+  font being chosen per segment by `resolve_inline_font`), and the row
+  color is injected as the default segment color. New helper
+  `measure_segment_line` for `halign=center|right` alignment.
++
+  Preserved: bold headers, clickable links (`/URI` annotation),
+  hyphenation of long words in a narrow column. 2 integration specs
+  added (mono codespan + bold-header / mono-body coexistence).
+
+== v2.3.24.96 — 2026-06-08
+
+=== Fixed (title-page logo `:title-logo-image:`)
+
+Four causes prevented a title-page logo from being displayed.
+
+* **`image:` form (single `:`) supported.** `parse_title_logo_macro`
+  only stripped the `image::` prefix (double `:`, block macro). The
+  standard asciidoctor-pdf form — `image:logo.svg[…]` (single `:`,
+  inline macro) — left the prefix glued to the path, resolution failed
+  and the logo did not appear (silent failure).
+
+* **Length units (`pdfwidth=4cm`).** The width was parsed by raw
+  `to_f?`: `"4cm".to_f?` = `nil` ⇒ default width. A new
+  `parse_logo_length` converts `cm`/`mm`/`in`/`pt` (and the bare
+  number) into PDF points.
+
+* **Relative path resolution (`safe=unsafe`).** asciidoctor's safe mode
+  (API default `secure`) EMPTIES `docdir` and relativizes `docfile`,
+  making it impossible to resolve a relative path outside the current
+  directory. The CLI now forces `safe=unsafe` by default — like the
+  `asciidoctor` CLI — for local files (overridable).
+  `resolve_image_path_str` additionally falls back to the `docfile`
+  folder.
+
+* **Vertical positioning (via `pdf` ~> 1.20.1).** SVG rendering offset
+  `<rect>` elements upward by their height; a logo at the top of the
+  page ended up off-page. Fixed in the `pdf` shard.
+
+=== Reminder
+
+The title-page logo is only rendered on a TITLE PAGE. An `article`
+(default doctype) must therefore declare `:title-page:` in its header
+for a title page — and thus the logo — to be produced.
+
+== v2.3.24.95 — 2026-06-08
+
+=== Fixed (documentation)
+
+* Removed an erroneous note from the v2.3.24.94 CHANGELOG claiming that
+  links did not work on single-page documents. This was a false
+  positive from a faulty `qpdf --qdf` check: raw-byte inspection
+  confirms that the page does carry its `/Annots` and that the URLs are
+  clickable, regardless of the number of pages.
+
+== v2.3.24.94 — 2026-06-08
+
+=== Fixed / Added
+
+* **Bare URLs correctly linked** (via `crystal-asciidoctor`
+  ~> 2.0.26.9). An auto-detected URL (`https://exemple.fr`) produced an
+  `href` truncated to the scheme (`https://`) with the domain returned
+  in the text. The parser fixes the full `href`; the URL now displays
+  and points correctly.
+
+* **Clickable links in table cells.** Cell rendering displays plain
+  text (`strip_inline_markup`); we now overlay a `/URI` annotation on
+  the text area of a cell that contains an external link
+  (http/https/ftp/mailto). Covers the common "cell = URL" case.
+
+Links are clickable both on a single-page and a multi-page document
+(verified on the raw bytes of the PDF: the page carries an `/Annots`
+referencing the `/URI` annotations).
+
+== v2.3.24.93 — 2026-06-08
+
+=== Changed
+
+* **Title page aligned with standard asciidoctor.** A title page is now
+  produced ONLY for a book (`:doctype: book`) or when an explicit
+  `:title-page:` is set. An `article` (default doctype) no longer has
+  an automatic title page: its title is rendered at the top of the
+  first page, directly followed by the content — standard AsciiDoc
+  behavior.
++
+  Previously, the theme default `title_page_enabled: true` applied to
+  ALL documents, inserting a title page even for short articles (the
+  content ended up on page 2). `title_page_enabled` remains a master
+  switch (disables the title page even for a book).
++
+  To keep a title page on an article: add `:title-page:` to the
+  document header.
+
+=== Migration
+
+Articles that relied on the automatic title page must add
+`:title-page:` to their header to keep it (e.g. beryl's README).
+
+== v2.3.24.92 — 2026-06-04
+
+=== Fixed
+
+* **`:toc!:` properly disables any table of contents.** Two causes:
++
+  0. The global config (`~/.config/.../config.yml`) injected its
+     attributes (`toc`, `x-title-page-toc`…) as HARD-SET, locking the
+     attribute: a `:toc!:` in a document had no effect.
+     `UserConfig#merge_into` now passes them as SOFT-SET (`@` suffix,
+     asciidoctor convention) — the config provides DEFAULTS that the
+     document header can override.
+  0. `title_page_toc_enabled?` only consulted `x-title-page-toc` (TOC
+     placement), never `toc` (presence). It now returns `false` as soon
+     as `toc` is disabled — no TOC on the title page either.
+
+* **Title-page subtitle wrapped.** `render_title_page_standard`
+  rendered the subtitle in a single `draw_text_run` that overflowed
+  off-page. It is now wrapped (`wrap_segments` + `render_segment_line`,
+  like the title and the inline-mode subtitle), and the separator line
+  is placed BELOW the last line of the subtitle (instead of a fixed
+  offset that crossed through it).
+
+* **Table header rendered.** Rendering tested `has_header_option`,
+  which could be `false` even though the parser had populated
+  `rows.head` (the `options="header"` case with a header row + an empty
+  row). We now rely on `rows.head`: if a header row exists, it is
+  rendered (background + bold).
+
+=== Known (outside this shard)
+
+* Autolinking a URL followed by a space in a cell produces a truncated
+  `href` (`https://`) on the crystal-asciidoctor parser side — to be
+  fixed in that shard.
+* pdf-audit reports `huge_gap` inside table cells (false positives: it
+  does not model columns).
+
+== v2.3.24.91 — 2026-06-04
+
+=== Changed
+
+* **The code-wrap `WARNING` now cites the source LINE NUMBER.** The
+  v2.3.24.90 message echoed the start of the line, which was not very
+  useful. It now directly indicates the line of the `.adoc` file:
++
+  ----
+  asciidoctor: WARNING: ligne de code repliée : trop longue pour l'encadré (ligne 280)
+  ----
++
+  The author immediately locates the line and decides what to do
+  (shorten it, or add a continuation proper to their language — a `\`
+  in shell).
+
+* **`sourcemap` enabled by default.** Required so that each parsed
+  block carries its line number (`node.lineno`). Overridable via
+  `-a sourcemap=false`. The line number of the content of a delimited
+  block is `node.lineno + 1` (the line of the opening `----` delimiter
+  plus one); the index of the wrapped chunk within the block is added
+  to it.
+
+== v2.3.24.90 — 2026-06-04
+
+=== Added
+
+* **Warning on wrapped code lines.** A `[source,…]` block line that is
+  automatically wrapped (v2.3.24.88) stays on two lines on screen, but
+  copy-pasting it embeds a line break — the command is then not
+  executable as-is. Now double-flagged:
++
+  0. **Visual marker**: a small amber "↳" hook is drawn in the left
+     gutter of the box, at the start of each continuation line. Drawn
+     as VECTOR (two segments + arrowhead), so (a) no dependency on the
+     mono font's coverage, and (b) ABSENT from copy-paste — the reader
+     gets only the code, never the marker. Color configurable via the
+     theme (`code_wrap_marker_color`, amber by default).
+  0. **`WARNING` at generation time**: a stderr message is emitted for
+     each wrapped source line ("copy-paste will insert a line break"),
+     inviting the author to shorten the line in the AsciiDoc source if
+     they wish.
+
+=== Note
+
+`[source,…]` block lines are not — and never have been — justified:
+they are rendered in fixed-pitch (mono), left-aligned, with original
+spaces preserved. Only prose (including the inline codespans it
+contains) is justified.
+
+== v2.3.24.89 — 2026-06-04
+
+=== Fixed
+
+* **Soft-wrap of `[source,…]` blocks: priority to the space (argument
+  boundary).** The v2.3.24.88 wrapping took the rightmost hinge, which
+  could split a flag: `… --write --` then `hostname=chouquette` (the
+  `--hostname` cut in two). We now break IN PRIORITY at the rightmost
+  space that fits — each argument/flag stays whole:
++
+  ....
+  beryl scan aloli/9783705f-f86f-4bf7-88ad-4c92b920e9ba --provider=scaleway --dns --write
+  --hostname=chouquette
+  ....
++
+  The hinges `/ - = ,` are now only used as a second resort, when a
+  SINGLE TOKEN is itself wider than the box (UUID, path or hash without
+  a space) — exactly like the soft-break of inline codespans. A hard
+  cut at the limit as a last resort.
+
+== v2.3.24.88 — 2026-06-04
+
+=== Added
+
+* **Soft-wrap of overly long lines in `[source,…]` blocks.** A code
+  block is rendered verbatim and is not justified, but a line wider
+  than the box (typically a shell command with a full UUID + flags,
+  e.g. `beryl scan aloli/<uuid> --provider=scaleway --dns --write
+  --hostname=…`) overflowed all the way OFF THE PAGE and got clipped —
+  the end of the command became invisible.
++
+  These lines are now wrapped at hinge characters (space first, then
+  `/`, `-`, `=`, `,` — the same logic as the soft-break of inline
+  codespans) as close as possible to the edge of the box, and continued
+  on a continuation line. The whole command stays visible. No character
+  is injected (no `\`, no indentation): a break on a space consumes the
+  space, a break on a hinge keeps the hinge on the top line — copy-paste
+  stays faithful. A line without any hinge (a single very long token)
+  is cut hard as a last resort, still preferable to clipping.
++
+  The box height and pagination adjust automatically (the wrapping
+  happens before the height computation), so a block that gains lines
+  through wrapping stays correctly boxed and can spill onto the next
+  page if needed.
+
+=== Verification
+
+beryl README FR + EN: the `beryl scan` command of the Scaleway scenario
+(UUID + 4 flags), which ran off the page (ending at 635 pt for an edge
+at 595), now fits entirely within the box on two lines. 0 pdf-audit
+anomaly, 261 specs green.
+
+== v2.3.24.87 — 2026-06-04
+
+=== Fixed
+
+* **Justification: lines reach the right margin again.** The
+  computation of `natural_w` (the natural width of a line, the basis of
+  `extra_per_space = (target_w - natural_w) / n_spaces`) on the
+  renderer side counted badge paddings (codespan/kbd/mark)
+  UNCONDITIONALLY, the way `tokenize` does for the break decision. But
+  the rendering only adds them CONDITIONALLY (not between two fragments
+  of the same codespan, nor before a clinging character). `natural_w`
+  was therefore OVER-estimated ⇒ `extra_per_space` too small ⇒
+  justified lines stopped a few points BEFORE the margin (visual defect
+  reported on many list items and paragraphs of the beryl README).
++
+  The renderer now applies EXACTLY the same condition as the rendering
+  (`next_clings` / `next_is_mono`) to count the paddings: `natural_w`
+  then equals the width actually drawn, and the line fills exactly up to
+  `target_w`. The composer keeps its inflated (unconditional) measure to
+  break conservatively — guaranteeing the absence of overflow.
+
+* **Simple admonition: text reaches the right margin.** The content
+  width of an admonition removed a `padding` on the RIGHT even in the
+  absence of a frame. For a simple admonition (left color bar only, the
+  default case), there is no right border: the text now reaches the page
+  margin like an ordinary paragraph. The right inset is kept only for
+  the boxed variant (`boxed`).
+
+=== Internal cleanup
+
+* Removal of the `composer_natural_w` threading / `wrap_segments_full`
+  method introduced in v2.3.24.86: the exact `natural_width` now being
+  recomputed locally and correctly by the renderer (conditional
+  paddings), the composer's value no longer needs to be passed. Back to
+  a single `wrap_segments`.
+
+=== Verification
+
+Rendering validated with poppler (`pdftotext -bbox`, independent
+reference): on the beryl README FR and EN, the justified lines reach the
+right margin (559 pt) with uniform inter-word spaces (~3-5 pt). The NOTE
+on page 1 now reaches the margin.
+
+== v2.3.24.86 — 2026-06-04
+
+=== Changed (internal refactor, rendering unchanged)
+
+* **Removal of the `@line_natural_widths` cache indexed by
+  `object_id`.** v2.3.24.85 passed the composer's exact `natural_width`
+  to the renderer via a `Hash(UInt64, Float64)` cache indexed by the
+  line's `object_id` — a functional but fragile compromise (address
+  reuse possible after GC, memory growth over the lifetime of the
+  document).
++
+  The `natural_width` is now passed **explicitly** as a
+  `composer_natural_w` parameter to `render_segment_line`. A new
+  `wrap_segments_full` method keeps the composer's complete `Line`
+  objects (segments + `natural_width`); the 3 paths that justify
+  (paragraph, list item, definition list) use it. `wrap_segments`
+  becomes a thin wrapper (`wrap_segments_full(...).map(&.segments)`) for
+  the ~9 non-justifying call-sites (titles, markers) that do not need
+  the metric.
++
+  Rendering **strictly identical** to v2.3.24.85 (positions of all
+  words byte-exact, verified on the beryl README: 2794 FR words /
+  2776 EN, 0 anomaly). The file loses 25 net lines (-76 / +51): shorter
+  and without a shared instance variable.
+
+=== Why this refactor
+
+The `object_id` approach had been chosen so as not to touch the
+signature of `render_segment_line` (shared by 12 call-sites). Realizing
+that only 3 of them actually justify (pass `target_w` + `align`), it
+becomes trivial to thread the real value only where it matters, via an
+optional `composer_natural_w : Float64? = nil` parameter
+(backward-compatible for the other 9). This eliminates the *code smell*
+without any change in rendering.
+
+== v2.3.24.85 — 2026-06-04
+
+=== Fixed
+
+* **Overflow of the French `:` (`mot<NBSP>:`) past the right margin.**
+  Root bug in `try_native_justified_text`: the NBSP (U+00A0) was
+  converted to an ASCII space *before* the `split(' ')`, which turned
+  it into a justification point. An `extra_tj` (stretch) was then
+  inserted between `source` and `:` in `source<NBSP>:`, pushing the `:`
+  beyond the margin.
++
+  In accordance with the typographic convention (confirmed: in French
+  `mot<NBSP>:<space>`, only the space AFTER the `:` is justifiable; the
+  NBSP is non-breaking AND of fixed width; in English `mot:<space>`,
+  same), the split is now done on the STRICT ASCII space. The NBSP stays
+  IN the chunks and is converted to a space (for glyph rendering) only
+  AFTER the split — so its width stays natural, with no `extra`. New
+  method `split_ascii_keep_nbsp`. The simple-font branch (`Tw`) switches
+  to manual positioning for the same reason (`Tw` applies to ALL byte-32
+  characters, NBSP-converted included).
+
+* **Over-stretching / overflow from a composer ↔ renderer measure
+  mismatch.**
+  `compose_knuth_plass` computes a per-line `natural_width` that
+  INCLUDES the codespan/kbd/mark paddings — it is on this measure that
+  the line breaks were decided. The renderer recomputed its own width
+  via `font.string_width` WITHOUT these paddings, so it was
+  underestimated: `extra_per_space = (tw - natural_w) / n_spaces` became
+  too large ⇒ over-stretched lines (gaps of 20-30 pt) or words
+  overflowing the margin.
++
+  The renderer now consults the composer's `natural_width` (source of
+  truth) via a `@line_natural_widths` cache indexed by the line's
+  `object_id`, filled in `wrap_segments`. Non-destructive read (a line
+  may be rendered several times during a pagination attempt). Safeguard:
+  the value is only adopted if it is greater than the local computation
+  and within a reasonable bound.
+
+* **Knuth-Plass: `ratio < 0` rejected (no compression).** The shrink
+  threshold goes from -1.0 to 0.0: no space compression is tolerated.
+  Any overflowing line is rejected, forcing the composer to break
+  earlier (the overflowing element moves to the next line, the previous
+  one stretches by positive stretch). An atomic Box `mot<NBSP>:` too
+  wide for the current line is thus systematically pushed to the next
+  line, never compressed nor cut.
+
+=== Impact
+
+PDF of the beryl README (FR and EN), measured by `pdf-audit` v0.2.1:
+**0** typographic **anomaly** (7 pages, 2794 FR words / 2776 EN words).
+Starting point of the session: 11 anomalies.
+
+No regression on the other examples (x-form-audit-iso27001 even goes
+from 8 to 7 pre-existing anomalies, related to the `[x-form]` field
+layouts).
+
+=== Implementation note
+
+The `@line_natural_widths` cache indexed by `object_id` is a localized
+compromise (avoiding changing the signature of `render_segment_line`,
+shared by 15+ call-sites). Safety rests on overwrite-at-write
+(`wrap_segments` rewrites the entry just before rendering) and a
+plausibility safeguard. A refactor toward a sequential identifier
+remains possible if the need arises.
+
+== v2.3.24.84 — 2026-06-04
+
+=== Fixed
+
+* **Knuth-Plass: `ratio < 0` rejected (no space compression).** The
+  standard TeX bound `next if ratio < -1.0` allowed up to 100%
+  compression of a line's Glues to make it fit within `target_w`. At
+  Philippe's request, and in accordance with the French typographic
+  convention which wants spaces of stable width (not tightened to gain
+  room), this bound becomes `ratio < 0.0`: no space compression
+  tolerated. An overflowing line is now systematically rejected by K-P
+  — the composer must break earlier, the previous line is stretched by
+  positive stretch, and the overflowing element (word, codespan, French
+  `:` after NBSP) moves to the next line.
++
+  Typical case eliminated: an atomic Box `mot<NBSP>:` (where the NBSP
+  makes the `mot`+`:` joint non-breaking, only the space AFTER the `:`
+  being justifiable) too wide for the current line is now pushed onto
+  the next line instead of being placed in overflow.
+
+=== Impact
+
+On the PDF of the beryl README (measured via `pdf-audit` v0.2.1): the
+typographic anomalies go from **11 to 4** (-64%).
+
+* `--hostname=chouquette` (75 pt overflow in a `[source,console]`
+  block): classified out-of-scope by the linter's `monospace?` filter —
+  typographic convention: code blocks are not wrapped (a shell command
+  must not be cut across lines), it is up to the document author to
+  break their line in the AsciiDoc source.
+* `bootstrapper.`, `réel.`, `API`, `:` (some p4 paragraphs), `l'API`
+  (p6 in some paragraphs): eliminated by the K-P `ratio < 0` rejection.
+* 4 residuals at 4-8 pt (`par`, `:`, `lit`, `l'API`): cases where
+  `compose_first_fit` (K-P fallback when no admissible path is found)
+  does not break correctly at the last Glue/Penalty before a final word.
+  Converging toward 0 anomaly requires a refactor of the first-fit
+  fallback (strict alignment of the composer measure with the actual
+  rendering of inter-segment codespan paddings).
+
+== v2.3.24.83 — 2026-06-04
+
+=== Fixed
+
+* **Compensation of badge paddings in the composer's computation.** The
+  `ParagraphComposer` did not know that the rendering adds
+  `codespan_padding_x` (typically 2 pt), `+4 pt` for `kbd`/`button` or
+  `+2 pt` for `mark` to `current_x` after each badge (cf.
+  `render_segment_line` ~ line 4031, fix J4.A v2.3.24.73).
+  Consequence: lines containing codespans were counted slightly shorter
+  than their actual rendering, and some words overflowed the right
+  margin by 1 to 16 pt.
++
+  Detected thanks to the brand-new `aloli-crystal/pdf-audit` (v0.1.0)
+  which reported 42 `margin_overflow` on the PDF of the beryl README.
+  The fix consists in inflating the measure of the segment's Box in the
+  measurement block of `tokenize` (cf. `converter.cr#wrap_segments`) by
+  the same amount as what the renderer adds downstream. Conservative:
+  counts a padding even for adjacent codespans (where the compensation
+  is actually nil) — an acceptable overestimation since it avoids any
+  overflow.
+
+  Verification after fix:
++
+  - `pdf-audit lint beryl.pdf`: 67 → 33 anomalies
+  - `margin_overflow`: 42 → 20 (the 20 remaining are final punctuation
+    `:`, `→`, short words whose pdf2text measure shows ±1-3 pt of
+    imprecision)
+  - `stuck_words`: 6 → 0
+  - Gold compare on the 53 prod-crystal READMEs: 0 project loses a page,
+    `beryl-recipes` gains 1 (compaction).
+
 == v2.3.24.82 — 2026-06-04
 
 === Added
