@@ -20,6 +20,51 @@
   dédiée (ou intégrée à la garde via `title-page-toc`). Nouveau
   helper de test `IntegrationHelper.page_text` + 1 spec de garde.
 
+== v2.3.24.99 — 2026-06-19
+
+=== Ajouté
+
+* **Répétition de l'en-tête sur chaque page d'un tableau
+  multi-pages.** Quand un tableau déborde sur la page suivante, sa ou
+  ses lignes d'en-tête (intitulés de colonnes) sont redessinées en
+  haut de chaque nouvelle page pour rester lisibles. Implémenté via un
+  hook `@repeat_table_header` posé par `convert_table` et invoqué par
+  `check_page_break` juste après un saut de page (désarmé pendant le
+  re-rendu pour éviter la récursion infinie). Test d'intégration
+  ajouté.
+
+== v2.3.24.98 — 2026-06-16
+
+=== Corrigé (bloc `[quote]` : bold-italic et hard break)
+
+* **Bold-italic invisible.** Dans un bloc `[quote]` (qui force
+  l'italique sur chaque segment), un marqueur gras `*mécanique*`
+  devait donner du bold-italic — mais la variante bold-italic de
+  DejaVu Sans manquait de `data/fonts/` et le thème pointait
+  `base_font_bold_italic_path` sur `nil`. Le rendu retombait sur la
+  Type1 `Helvetica-BoldOblique` (encodage WinAnsi) incapable de
+  dessiner les glyphes non-ASCII (`é`, `—`, …) produits par DejaVu
+  ailleurs : le segment était silencieusement supprimé, laissant un
+  trou blanc dans la ligne.
++
+  Fix : embarquer `DejaVuSans-BoldOblique.ttf` (dejavu-fonts 2.37,
+  même famille/licence que les 3 autres TTF déjà livrées) et y pointer
+  `base_font_bold_italic_path`.
+
+* **Hard break `+` avalé dans `[quote]`.** Deux causes en cascade :
++
+  - `render_indented_block` reconstruisait chaque `InlineSegment` pour
+    forcer l'italique mais oubliait de reporter
+    `line_break: seg.line_break` — le segment-marqueur du `+\n` (texte
+    vide, `line_break: true`) perdait son flag et devenait un segment
+    vide ignoré.
++
+  - `ParagraphComposer.compose_knuth_plass` traitait
+    `Penalty(NEG_INFINITY)` comme une coupure FACULTATIVE plutôt
+    qu'OBLIGATOIRE : Knuth-Plass pouvait franchir le saut forcé. Fix :
+    préserver `line_break` + précalcul `next_forced[i]` rejetant toute
+    ligne candidate qui traverse un break obligatoire.
+
 == v2.3.24.97 — 2026-06-08
 
 === Corrigé (markup inline dans les cellules de tableau)

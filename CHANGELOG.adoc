@@ -3,6 +3,37 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.100 — 2026-06-22
+
+=== Fixed
+
+* **Article doctitle now shares the first page with its TOC.** For an
+  `article` (default doctype, no title page) requesting a TOC
+  (`:toc:`, `:toc: left`, …), the TOC took the whole first page on its
+  own and the doctitle — title, author, date — landed at the top of
+  the next page, so the TOC appeared "title-less".
++
+  `convert_document` now renders the doctitle inline at the top of the
+  first page, then reserves the rest of that page for the TOC (drawn
+  below the title via `render_toc(..., y_start:)`); the body starts on
+  the following page. This matches AsciiDoc's `auto` TOC placement for
+  an article (title → TOC → content). Books (`:doctype: book`) and
+  documents with an explicit `:title-page:` keep their title page and
+  dedicated/embedded TOC unchanged. New test helper
+  `IntegrationHelper.page_text` + one guard spec.
+
+== v2.3.24.99 — 2026-06-19
+
+=== Added
+
+* **Repeat the table header on every page of a multi-page table.**
+  When a table overflows onto the next page, its header row(s) (column
+  labels) are redrawn at the top of each new page so the columns stay
+  readable. Implemented via a `@repeat_table_header` hook set by
+  `convert_table` and invoked by `check_page_break` right after a page
+  break (disarmed during the re-render to avoid infinite recursion).
+  Integration test added.
+
 == v2.3.24.98 — 2026-06-16
 
 === Fixed
