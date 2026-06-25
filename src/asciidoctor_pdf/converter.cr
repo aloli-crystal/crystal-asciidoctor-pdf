@@ -86,6 +86,11 @@ module AsciidoctorPDF
     @page_metas : Array(PageMeta) = [] of PageMeta
     @current_section_title : String = ""
     @document_title : String = ""
+    # Nom du fichier source AsciiDoc (`docfile`, repli `docname`).
+    # Sert à préfixer les `WARNING` stderr pour qu'on sache, en
+    # conversion multi-fichiers (`*.adoc`), DE QUEL fichier provient
+    # l'avertissement. Vide si l'info n'est pas disponible.
+    @document_file : String = ""
     # Langue du document AsciiDoc (`:lang:` ou défaut `en`).
     # Utilisée pour résoudre les patterns de césure Liang via
     # `Hyphenation::Loader.for(@document_lang)`. `nil` = pas de
@@ -252,6 +257,18 @@ module AsciidoctorPDF
       # ASCII spaces only just before each `page.text` call.
       @document_title = decode_html_entities(node.doctitle || "")
       @output_path = determine_output_path(node)
+
+      # Nom du fichier source, pour préfixer les WARNING (savoir de quel
+      # fichier ils proviennent en conversion multi-fichiers). `docfile`
+      # d'abord (chemin tel que passé), repli sur `docname`.
+      @document_file =
+        if node.attr?("docfile") && !node.attr("docfile").to_s.empty?
+          node.attr("docfile").to_s
+        elsif node.attr?("docname")
+          node.attr("docname").to_s
+        else
+          ""
+        end
 
       # Détection de la langue : attribut `:lang:` du document
       # AsciiDoc. Détermine quel pattern Liang sera utilisé pour
@@ -712,7 +729,10 @@ module AsciidoctorPDF
           result << {line, false}
         else
           where = content_first_lineno ? "(ligne #{content_first_lineno + idx})" : "(numéro de ligne indisponible — activez sourcemap)"
-          STDERR.puts "asciidoctor: WARNING: ligne de code repliée : trop longue pour l'encadré #{where}"
+          # Préfixe `<fichier>: ` (convention asciidoctor) pour savoir
+          # de quel source provient le warning en mode multi-fichiers.
+          file_prefix = @document_file.empty? ? "" : "#{@document_file}: "
+          STDERR.puts "asciidoctor: WARNING: #{file_prefix}ligne de code repliée : trop longue pour l'encadré #{where}"
           rest = line
           first = true
           # Garde-fou anti-boucle : au plus une coupure par caractère.

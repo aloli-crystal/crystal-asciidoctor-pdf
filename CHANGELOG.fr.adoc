@@ -1,3 +1,21 @@
+== v2.3.24.102 — 2026-06-25
+
+=== Corrigé
+
+* **Les `WARNING` de ligne de code repliée citent désormais le fichier
+  source.** En conversion multi-fichiers (`*.adoc`), un avertissement
+  « ligne de code repliée : trop longue pour l'encadré (ligne N) » ne
+  permettait pas de savoir DE QUEL fichier il provenait. Le message est
+  désormais préfixé du `docfile` (convention asciidoctor
+  `WARNING: <fichier>: …`) :
++
+  ----
+  asciidoctor: WARNING: AUDIT-SECURITE-2026-06-13.adoc: ligne de code repliée : trop longue pour l'encadré (ligne 139)
+  ----
++
+  Capturé via un nouvel ivar `@document_file` (repli `docname`). 1 spec
+  d'intégration ajoutée.
+
 == v2.3.24.101 — 2026-06-25
 
 === Corrigé (conversion de plusieurs fichiers)

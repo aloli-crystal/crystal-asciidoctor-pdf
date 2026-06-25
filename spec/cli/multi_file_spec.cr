@@ -47,6 +47,27 @@ describe "CLI · conversion multi-fichiers" do
     end
   end
 
+  it "préfixe les WARNING du nom du fichier source (savoir lequel en lot)" do
+    pending! "binaire absent : #{binary}" unless File::Info.executable?(binary)
+    dir = File.tempname("capdf-warn")
+    Dir.mkdir_p(dir)
+    begin
+      f = File.join(dir, "trop-long.adoc")
+      long_line = "commande " + ("--flag-tres-long-pour-deborder=valeur " * 12)
+      File.write(f, "= W\n\n[source,console]\n----\n#{long_line}\n----\n")
+      stderr = IO::Memory.new
+      status = Process.run(binary, [f],
+        output: Process::Redirect::Close, error: stderr)
+      status.exit_code.should eq 0
+      out = stderr.to_s
+      out.should contain("ligne de code repliée")
+      # Le nom du fichier source doit apparaître dans le warning.
+      out.should contain("trop-long.adoc")
+    ensure
+      FileUtils.rm_rf(dir)
+    end
+  end
+
   it "poursuit malgré un fichier manquant, avec exit non nul" do
     pending! "binaire absent : #{binary}" unless File::Info.executable?(binary)
     dir = File.tempname("capdf-multi-miss")
