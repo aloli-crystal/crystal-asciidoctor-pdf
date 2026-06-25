@@ -3,6 +3,25 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.101 — 2026-06-25
+
+=== Fixed (converting several files)
+
+* **`crystal-asciidoctor-pdf *.adoc` only converted the first file.**
+  The CLI only kept the FIRST positional argument
+  (`unknown_args { |args| input_file = args.first? }`): a shell glob
+  `*.adoc` produced a single PDF, the other files were silently ignored.
+  The CLI now accepts a LIST of files and converts them all, each
+  producing its own `<name>.adoc.pdf`.
++
+  - `-o`/`--out-file` stays reserved for the single-file case
+    (incompatible with multiple inputs, which would overwrite each
+    other): explicit error otherwise.
+  - A missing file no longer aborts the batch: it is reported, the others
+    are converted, and the final exit code is non-zero.
++
+  3 integration specs added (via the binary).
+
 == v2.3.24.100 — 2026-06-22
 
 === Fixed

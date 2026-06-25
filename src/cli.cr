@@ -10,7 +10,7 @@ if ARGV.first? == "hyph"
   exit 0
 end
 
-input_file = ""
+input_files = [] of String
 output_file = ""
 theme_file = ""
 sample_mode = false
@@ -18,7 +18,7 @@ no_user_config = false
 attributes = {} of String => String
 
 OptionParser.parse do |parser|
-  parser.banner = "Usage : crystal-asciidoctor-pdf [options] fichier.adoc"
+  parser.banner = "Usage : crystal-asciidoctor-pdf [options] fichier.adoc [fichier2.adoc …]"
   parser.on("-o FILE", "--out-file FILE", "Fichier de sortie PDF (par défaut : fichier.adoc.pdf)") { |f| output_file = f }
   parser.on("-T NAME", "--theme NAME", "Thème : nom embarqué (#{AsciidoctorPDF::ThemeLoader.builtin_names.join(", ")}) ou chemin YAML") { |f| theme_file = f }
   parser.on("-a ATTR", "--attribute ATTR", "Attribut nom=valeur") do |a|
@@ -29,7 +29,7 @@ OptionParser.parse do |parser|
   parser.on("--sample", "Générer le document de référence (reference.adoc + PDF)") { sample_mode = true }
   parser.on("-h", "--help", "Afficher l'aide") { puts parser; exit 0 }
   parser.on("-v", "--version", "Afficher la version") { puts "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"; exit 0 }
-  parser.unknown_args { |args| input_file = args.first? || "" }
+  parser.unknown_args { |args| input_files = args }
 end
 
 # Chargement de la configuration utilisateur (XDG).
@@ -55,71 +55,93 @@ if sample_mode
   exit 0
 end
 
-if input_file.empty?
+if input_files.empty?
   STDERR.puts "Erreur : aucun fichier d'entrée spécifié."
-  STDERR.puts "Usage : crystal-asciidoctor-pdf [options] fichier.adoc"
+  STDERR.puts "Usage : crystal-asciidoctor-pdf [options] fichier.adoc [fichier2.adoc …]"
   exit 1
 end
 
-unless File.exists?(input_file)
-  STDERR.puts "Erreur : le fichier '#{input_file}' n'existe pas."
+# `-o`/`--out-file` impose UN nom de sortie : incompatible avec
+# plusieurs fichiers d'entrée (le second écraserait le PDF du premier).
+# Sans `-o`, chaque fichier produit son propre `<nom>.adoc.pdf` — c'est
+# ce qui permet `crystal-asciidoctor-pdf *.adoc`.
+if !output_file.empty? && input_files.size > 1
+  STDERR.puts "Erreur : -o/--out-file ne peut pas servir avec plusieurs fichiers d'entrée."
+  STDERR.puts "Sans -o, chaque fichier produit son propre <nom>.adoc.pdf."
   exit 1
 end
 
-# Convention de nommage : mon_document.adoc => mon_document.adoc.pdf
-# (permet de distinguer facilement les fichiers source et PDF,
-#  et d'éviter toute confusion avec la version Ruby asciidoctor-pdf)
-if output_file.empty?
-  output_file = File.join(
-    File.dirname(input_file),
-    File.basename(input_file) + ".pdf"
-  )
-end
+had_error = false
 
-options = {"docfile" => input_file, "outfile" => output_file} of String => String
-
-# Fusion des attributs CLI puis user config dans `options`.
-# Ordre important : les attributs CLI ont la priorité sur le user
-# config ; le document AsciiDoc lui-même peut encore écraser tout ça
-# via `:attribut: valeur` (gestion par Asciidoctor.load).
-attributes.each { |k, v| options[k] = v }
-user_config.merge_into(options)
-
-# Active `sourcemap` par défaut : chaque bloc parsé porte alors son
-# numéro de ligne source (`node.lineno`), ce qui permet aux
-# avertissements (p. ex. « ligne de code repliée ») de pointer la
-# ligne exacte du fichier `.adoc`. Surchargeable par l'utilisateur
-# via `-a sourcemap=false`.
-options["sourcemap"] = "true" unless options.has_key?("sourcemap")
-
-# Safe mode `unsafe` par défaut, comme la CLI `asciidoctor` (et NON
-# le défaut API `secure`). Indispensable ici : en mode `secure`/
-# `server`, asciidoctor VIDE `docdir` et relativise `docfile`, si
-# bien que les chemins relatifs (logo de page de garde, images) ne
-# peuvent plus être résolus que depuis le répertoire courant. En
-# `unsafe`, `docdir` est conservé et l'utilisateur — qui génère un
-# PDF depuis SES propres fichiers locaux — retrouve le comportement
-# attendu. Surchargeable via `-a safe=…` ou l'option `safe`.
-options["safe"] = "unsafe" unless options.has_key?("safe")
-doc = Asciidoctor.load_file(input_file, options)
-
-# Résolution du thème, par ordre de priorité décroissante :
-#   1. argument CLI `--theme` (nom embarqué OU chemin YAML)
-#   2. attribut document `:pdf-theme:` dans le source AsciiDoc
-#   3. user config `theme:` (XDG)
-#   4. thème par défaut intégré
-theme =
-  if !theme_file.empty?
-    AsciidoctorPDF::ThemeLoader.resolve(theme_file)
-  elsif (pdf_theme = doc.attr("pdf-theme")) && !pdf_theme.to_s.empty?
-    AsciidoctorPDF::ThemeLoader.resolve(pdf_theme.to_s)
-  elsif (user_theme = user_config.resolve_theme)
-    user_theme
-  else
-    AsciidoctorPDF::Theme.new
+input_files.each do |input_file|
+  unless File.exists?(input_file)
+    STDERR.puts "Erreur : le fichier '#{input_file}' n'existe pas."
+    had_error = true
+    next
   end
 
-converter = AsciidoctorPDF::Converter.new("pdf", theme)
-converter.convert(doc)
+  # Convention de nommage : mon_document.adoc => mon_document.adoc.pdf
+  # (permet de distinguer facilement les fichiers source et PDF,
+  #  et d'éviter toute confusion avec la version Ruby asciidoctor-pdf).
+  # En multi-fichiers, `output_file` est forcément vide (cf. garde
+  # ci-dessus) : chaque entrée calcule donc son propre nom.
+  out_file = output_file.empty? ? File.join(File.dirname(input_file), File.basename(input_file) + ".pdf") : output_file
 
-puts "PDF généré : #{output_file}"
+  options = {"docfile" => input_file, "outfile" => out_file} of String => String
+
+  # Fusion des attributs CLI puis user config dans `options`.
+  # Ordre important : les attributs CLI ont la priorité sur le user
+  # config ; le document AsciiDoc lui-même peut encore écraser tout ça
+  # via `:attribut: valeur` (gestion par Asciidoctor.load).
+  attributes.each { |k, v| options[k] = v }
+  user_config.merge_into(options)
+
+  # Active `sourcemap` par défaut : chaque bloc parsé porte alors son
+  # numéro de ligne source (`node.lineno`), ce qui permet aux
+  # avertissements (p. ex. « ligne de code repliée ») de pointer la
+  # ligne exacte du fichier `.adoc`. Surchargeable par l'utilisateur
+  # via `-a sourcemap=false`.
+  options["sourcemap"] = "true" unless options.has_key?("sourcemap")
+
+  # Safe mode `unsafe` par défaut, comme la CLI `asciidoctor` (et NON
+  # le défaut API `secure`). Indispensable ici : en mode `secure`/
+  # `server`, asciidoctor VIDE `docdir` et relativise `docfile`, si
+  # bien que les chemins relatifs (logo de page de garde, images) ne
+  # peuvent plus être résolus que depuis le répertoire courant. En
+  # `unsafe`, `docdir` est conservé et l'utilisateur — qui génère un
+  # PDF depuis SES propres fichiers locaux — retrouve le comportement
+  # attendu. Surchargeable via `-a safe=…` ou l'option `safe`.
+  options["safe"] = "unsafe" unless options.has_key?("safe")
+
+  begin
+    doc = Asciidoctor.load_file(input_file, options)
+
+    # Résolution du thème, par ordre de priorité décroissante :
+    #   1. argument CLI `--theme` (nom embarqué OU chemin YAML)
+    #   2. attribut document `:pdf-theme:` dans le source AsciiDoc
+    #   3. user config `theme:` (XDG)
+    #   4. thème par défaut intégré
+    theme =
+      if !theme_file.empty?
+        AsciidoctorPDF::ThemeLoader.resolve(theme_file)
+      elsif (pdf_theme = doc.attr("pdf-theme")) && !pdf_theme.to_s.empty?
+        AsciidoctorPDF::ThemeLoader.resolve(pdf_theme.to_s)
+      elsif (user_theme = user_config.resolve_theme)
+        user_theme
+      else
+        AsciidoctorPDF::Theme.new
+      end
+
+    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    converter.convert(doc)
+
+    puts "PDF généré : #{out_file}"
+  rescue ex
+    # En lot, l'échec d'un fichier ne doit pas interrompre les autres :
+    # on signale et on poursuit, avec un code de sortie non nul au final.
+    STDERR.puts "Erreur lors de la conversion de '#{input_file}' : #{ex.message}"
+    had_error = true
+  end
+end
+
+exit 1 if had_error

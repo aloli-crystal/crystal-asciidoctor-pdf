@@ -1,3 +1,23 @@
+== v2.3.24.101 — 2026-06-25
+
+=== Corrigé (conversion de plusieurs fichiers)
+
+* **`crystal-asciidoctor-pdf *.adoc` ne convertissait que le premier
+  fichier.** La CLI ne gardait que le PREMIER argument positionnel
+  (`unknown_args { |args| input_file = args.first? }`) : un glob shell
+  `*.adoc` ne produisait qu'un seul PDF, les autres fichiers étaient
+  ignorés silencieusement. La CLI accepte désormais une LISTE de
+  fichiers et les convertit tous, chacun produisant son propre
+  `<nom>.adoc.pdf`.
++
+  - `-o`/`--out-file` reste réservé au cas mono-fichier (incompatible
+    avec plusieurs entrées qui s'écraseraient mutuellement) : erreur
+    explicite sinon.
+  - Un fichier manquant n'interrompt plus le lot : il est signalé, les
+    autres sont convertis, et le code de sortie final est non nul.
++
+  3 specs d'intégration ajoutées (via le binaire).
+
 == v2.3.24.100 — 2026-06-22
 
 === Corrigé (article avec `:toc:` — doctitle manquant)
