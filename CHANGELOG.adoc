@@ -1682,6 +1682,919 @@ painful on long documents (READMEs, audit manuals, etc.).
 * XDG convention to generalise to all other aloli-crystal shards
   that store user-level configuration (notably crystal-beryl).
 
+== v2.3.24.56 — 2026-05-08
+
+=== Fixed
+
+* **Invisible bold-italic text (bump `pdf` ~> 0.5.5).** The `pdf`
+  shard v0.5.5 fixes an `F<n>` key collision between Type1 and
+  TrueType fonts on the same page: Type1 text added after a TTF was
+  invisible because Acrobat interpreted its key as the TTF and tried
+  to decode its WinAnsi bytes as TTF glyphs.
++
+  Typical symptom: a `*_mécanique_*` word (bold-italic) disappeared
+  from the rendered PDF, because the DejaVu Sans theme does not
+  include `BoldOblique` and the `Helvetica-BoldOblique` (Type1)
+  fallback collided with DejaVu (TTF) already active on the page.
++
+  Bump: `pdf` ~> 0.5.4 → ~> 0.5.5.
+
+== v2.3.24.55 — 2026-05-07
+
+=== Changed
+
+* **`VERSION` read at compile-time from `shard.yml`.** Previously the
+  `VERSION` constant was hardcoded to `"2.3.24.54"` while `shard.yml`
+  was already at `2.3.24.54` — a silent desync. It is now read via
+  the `read_file` macro directly from `shard.yml`, making any desync
+  impossible. Pattern generalized to the `aloli-crystal/*` ecosystem.
+
+== v2.3.24.54 — 2026-05-01
+
+=== Fixed
+
+* **`pass:[<br>]` honored in the subtitle.** The subtitle was
+  rendered in one block via a direct `draw_text_run`, without going
+  through `InlineRenderer.parse` — so `pass:[<br>]` came out
+  literally as `<br>` instead of breaking the line.
++
+  The subtitle is now handled like the title: segments parsed via
+  `InlineRenderer`, wrapping via `wrap_segments` (which honors
+  `line_break` segments), rendered via `render_segment_line` line by
+  line with consistent alignment (centering if requested).
++
+  The theme color `subtitle_font_color` is still applied: a new
+  private helper `force_color(seg, color)` injects the theme color
+  into every segment that does not define one explicitly, otherwise
+  `render_segment_line` would fall back to `base_font_color`.
++
+  Typical usage:
++
+  ----
+  :subtitle: Marie Dupont pass:[<br>]01/05/2026 12:25
+  ----
+
+== v2.3.24.53 — 2026-05-01
+
+=== Fixed
+
+* **Consistent alignment of the subtitle and the byline.** In
+  `:title-page: false` mode (`render_inline_doctitle`), when
+  `title_page_align: center` (or `right`) is set, the `:subtitle:`
+  and the byline `:author: · :revdate:` now follow the same
+  alignment as the title. Previously they stayed strictly
+  left-aligned, producing a visual dissonance (centered title ↔
+  left-aligned satellites).
++
+  Generic consistency: "when the title is centered, its satellites
+  follow". Not specific to any use case.
++
+  NOTE: v2.3.24.51 also contained a smart-fold of the subtitle on a
+  dash, reverted in v2.3.24.52 to stay out of business logic — the
+  subtitle splitting strategy belongs to the calling application.
+
+== v2.3.24.52 — 2026-05-01
+
+=== Changed
+
+* **Revert of v2.3.24.51** ("smart subtitle + consistent
+  alignment"). The smart-fold of the subtitle on a dash is removed:
+  the subtitle splitting strategy belongs to the calling
+  application, not the shard. The consistent subtitle alignment is
+  reintroduced cleanly in v2.3.24.53.
+
+== v2.3.24.51 — 2026-05-01
+
+=== Added
+
+* **Smart subtitle + consistent alignment** (`:title-page: false`
+  mode, `render_inline_doctitle`).
++
+  - **Subtitle aligned like the title.** If `title_page_align:
+    center` is set, the `:subtitle:` (and the byline `:author: ·
+    :revdate:`) follow the same alignment — previously strictly
+    left-aligned.
+  - **Smart fold of the subtitle on a dash.** When the subtitle
+    exceeds `@content_width` AND contains a dash separator surrounded
+    by spaces (` — ` em-dash, ` – ` en-dash), we try to break there
+    in priority rather than at the next space. If the break yields
+    two halves each fitting on 1 line → 2 balanced lines; otherwise →
+    standard word wrap. Typical case:
+    `:subtitle: Marie Dupont — 01/05/2026 10:50` becomes
+    `Marie Dupont` + `01/05/2026 10:50` instead of cutting between
+    first and last name or in the middle of the date.
++
+  Private helper `smart_subtitle_lines` extracted to be tested
+  independently.
++
+  NOTE: fully reverted in v2.3.24.52.
+
+== v2.3.24.50 — 2026-04-30
+
+=== Added
+
+* **Centerable H1 title and `<br>` line break respected.** Two
+  related features on doctitle rendering.
++
+  0. **Line break in the title.** `crystal-asciidoctor` already
+     produces `<br>` when an AsciiDoc `+\n` or a `pass:[<br>]`
+     appears in a title, but our `InlineRenderer` treated `<br>` as a
+     plain space — the break was invisible. New flag
+     `InlineSegment.line_break : Bool` marking an empty segment as a
+     "forced break point"; the HTML parser emits it on `<br>`;
+     `wrap_segments` closes the current line regardless of how full
+     it is. Syntax: `= First part pass:[<br>]Second part`. A plain
+     `+\n` at the end of a title line does NOT work (the title is
+     single-line in source): prefer `pass:[<br>]`.
+  0. **H1 title centering.** New theme property `title_page_align`
+     (`left` / `center` / `right`, default `left`), overridable per
+     document via `:title-page-align:`. Applied to all three
+     rendering modes: standard title page
+     (`render_title_page_standard`), title page + integrated TOC
+     (`render_title_page_with_toc`) and inline doctitle
+     (`render_inline_doctitle`). Private helpers
+     `resolve_title_align`, `title_line_x` and `force_bold` (clone
+     segments to bold before wrapping so the measure uses
+     Helvetica-Bold metrics, otherwise the title overflows).
+  0. **Footer / header: strip HTML tags.** `{document_title}`
+     injected into `footer_left` etc. carried the `<br>` literally.
+     `resolve_page_vars` now strips inline HTML tags and collapses
+     spaces before substitution.
+
+== v2.3.24.49 — 2026-04-30
+
+=== Fixed
+
+* **`:pdf-theme:` resolved on the API side, not only the CLI.** An
+  AsciiDoc source containing `:pdf-theme: fr` had its attribute
+  ignored as soon as it was converted via the direct API (apps that
+  instantiate `Converter.new("pdf", theme)` without going through the
+  CLI) — resolution was implemented only in `src/cli.cr`. Symptom: a
+  `[.x-score-a-revoir]` label came out "NEEDS REVIEW" (English)
+  instead of "À REVOIR" (the expected French).
++
+  Resolution now happens at the `convert_document` level, applied to
+  both usages (CLI and API):
++
+  - If the caller passes an explicit theme (`@theme_provided =
+    true`), its choice is respected and the document attribute
+    ignored (full backward compatibility).
+  - Otherwise (`Converter.new("pdf")` or `Converter.new("pdf",
+    nil)`), `convert_document` reads `node.attr("pdf-theme")` and
+    calls `ThemeLoader.resolve(...)`; fonts and page size are
+    reapplied.
++
+  The user has nothing to change in their Crystal code:
+  `:pdf-theme: fr` in the source is enough (label verified
+  `À REVOIR` / `ATTENTION`).
+
+== v2.3.24.48 — 2026-04-30
+
+=== Added
+
+* **Boxed mode (`boxed`) with drop shadow.** Reinforced emphasis for
+  admonitions and `x-score` blocks: full rectangular frame, discreet
+  drop shadow, label integrated into the frame. Activable via two
+  cumulative options (logical OR):
++
+  - **A — per block**: AsciiDoc `boxed` role on the node, e.g.
+    `[CAUTION,role=boxed]` or `[.x-score-excellent.boxed]`.
+  - **B — per theme**: YAML properties `admonition_boxed: true` /
+    `x_score_boxed: true` — all concerned blocks become boxed without
+    touching the source.
++
+  12 theme properties added (6 admonitions + 6 x-score):
+  `<kind>_boxed`, `<kind>_box_background_color`,
+  `<kind>_box_border_color`, `<kind>_box_border_width`,
+  `<kind>_box_shadow_enabled`, `<kind>_box_shadow_color`,
+  `<kind>_box_shadow_offset`. New private function
+  `render_box_chrome` (shadow + background + border in that order),
+  shared between admonitions and x-score.
++
+  Limitation: no transparency on the shadow (the `pdf` shard does not
+  expose `/CA` in a public API); a pale gray color is used instead.
+
+== v2.3.24.47 — 2026-04-30
+
+=== Added
+
+* **Index: page ranges (`12-15`) instead of flat lists.** The index
+  grouped all the pages of a term via `pages.map(&.to_s).join(", ")`,
+  giving hard-to-read entries like "12, 13, 14, 15, 17, 20, 21".
+  Contiguous sequences are now compressed into ranges: "12-15, 17,
+  20-21". Format matching the upstream Ruby asciidoctor-pdf behavior
+  (`index_pagenum_sequence_style: range`, default).
++
+  New private function `format_page_ranges` that iterates over the
+  sorted list and emits a lone number outside a sequence, a range as
+  soon as 2+ pages are contiguous. Unit tests: `[12,13,14,15]` →
+  "12-15", `[12,13,15,16,17]` → "12-13, 15-17", `[5]` → "5",
+  `[1,3,5,7]` → "1, 3, 5, 7", `[1,2,5,6,7,9,10]` → "1-2, 5-7, 9-10".
+
+== v2.3.24.46 — 2026-04-30
+
+=== Added
+
+* **`[abstract]` block presented distinctly.** The `[abstract]` block
+  was rendered as a generic paragraph, with no visual distinction for
+  what is typically a document's summary or lead-in. It is now detected
+  in `convert_paragraph` via `node.style == "abstract"` and styled:
++
+  * indented (24pt left and right, shorter lines);
+  * italic (forced on segments that are not explicitly italic, without
+    flipping those already italic);
+  * color `#555555` (discreet gray) rather than `base_font_color`;
+  * slightly larger font size (+1pt).
++
+  Inline markup (bold / italic / mono / links) remains preserved in the
+  abstract. Closes the "Abstract block" item of the ROADMAP.
+
+== v2.3.24.45 — 2026-04-30
+
+=== Added
+
+* **`[%collapsible]` blocks flagged with ▾ in the title.** The
+  `[%collapsible]` block has no semantics in PDF (no interactivity),
+  but ignoring its intent would be a waste. Now, when an example block
+  carries the `collapsible` option, its title is prefixed with the ▾
+  glyph to visually signal the "expandable" nature on the HTML side —
+  purely informational in PDF.
++
+  No structural change, just a title prefix, and no external library
+  added: the visual rendering stays consistent with other examples.
+  Closes the "Collapsible blocks" item of the ROADMAP.
+
+== v2.3.24.44 — 2026-04-30
+
+=== Added
+
+* **Placeholders for `audio` / `video` / `stem` / `pass`.** The four
+  dispatchers silently returned `""`: any `audio:[]`, `video:[]`,
+  `stem:[]` or passthrough block vanished from the PDF without a word.
+  Now:
++
+  * **`audio:[url]`**: an "▶ Audio" banner with the source shown; if
+    the source is http(s), a clickable `/URI` annotation is laid down
+    to open the URL;
+  * **`video:[url]`**: same with the "▶ Vidéo" label;
+  * **`stem::[expr]`**: an "∑ Math" banner with the source expression
+    in monospace (no actual math rendering — that would require
+    embedding a MathJax / katex subset, deferred);
+  * **`pass::[html]`**: the raw HTML is stripped via
+    `Sanitizer.sanitize` then rendered as a normal paragraph.
++
+  Uniform rendering (pale gray background + border + colored label)
+  through a shared utility function `render_media_placeholder`, with no
+  external library. Closes the "Audio / video / stem / pass" item of
+  the ROADMAP.
+
+== v2.3.24.43 — 2026-04-30
+
+=== Added
+
+* **`TextTransformer` module (uppercase, smallcaps, capitalize).** Port
+  of upstream `text_transformer.rb` (Ruby asciidoctor-pdf 2.3.24).
+  Three transformations exposed:
++
+  * `TextTransformer.uppercase(s)`: everything uppercased;
+  * `TextTransformer.capitalize_words(s)`: capital on the first letter
+    of each word (`"hello world"` → `"Hello World"`);
+  * `TextTransformer.smallcaps(s)`: small caps via Unicode small-caps
+    characters (`f` → `ғ` and `q` → `ǫ`, better supported by Helvetica
+    / DejaVu than `ꜰ` / `ꞯ`).
++
+  A dispatch function `TextTransformer.apply(s, kind)` routes by name
+  (`"uppercase"` / `"smallcaps"` / `"capitalize"` / other or `nil` =
+  identity). Two theme properties added: `heading_text_transform` (all
+  headings h0-h6, numbered sections included) and
+  `title_page_text_transform` (title-page title and inline doctitle).
+  Closes the "Text transformer" item of the ROADMAP.
+
+== v2.3.24.42 — 2026-04-30
+
+=== Added
+
+* **Internal `Sanitizer` module (`sanitizer.rb` parity).** 1:1 port of
+  upstream `sanitizer.rb` (Ruby asciidoctor-pdf 2.3.24), an internal
+  utility module for the text → PDF pipeline:
++
+  * `Sanitizer.sanitize(s)`: strips XML/HTML tags, resolves entities
+    (named + numeric decimal + hex), collapses whitespace. The
+    converter's naive `gsub(/<[^>]+>/, "")` is replaced by this call
+    (entity coverage raised from ~10 to ~14 named + numeric);
+  * `Sanitizer.escape_xml` / `unescape_xml`: encode / decode the
+    standard XML entities (`<`, `>`, `&`, `"`, `'`);
+  * `Sanitizer.escape_amp`: encodes lone `&` without touching
+    already-valid entities;
+  * `Sanitizer.encode_quotes`: `"` → `&quot;` for injection into an
+    HTML attribute.
++
+  WARNING: this is NOT a security sanitizer (no protection against XSS
+  / CSS injection / hostile HTML). The dedicated security shard is
+  documented in `CRYSTAL-SANITIZER-HTML-SPECS.adoc`. Closes the
+  "Dedicated sanitizer" item of the ROADMAP.
+
+== v2.3.24.41 — 2026-04-29
+
+=== Added
+
+* **Open block — `[.x-box]` role.** The AsciiDoc open block
+  (`-- ... --`) is neutral by design: it groups without typesetting. To
+  make it framed without hijacking `[sidebar]` (`****`) or `[example]`
+  (`====`), which have their own semantics, the `[.x-box]` role is
+  added, turning the open block into a framed panel (background, border,
+  padding, optional title):
++
+  ----
+  [.x-box]
+  .Optional title
+  --
+  Framed content, with *bold*, _italic_, lists, tables… markup.
+  --
+  ----
++
+  Implementation: routes to `render_panel(node, :sidebar)` — same
+  visual rendering as a sidebar, without the "ancillary content"
+  semantics. The `x-` prefix is consistent with the shard's
+  "non-standard extension" convention (cf. `x-score-*`,
+  `x-title-page-toc`). Last item of the "secondary gaps" sprint: all
+  the relevant ROADMAP items are closed.
+
+== v2.3.24.40 — 2026-04-29
+
+=== Added
+
+* **Description list — `qanda` and `horizontal` styles.**
+  `convert_dlist` only handled the default mode (bold term, definition
+  below). Two additional styles, often seen in documentation, are added
+  at parity with Ruby asciidoctor-pdf:
++
+  * **`qanda`**: FAQ style. Each term becomes a numbered question
+    ("Q1.", "Q2."…) in bold, and the sub-blocks become the answers
+    indented under the number;
+  * **`horizontal`**: term on the left in a fixed column (~25 % of the
+    content width), definition on the right; for multi-line
+    definitions, the term stays aligned on the first line.
++
+  Refactor: `convert_dlist` split into three private functions
+  (`render_dlist_default`, `render_dlist_qanda`,
+  `render_dlist_horizontal`), the dispatch reading `node.style`.
+  `horizontal` limitation: sub-blocks other than paragraphs (listings,
+  nested tables) are flattened into inline text.
+
+== v2.3.24.39 — 2026-04-29
+
+=== Added
+
+* **Document-level `pdf-*` attributes (page-size, page-layout).** The
+  converter respected `theme.page_size` / `theme.page_layout` but
+  ignored the eponymous document attributes. The `:pdf-page-size:` and
+  `:pdf-page-layout:` attributes read in `convert_document` now
+  override the theme defaults for the current document (Ruby
+  asciidoctor-pdf parity):
++
+  ----
+  = My poster
+  :pdf-page-size: A3
+  :pdf-page-layout: landscape
+  ----
++
+  Supported sizes (`PAGE_SIZES` table, case-insensitive): A0, A1, A2,
+  A3, A4, A5, A6, B5, Letter, Legal, Tabloid. Size + orientation
+  resolution is extracted into `apply_page_size(size, layout)`, called
+  at converter construction then re-called at the start of
+  `convert_document` when an attribute overrides. Verified: MediaBox
+  `[0 0 1190 841]` for A3 landscape.
+
+== v2.3.24.38 — 2026-04-29
+
+=== Fixed
+
+* **`quote` / `verse` distinguished (markup + pre-wrap + citetitle).**
+  `convert_quote` and `convert_verse` shared `render_indented_block`,
+  which stripped inline markup and did not distinguish the two
+  line-break modes: `*bold*` / `_italic_` disappeared and a poem
+  (verse) lost its visual structure. Refactor:
++
+  * **inline markup preserved**: `InlineRenderer.parse` +
+    `wrap_segments` + `render_segment_line` (same pattern as admonitions
+    / x-score). Italic is forced on segments that are not explicitly
+    italic, without flipping already-italic text;
+  * **pre-wrap for `verse`**: with `kind: :verse`, each `\n` of the
+    source becomes a line break in the PDF (wrap only applies to lines
+    that overflow `content_w`), whereas `kind: :quote` keeps the
+    continuous flow;
+  * **citetitle**: `[quote, Author, Title]` now renders
+    `— Author, Title` as attribution (before: author only).
+
+== v2.3.24.37 — 2026-04-29
+
+=== Fixed
+
+* **Callouts + colist (code annotations).** `convert_inline_callout`
+  and `convert_colist` returned `""`: the classic "code + numbered
+  list of explanations" teaching pattern did not work, the `<1>`, `<2>`
+  annotations disappeared. Implementations:
++
+  * **inline_callout**: produces `<b class="conum">①</b>` (fallback
+    `(N)` beyond 20), via the Unicode enclosed digits U+2460..U+2473,
+    with no icon dependency;
+  * **colist**: iterates the items and renders each as "bold ① marker
+    on the left + indented text on the right", inline markup preserved
+    (`InlineRenderer.parse` + `render_segment_line`).
++
+  Known limitation (deferred): inside a `[source]` block, the code's
+  `<1>`, `<2>` appear as plain text (substitution in the code =
+  integration into the crystal-rouge syntax highlighter pipeline, too
+  invasive here). The post-listing colist remains fully functional.
+
+== v2.3.24.36 — 2026-04-29
+
+=== Added
+
+* **Extended PDF metadata: `keywords` and `creator`.** The converter
+  only set `title`, `author`, `subject` and `producer`. Added the two
+  missing entries for parity with Ruby asciidoctor-pdf and better
+  indexing by search engines / DAMs:
++
+  - `:keywords:` on the AsciiDoc source side — a comma-separated list of
+    keywords (`/Keywords` in the PDF).
+  - `:creator:` on the source side — the name of the application that
+    produced the content, distinct from `producer` (which remains the
+    PDF engine, `crystal-asciidoctor-pdf X.Y.Z`).
++
+  Verified: `strings` on the output PDF shows `/Keywords` and `/Creator`
+  correctly set, encoded in UTF-16BE for accented characters.
+
+=== Note
+
+Two metadata items still await an extension of the `pdf` shard:
+`:lang:` (`/Lang` of the Catalog, not yet exposed by `PDF::Document`)
+and customizable dates (`:revdate:` → `/CreationDate`, for now fixed at
+generation time).
+
+== v2.3.24.35 — 2026-04-29
+
+=== Added
+
+* **Page break: `[%recto]` and `[%verso]` options.** The plain `<<<`
+  always created a new page (which already covers `[%always]`, accepted
+  for Ruby parity without changing behavior). Added the two options
+  useful for printable documents:
++
+  - `[%recto]`: aligns the next content page onto an odd page (recto,
+    right-hand page). If the break lands on an even page, an extra page
+    is generated — the intermediate one stays empty. Typical use:
+    starting each chapter on a recto.
+  - `[%verso]`: symmetric, forces the next page onto an even page
+    (left-hand page of an open book).
++
+  Aligned with Ruby asciidoctor-pdf 2.3.24
+  (`page-break-after-recto` / `-verso`).
+
+== v2.3.24.34 — 2026-04-29
+
+=== Added
+
+* **Tables: `colspan`, `valign` and factoring of `render_table_row`.**
+  First salvo of the ROADMAP's "7 secondary gaps" sprint.
++
+  - `colspan`: the cell occupies N columns from the current position;
+    its effective width sums the consecutive `col_widths`. Bounded to
+    the number of remaining columns to avoid overflow.
+  - `valign`: `top` (default) / `middle` / `bottom` — vertical
+    positioning of the text block within the row per the spec.
+  - Factoring: the three sections (head / body / foot) each had their own
+    copy-pasted render loop; refactored into a shared `render_table_row`
+    — fewer lines, consistent behavior.
++
+  Known limitations: `rowspan` is read but not materialized visually
+  (the cell occupies a single row), and `autofit` (auto widths from
+  content) is not implemented — only explicit `colpcwidth` or the
+  default uniform distribution.
+
+=== Dependency
+
+* `crystal-asciidoctor` ~> 2.0.26.2 (parser fix on `CellSpecEndRx` to
+  recognize multi-line specs `3+|`).
+
+== v2.3.24.33 — 2026-04-29
+
+=== Added
+
+* **Recto-verso header / footer.** The shard only had a single set of
+  header/footer templates; added Ruby asciidoctor-pdf's recto-verso
+  convention: overriding the three zones (left/center/right) according
+  to the page parity.
++
+  12 new theme properties (all empty by default, so no change for
+  existing documents): `header_recto_left/center/right`,
+  `header_verso_left/center/right` and their `footer_*` equivalents.
++
+  For each page, `header_templates_for` / `footer_templates_for`
+  selects the recto variant (odd number) or verso variant (even
+  number); if it is non-empty, it overrides the neutral default.
+
+=== Note
+
+Closes the last 🟠 of the ROADMAP (parity with "section_info_by_page":
+the `{section_title}` variable was already populated, only the
+recto/verso routing was missing). All priority items (🔴 + 🟠) of the
+sprint are closed.
+
+== v2.3.24.32 — 2026-04-29
+
+=== Added
+
+* **Chapter break `heading_chapter_break_before`.** Theme property
+  (default `0`): when `> 0`, triggers an automatic page break before any
+  heading of level ≤ value. "Book" mode: set to `1` so that an H1 always
+  starts on a new page. The rule skips already-blank pages so as not to
+  create two blank pages.
+
+* **Roman numbering of the front matter
+  (`:pdf-front-matter-numbering: roman`).** Distinct numbering of the
+  front-matter pages (title page + TOC) in roman numerals "i, ii, iii…"
+  then the body in arabic "1, 2, 3…", each counter restarting from 1.
++
+  - `PageMeta` becomes a class (instead of a record) with a mutable
+    `displayed_number` field and three `numbering` styles: `:none` (no
+    footer, e.g. title page), `:roman`, `:arabic`.
+  - New `assign_displayed_numbers` function walking `@page_metas` after
+    rendering to assign the right number per style.
+  - New module `AsciidoctorPDF::RomanNumeral` (port of
+    `roman_numeral.rb`) for the integer → "i, ii, iii…" conversion.
+  - `resolve_page_vars` translates `{page_number}` via
+    `format_page_number(meta)`; a `{page_number_pdf}` variable is
+    exposed for the raw PDF index. `render_toc` points to the logical
+    number ("1") rather than the PDF index ("3"). `render_title_page`
+    marks the title page `numbering: :none` so that arabic starts at 1.
+
+* `h0_font_size` and `heading_chapter_break_before` are also exposed in
+  the YAML loader (parsed as `Float64` / `Int32`).
+
+== v2.3.24.31 — 2026-04-29
+
+=== Added
+
+* **Visual framing of sidebar and example blocks.** `convert_sidebar`
+  and `convert_example` iterated their sub-blocks without any visual
+  rendering — these blocks were invisible (plain paragraphs in the
+  flow). Closes a 🔴 of the ROADMAP.
++
+  - New private method `render_panel(node, kind)` shared by sidebar and
+    example: draws background + border ahead of time (based on
+    `estimate_block_height`) then the content on top, so the text isn't
+    masked.
+  - Optional title (`.My title`) rendered in bold above the content.
+  - Internal indentation via temporary `@margin` / `@content_width`,
+    restored after iteration so as not to pollute the global state.
+  - Page-break pre-flight if the block fits on a full page but not in
+    the remaining space (parity with `[%unbreakable]`).
+  - 16 new theme properties: `sidebar_background_color`,
+    `sidebar_border_color/width`, `sidebar_padding`,
+    `sidebar_margin_top/bottom`, `sidebar_title_font_color/size` and
+    their `example_*` equivalents.
++
+  Known limitation: for a block whose real height noticeably exceeds the
+  estimate, the background may be a bit too short — acceptable for short
+  sidebars/examples.
+
+== v2.3.24.30 — 2026-04-29
+
+=== Added
+
+* **Inline images and icons (`image:path[]`, `icon:name[]`).**
+  `convert_inline_image` returned `""` — any `image:logo.png[]` or
+  `icon:warning[]` macro was silently erased. Closes a 🔴 of the
+  ROADMAP.
++
+  - `InlineSegment` gains `image_path`, `image_width`, `image_height`;
+    an image segment is treated as atomic at wrap (no split per word)
+    and at render time.
+  - `render_segment_line` routes to `render_inline_image`, which
+    dispatches on the extension: `.svg` → `page.svg` (viewBox, ratio
+    preserved), otherwise → `page.image` (`PDF::Images::Image.load`). On
+    error (file not found, SVG parse), fallback to the alt-text — no
+    crash.
+  - `InlineRenderer.parse_html` recognizes self-closing tags
+    `<img src="…" width="…" height="…" alt="…"/>`.
+  - The wrap respects the image width (no horizontal overflow).
++
+  `icon:name[]`: text fallback `[<name>]` for now (a real embedded icon
+  library is reserved for a future iteration). Limitation: an image
+  taller than the line overflows onto the next one; for full-width
+  photos, keep the standalone `image::…[]` macro.
+
+== v2.3.24.29 — 2026-04-29
+
+=== Added
+
+* **Extended inline quoted: `sub`, `sup`, `mark`, `kbd`, `btn`,
+  `menu`.** `convert_inline_quoted`, `convert_inline_button`,
+  `convert_inline_kbd` and `convert_inline_menu` returned `""` — all
+  technical formatting (`H~2~O`, `E=mc^2^`, `#mark#`, `kbd:[Ctrl+C]`,
+  `btn:[OK]`, `menu:…` paths) disappeared at conversion. Closes a 🔴 of
+  the ROADMAP.
++
+  - Dispatchers added to the converter, producing the Ruby-parity inline
+    HTML: `<sub>`, `<sup>`, `<mark>`, `<kbd>`, `<span class="keyseq">`,
+    `<b class="button">`, `<span class="menuseq">`, `<b
+    class="menu|menuitem|caret">`.
+  - `InlineSegment` gains 6 flags (`sup`, `sub`, `mark`, `kbd`,
+    `button`, `menu`), each with its own typographic rendering: sup/sub
+    in offset 75% font, `mark` on a pastel yellow background (`#fff59d`),
+    `kbd` in a pale gray bordered box (`#cccccc`) at 90%, `button` in a
+    solid gray box (`#e0e0e0`), `menu` inheriting the bold.
+  - `InlineRenderer.parse_html` extended: recognizes `<sub>`, `<sup>`,
+    `<mark>`, `<kbd>` and distinguishes the `<b class="…">` (button /
+    menu / generic bold). Additional HTML entities decoded: `&#8249;`,
+    `&#8250;`, `&hellip;`, `&laquo;`, `&raquo;`, `&mdash;`, `&ndash;`.
+
+* **Latent inline-wrap fix.** `render_inline_lines` re-created
+  `InlineSegment` during the wrap but only propagated
+  bold/italic/mono/color/link — losing sup/sub/mark/etc. Refactored to
+  reuse `wrap_segments`, which clones faithfully.
+
+== v2.3.24.28 — 2026-04-29
+
+=== Fixed
+
+* **Inline markup preserved in admonitions and x-score blocks.**
+  `convert_admonition` and `render_x_score_block` called
+  `strip_inline_markup`, which erased the inline HTML generated by
+  crystal-asciidoctor (bold, italic, mono, color, link):
+  `*Quizz non validé*` rendered as plain text.
++
+  - New private function `wrap_segments(segments, width, font_size)`
+    that splits a stream of `InlineSegment` into lines according to
+    width, preserving style attributes (where `wrap_text` works on plain
+    text).
+  - `convert_admonition` now parses `node.content` via
+    `InlineRenderer.parse`, wraps via `wrap_segments`, renders via
+    `render_segment_line` line by line.
+  - `render_x_score_block` gets the same treatment (same visual
+    structure, same fix).
++
+  Result: `*bold*`, `_italic_`, `` `mono` `` render correctly in
+  admonitions and score blocks.
+
+== v2.3.24.27 — 2026-04-29
+
+=== Changed
+
+* **`x-score-*` labels in English by default.** The default theme now
+  follows the "English default, overrides via embedded theme" convention
+  of the rest of the shard (NOTE / TIP / WARNING / CAUTION / IMPORTANT).
+  Before, the `x-score-*` labels were mixed (EXCELLENT in English but
+  TRÈS BIEN, INSUFFISANT, À REVOIR in French) — the default theme served
+  French that wasn't requested.
++
+  Mapping: `excellent` → EXCELLENT (unchanged), `tres-bien` → VERY GOOD,
+  `bien` → GOOD, `insuffisant` → INSUFFICIENT, `a-revoir` → NEEDS
+  REVIEW. The embedded `fr` theme (`themes/fr.yml`) overrides these five
+  labels with their French equivalents.
+
+=== Note
+
+The **level identifiers** in the AsciiDoc role stay in French
+(`[.x-score-tres-bien]`, etc.): they are technical identifiers carved
+into the syntax, left unchanged so as not to break existing sources.
+
+== v2.3.24.26 — 2026-04-29
+
+=== Added (built-in `fr` theme + `[.x-score-*]` score blocks)
+
+Two related features: a French theme shipped with the shard, and five
+reusable colored score levels for quiz grading scales.
+
+* **Built-in themes via `ThemeLoader.builtin(name)`.** The YAML is inlined
+  into the binary at compile time (`{{ read_file(...) }}`) — no runtime file
+  dependency. First theme shipped: `fr` (aliases `francais`, `french`).
++
+Three selection channels, in decreasing priority CLI > document attribute >
+built-in default:
++
+- CLI: `--theme fr` (also accepts a YAML path, via `ThemeLoader.resolve`).
+- AsciiDoc source: `:pdf-theme: fr` in the header.
+- Crystal API: `ThemeLoader.builtin("fr")`.
++
+The `fr` theme translates the admonitions (NOTE / ASTUCE / AVERTISSEMENT /
+ATTENTION / IMPORTANT), the `toc_title` (« Table des matières ») and the
+`index_title` (« Index »).
+
+* **Score blocks `[.x-score-<level>]`** (extension): five predefined
+  qualitative levels for quiz grading scales and evaluation sheets, enabled
+  via the AsciiDoc role on an example (`====`) or open (`--`) block:
++
+- `excellent` (dark green, EXCELLENT)
+- `tres-bien` (light green, TRÈS BIEN)
+- `bien` (yellow, BIEN)
+- `insuffisant` (orange, INSUFFISANT)
+- `a-revoir` (red, À REVOIR)
++
+Colors and labels are configurable through the YAML theme
+(`x_score_<level>_color/label`). Rendered like admonitions: colored vertical
+band + bold label + indented text. The `x-` prefix follows the shard's
+"non-standard extension" convention, with no equivalent in AsciiDoc / Ruby
+asciidoctor-pdf.
+
+== v2.3.24.25 — 2026-04-29
+
+=== Added (admonition label translation, Ruby parity)
+
+* **Admonition labels (NOTE / TIP / WARNING / CAUTION / IMPORTANT) are now
+  resolved through a cascade** instead of being hard-coded as `name.upcase`,
+  allowing translation without patching the code. Resolution order:
++
+0. AsciiDoc attribute `:<name>-caption:` (when it differs from the title-case
+   default injected by crystal-asciidoctor).
+0. Theme property `admonition_<name>_label`.
+0. Ultimate fallback: `name.upcase`.
+
+* Five new theme properties with English defaults for Ruby asciidoctor-pdf
+  parity: `admonition_note_label`, `admonition_tip_label`,
+  `admonition_warning_label`, `admonition_caution_label`,
+  `admonition_important_label`.
++
+To translate a quiz into French, override via the attributes `:note-caption:`,
+`:tip-caption: ASTUCE`, `:warning-caption: AVERTISSEMENT`,
+`:caution-caption: ATTENTION`, `:important-caption: IMPORTANT`.
+
+* Implementation note: crystal-asciidoctor injects document-level title-case
+  defaults (`Warning`, `Caution`, …) for HTML rendering. The cascade detects
+  and ignores them, otherwise the theme would be short-circuited in every doc
+  without a user override.
+
+== v2.3.24.24 — 2026-04-29
+
+=== Added (documentation: recipes and attribute conventions)
+
+* The `README.adoc` now explains the three document templates produced:
++
+- Quiz / short sheet with a compact title page (logo + title + integrated
+  contents on a single page).
+- Short document with no title page — header banner with logo, title,
+  author · date byline.
+- Long document with title page + separate TOC (default).
+
+* Also documents the `:title-logo-image:` format (`image::PATH[opts]`, with
+  `align`, `pdfwidth`, `alt` options), the pitfall of the `image::PATH[]`
+  macro placed before `= Doctitle` which demotes the title to a level-0
+  section ("part"), and the `x-` convention for non-standard attributes /
+  properties (including the `:x-title-page-toc:` extension).
+
+== v2.3.24.23 — 2026-04-29
+
+=== Changed (`x-` prefix for extensions, full inline doctitle)
+
+* **`x-` prefix (non-standard extension).** Renamed to signal the feature's
+  non-standard nature (convention inherited from `X-*` in HTTP/MIME):
+  `:title-page-toc:` → `:x-title-page-toc:` and `theme.title_page_with_toc`
+  → `theme.x_title_page_with_toc`. The README documents the convention: any
+  `x-`-prefixed attribute is a shard-specific extension with no native
+  equivalent in AsciiDoc / Ruby asciidoctor-pdf.
+
+* **`heading_font_size(0)` returned `h6_font_size` (10pt).** When the doctitle
+  ended up demoted to a level-0 section (AsciiDoc "part", typical of a source
+  where an `image::` precedes the `=`), `heading_font_size` fell into the
+  `else` branch and applied the smallest size, hence tiny titles. Fix: new
+  `h0_font_size: 26.0` property and level-0 handling in `heading_font_size`,
+  `heading_margin_top` and `heading_margin_bottom`.
+
+* **Full `render_inline_doctitle`.** When `:title-page: false` disables the
+  title page, the doctitle is now rendered at full size (28pt, like the
+  standard cover title) and preceded by the `:title-logo-image:` logo if set
+  (centered logo, 28pt bold title, author · revdate byline in gray, separator,
+  content). Preferable to the `image::...[]` hack placed before the `=`, which
+  demotes the doctitle to a level-0 section.
+
+== v2.3.24.22 — 2026-04-29
+
+=== Added (`[%unbreakable]` option on open blocks)
+
+* **Prevents a group from being split by a page break** (e.g. text orphaned
+  from its table). Standard AsciiDoc syntax `[%unbreakable]` on an open block
+  (`-- ... --`).
++
+Implementation in `convert_open`:
++
+0. When `node.option?("unbreakable")` is true, the block's cumulative height
+   is estimated before rendering via `estimate_block_height` (paragraphs,
+   tables, lists, listings, admonitions, images, nested opens).
+0. If remaining space is insufficient but the block fits on a full page,
+   `new_page` before starting.
+0. If the block exceeds a full page, fall back to normal pagination ("if
+   possible" from the standard).
++
+The estimate is deliberately pessimistic. Current limitation: only *open
+blocks* carry the option; not yet supported on sidebar / example / quote.
+
+== v2.3.24.21 — 2026-04-29
+
+=== Added (`:title-page: false` + `:title-page-toc:` docs)
+
+Two complementary additions to 2.3.24.20.
+
+* **Title page disabling** (Ruby asciidoctor-pdf parity). The shard ignored
+  the `:title-page:` attribute until now. Henceforth:
++
+- `:title-page:` ⇒ title page forced.
+- `:title-page: false` ⇒ no title page (functional equivalent of the standard
+  `:!title-page:`, undetectable on the crystal-asciidoctor side since the
+  negation leaves no trace in `attr?` / `attr`).
+- absent ⇒ theme default (`title_page_enabled`, `true` by default, unchanged
+  behavior).
+
+* **Doctitle at the top of page 1** when there is no title page (standard
+  AsciiDoc `article` mode): the doctitle becomes an H1 at the top of the first
+  content page, followed by an "author · date" byline in gray, a separator,
+  then the preamble. Implemented via `render_inline_doctitle`.
+
+* The README documents the title page and marks `:title-page-toc:` as a
+  crystal-asciidoctor-pdf-specific extension, with no native equivalent.
+
+== v2.3.24.20 — 2026-04-29
+
+=== Added (SVG, `:title-logo-image:`, `:title-page-toc:`)
+
+Three additions related to title-page layout and vector images.
+
+* **Routing `.svg` images to `page.svg`** (`convert_image`).
+  `PDF::Images::Image.load` only reads bitmaps (PNG/JPG); for `.svg` files,
+  the text content is read and passed to `page.svg(...)` (the pdf shard's
+  native SVG renderer, which turns SVG elements into PDF primitives). The
+  aspect ratio is preserved even when only `width` is specified.
+
+* **`:title-logo-image:`** (Ruby asciidoctor-pdf 2.3.24 parity).
+  `render_title_page` never read this attribute, hence the missing cover logo
+  compared to upstream. Format accepted identically:
+  `:title-logo-image: image::path/logo.svg[align=center,pdfwidth=200]`. The
+  logo is placed at the top of the cover, without affecting the title position
+  (centered-low).
+
+* **`:title-page-toc:` / `theme.title_page_with_toc`.** New title-page mode:
+  title at the top (not centered), separator, integrated contents (title +
+  entries with leaders and page numbers), author + date at the bottom.
+  Enabled per-document via the attribute or by default via the theme property.
+  `render_title_page` routes between `render_title_page_standard` (existing)
+  and `render_title_page_with_toc` (new); in cover-TOC mode no separate TOC
+  page is allocated — the TOC is drawn in post-processing from the memorized
+  Y. `render_toc` gains two optional parameters: `y_start` (starting Y) and
+  `render_title : Bool` (lets the caller draw the "Contents" title itself).
+
+== v2.3.24.19 — 2026-04-29
+
+=== Added (title page without header / footer / footnotes)
+
+* **Typographic convention: the title page is "bare".** No header line, no
+  page number, no footnotes.
++
+Implementation:
++
+- `PageMeta` gains a `chrome : Bool = true` field. When `chrome = false`,
+  `render_headers_footers` skips the page (header, footer AND footnotes).
+- `new_page` accepts an optional `chrome` argument that propagates the flag
+  into the created `PageMeta`.
+- `render_title_page` calls `new_page(chrome: false)` to mark the cover.
++
+Consistent side effect: content starts on numbered page 2, the cover not
+being counted in the footer since it carries none.
+
+== v2.3.24.18 — 2026-04-29
+
+=== Fixed (title-page isolation when TOC is inactive)
+
+* **Content collided with the cover title when `:toc:` was absent.**
+  `render_title_page` draws the title at mid-height (`title_y =
+  page_height * 0.55`). With TOC active, two `new_page` calls then isolated
+  the content; but without `:toc:` (typical of quizzes, job sheets, short
+  memos), no new page was created and content started at the top of the cover,
+  overlapping the title.
++
+Fix: trigger a `new_page` after the title page whenever no TOC already does
+it for us. Result: page 1 = isolated cover, page 2+ = content.
+
+== v2.3.24.17 — 2026-04-29
+
+=== Changed (requires by shard name + `flags` → `country-flags`)
+
+* **Migration to short requires by shard name.** The
+  `require "<shard>/src/<file>"` requires only work while the shard name and
+  the file name match; with the renaming cascade (`CrystalX` → `X`) and the
+  `src/<shard>.cr` entry-point convention, these explicit paths broke in CI.
+  New requires:
++
+- `pdf/src/pdf` → `pdf`
+- `flags/src/crystal_flags` → `country-flags`
+- `emojis/src/crystal_emojis` → `emojis`
+- `noto-cjk/src/crystal_noto_cjk` → `noto-cjk`
+- `crystal-asciidoctor/src/crystal-asciidoctor` → `crystal-asciidoctor`
+
+* Renamed the `flags` dependency to `country-flags` (`~> 0.1.4`) following the
+  `aloli-crystal/country-flags` repo. Client module updated: `Flags.svg` →
+  `CountryFlags.svg` at both call sites.
+
 == v2.3.24.16 — 2026-04-29
 
 === Changed
