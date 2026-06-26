@@ -1,3 +1,22 @@
+== v2.3.24.103 — 2026-06-26
+
+=== Corrigé (tableaux : duplication de rangées)
+
+* **Un tableau dont une cellule se termine par un gras à nombre
+  (`*Phase 5.2 6.0*`) voyait ses rangées se DUPLIQUER et son contenu
+  déversé dans les MAUVAISES COLONNES** (« propre au début, puis ça se
+  gâte » — 21 rangées au lieu de 10 sur un plan de migration réel).
++
+  Cause : un bug du parser `crystal-asciidoctor`. `parse_cellspec(:end)`
+  prenait le `6.0*` final pour le multiplicateur de cell-spec
+  « répéter 6× » (`N*|`), corrompant tout le découpage en cellules.
+  Corrigé dans `crystal-asciidoctor` ~> 2.0.26.10 : le spec de fin n'est
+  plus cherché que sur la DERNIÈRE ligne du fragment. Le vrai
+  multiplicateur `N*|` mono-ligne continue de fonctionner.
++
+  Bump de dépendance (`crystal-asciidoctor` ~> 2.0.26.10) + 1 spec
+  d'intégration anti-duplication.
+
 == v2.3.24.102 — 2026-06-25
 
 === Corrigé

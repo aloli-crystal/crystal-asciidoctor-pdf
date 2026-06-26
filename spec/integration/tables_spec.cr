@@ -115,4 +115,29 @@ describe "Tables" do
     (text.split("ZHEADERZ").size - 1).should be >= 2
     File.delete(pdf)
   end
+
+  it "does not duplicate rows when a bold cell ends with a number" do
+    # Régression (parser crystal-asciidoctor ~> 2.0.26.10) : une cellule
+    # finissant par un gras à nombre, p.ex. `*Phase 5.2 6.0*`, voyait son
+    # `6.0*` final pris pour le multiplicateur de cellule « répéter 6× »,
+    # ce qui dupliquait les rangées et déversait le texte dans les
+    # mauvaises colonnes (« propre au début, puis ça se gâte »).
+    pdf = IntegrationHelper.convert(<<-ADOC)
+      = Test
+
+      [cols="1,4"]
+      |===
+      | *Phase 5.2 6.0*
+      | ZALPHAZ contenu unique.
+
+      | *Phase 6.0 6.1*
+      | ZBETAZ contenu unique.
+      |===
+      ADOC
+    text = IntegrationHelper.text(pdf)
+    # Chaque description n'apparaît qu'UNE fois (pas de duplication).
+    (text.split("ZALPHAZ").size - 1).should eq(1)
+    (text.split("ZBETAZ").size - 1).should eq(1)
+    File.delete(pdf)
+  end
 end

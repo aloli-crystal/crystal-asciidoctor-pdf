@@ -3,6 +3,25 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.103 — 2026-06-26
+
+=== Fixed (tables: row duplication)
+
+* **A table whose cell ended in a bold-with-number (`*Phase 5.2 6.0*`)
+  had its rows DUPLICATED and its content spilled into the WRONG
+  COLUMNS** ("clean at first, then it falls apart" — 21 rows instead of
+  10 on a real migration plan).
++
+  Cause: a `crystal-asciidoctor` parser bug. `parse_cellspec(:end)`
+  mistook the trailing `6.0*` for the cell-spec repeat multiplier
+  ("repeat 6×", `N*|`), corrupting the whole cell splitting. Fixed in
+  `crystal-asciidoctor` ~> 2.0.26.10: the end-spec is now only searched
+  on the LAST line of the fragment. The real single-line `N*|`
+  multiplier keeps working.
++
+  Dependency bump (`crystal-asciidoctor` ~> 2.0.26.10) + 1
+  anti-duplication integration spec.
+
 == v2.3.24.102 — 2026-06-25
 
 === Fixed
