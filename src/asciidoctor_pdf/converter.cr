@@ -1887,15 +1887,28 @@ module AsciidoctorPDF
                       else               @current_y - padding
                       end
 
+        last_li = lines.size - 1
         lines.each_with_index do |line, li|
-          lw = measure_segment_line(line, font_size)
-          tx = case halign
-               when "center" then x + (cw - lw) / 2
-               when "right"  then x + cw - lw - padding
-               else               x + padding
-               end
           ty = block_top_y - font_size - (li * line_h)
-          render_segment_line(page, line, tx, ty, font_size)
+          if halign == "center" || halign == "right"
+            # Centré / à droite : mesure + décalage, jamais justifié.
+            lw = measure_segment_line(line, font_size)
+            tx = halign == "center" ? x + (cw - lw) / 2 : x + cw - lw - padding
+            render_segment_line(page, line, tx, ty, font_size)
+          else
+            # Aligné à gauche (défaut) : on JUSTIFIE les lignes
+            # non-finales à la largeur interne de la cellule, comme un
+            # paragraphe (la dernière ligne reste à gauche). On suit le
+            # défaut du thème via `base_text_align` : en thème « left »
+            # rien n'est étiré ; en « justify » un paragraphe de cellule
+            # multi-lignes va jusqu'au bord droit de la colonne — même
+            # traitement que les paragraphes hors tableau. Le garde-fou
+            # `max_extra_factor` de `render_segment_line` évite les
+            # lignes sur-étirées (colonne étroite).
+            line_align = li == last_li ? "left" : @theme.base_text_align
+            render_segment_line(page, line, x + padding, ty, font_size,
+              target_w: cw - 2 * padding, align: line_align)
+          end
         end
 
         # Lien cliquable : le rendu de cellule affiche du texte brut

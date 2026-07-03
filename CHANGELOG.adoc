@@ -3,6 +3,22 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.105 — 2026-07-04
+
+=== Fixed (justification of cell paragraphs)
+
+* **Multi-line paragraphs inside a table cell are now justified like
+  paragraphs outside tables**, when the theme requests it by default
+  (`base_text_align: justify`). Cells were previously rendered
+  left-aligned regardless of the theme setting.
++
+  `render_table_row` justifies the NON-LAST lines of `halign=left`
+  (default) cells to the column's inner width — the last line stays
+  left-aligned, exactly like a paragraph. `halign=center|right` cells
+  stay aligned (never justified). `render_segment_line`'s
+  `max_extra_factor` guard prevents over-stretching in a narrow column.
+  1 integration spec.
+
 == v2.3.24.104 — 2026-06-26
 
 === Fixed (long codespans in a narrow cell)

@@ -1,3 +1,20 @@
+== v2.3.24.105 — 2026-07-04
+
+=== Corrigé (justification des paragraphes en cellule)
+
+* **Les paragraphes multi-lignes dans une cellule de tableau sont
+  désormais justifiés comme les paragraphes hors tableau**, quand le
+  thème le demande par défaut (`base_text_align: justify`). Avant, les
+  cellules étaient rendues alignées à gauche quel que soit le réglage
+  du thème.
++
+  `render_table_row` justifie les lignes NON FINALES des cellules
+  `halign=left` (défaut) à la largeur interne de la colonne — la
+  dernière ligne reste à gauche, exactement comme un paragraphe. Les
+  cellules `halign=center|right` restent alignées (jamais justifiées).
+  Le garde-fou `max_extra_factor` de `render_segment_line` évite le
+  sur-étirement en colonne étroite. 1 spec d'intégration.
+
 == v2.3.24.104 — 2026-06-26
 
 === Corrigé (codespans longs en cellule étroite)

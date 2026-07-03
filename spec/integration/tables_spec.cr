@@ -140,4 +140,21 @@ describe "Tables" do
     (text.split("ZBETAZ").size - 1).should eq(1)
     File.delete(pdf)
   end
+
+  it "renders a multi-line justified cell paragraph without losing content" do
+    # Un paragraphe dans une cellule est désormais justifié comme hors
+    # tableau (défaut du thème `justify`) : les lignes non-finales
+    # atteignent le bord droit de la colonne (vérifié visuellement). On
+    # garde ici que le chemin de rendu justifié d'une cellule
+    # multi-lignes ne perd aucun contenu et ne plante pas.
+    long = "Un paragraphe de cellule suffisamment long pour occuper " \
+           "plusieurs lignes dans la colonne et exercer la justification " \
+           "des lignes non finales."
+    pdf = IntegrationHelper.convert("= Test\n\n[cols=\"1,3\"]\n|===\n| Cle\n| #{long}\n|===\n")
+    text = IntegrationHelper.text(pdf)
+    text.should contain("justification")
+    text.should contain("colonne")
+    text.should contain("finales")
+    File.delete(pdf)
+  end
 end
