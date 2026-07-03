@@ -44,14 +44,26 @@ module AsciidoctorPDF
     CLINGING_CHARS = ".,;:!?)]}»'  "
 
     # Caractères « charnières » des codespans inline (segments
-    # `mono`) qui autorisent une coupure douce : `/`, `-`, `=`,
-    # `,`. Sont insérées des Penalty non-flagged à coût élevé
-    # (`CODESPAN_BREAK_COST`) après chaque occurrence — coût
-    # élevé pour décourager la coupure si une autre est possible,
-    # mais non infini pour permettre la coupure d'une longue
-    # commande type `beryl scan aloli/9783... --provider=…`
-    # plutôt que de la laisser déborder de la marge.
-    CODESPAN_HINGE_CHARS = "/-=,"
+    # `mono`) qui autorisent une coupure douce : séparateurs de
+    # chemins/commandes (`/`, `-`, `=`, `,`) ET séparateurs
+    # d'identifiants de code (`_`, `(`). Sont insérées des
+    # Penalty non-flagged à coût élevé (`CODESPAN_BREAK_COST`)
+    # après chaque occurrence — coût élevé pour décourager la
+    # coupure si une autre est possible, mais non infini pour
+    # permettre la coupure d'une longue commande type
+    # `beryl scan aloli/9783... --provider=…` OU d'un long
+    # identifiant type `Moving.platform_server(plat, zone)`
+    # (méthode Crystal/Ruby dans une cellule étroite) plutôt que
+    # de la laisser déborder de la marge / de la colonne.
+    # Les points de coupure sont POTENTIELS : un codespan court
+    # qui tient n'est jamais coupé.
+    #
+    # `.` est VOLONTAIREMENT exclu : casser sur le point rendait
+    # orphelin le point de phrase qui suit un codespan finissant
+    # par `.` (`… `foo.bar`.` → `.` seul en début de ligne). `_`
+    # et `(` suffisent aux identifiants (`branch_for(plat)` se
+    # coupe en `branch_` / `for(` / `plat)`).
+    CODESPAN_HINGE_CHARS = "/-=,_("
     CODESPAN_BREAK_COST  = 200.0
 
     # Découpe un word de codespan APRÈS chaque caractère charnière.

@@ -1,3 +1,22 @@
+== v2.3.24.104 — 2026-06-26
+
+=== Corrigé (codespans longs en cellule étroite)
+
+* **Un codespan plus large que sa colonne
+  (`Moving.platform_server(plat, zone)`) DÉBORDAIT sur la colonne
+  voisine au lieu de se replier.** La coupure douce des codespans ne
+  connaissait que les charnières de chemins/commandes (`/ - = ,`) ; un
+  identifiant de code Crystal/Ruby (points, underscores, parenthèses)
+  n'offrait aucun point de coupure.
++
+  On ajoute `_` et `(` aux charnières (`CODESPAN_HINGE_CHARS`) :
+  `branch_for(plat)` se replie en `branch_` / `for(` / `plat)`. Le `.`
+  est VOLONTAIREMENT exclu (il orphelinait le point de phrase qui suit
+  un codespan finissant par `.`). Les points de coupure sont
+  POTENTIELS : un codespan court n'est jamais coupé.
++
+  2 specs composer ; beryl toujours 0 anomalie.
+
 == v2.3.24.103 — 2026-06-26
 
 === Corrigé (tableaux : duplication de rangées)

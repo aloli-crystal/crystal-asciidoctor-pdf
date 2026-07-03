@@ -3,6 +3,24 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.104 — 2026-06-26
+
+=== Fixed (long codespans in a narrow cell)
+
+* **A codespan wider than its column
+  (`Moving.platform_server(plat, zone)`) OVERFLOWED into the
+  neighboring column instead of wrapping.** The codespan soft-break only
+  knew path/command hinges (`/ - = ,`); a Crystal/Ruby code identifier
+  (dots, underscores, parentheses) had no break point.
++
+  `_` and `(` are added to the hinges (`CODESPAN_HINGE_CHARS`):
+  `branch_for(plat)` wraps as `branch_` / `for(` / `plat)`. `.` is
+  DELIBERATELY excluded (it orphaned the sentence period following a
+  codespan ending in `.`). Break points are POTENTIAL: a short codespan
+  is never split.
++
+  2 composer specs; beryl still 0 anomaly.
+
 == v2.3.24.103 — 2026-06-26
 
 === Fixed (tables: row duplication)
