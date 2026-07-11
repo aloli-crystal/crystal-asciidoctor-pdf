@@ -3,6 +3,19 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.106 — 2026-07-04
+
+=== Added (open the PDF after generation)
+
+* **New `-O` / `--open` flag: opens the generated PDF in the system's
+  default viewer** (macOS: Preview via `open`; Linux: `xdg-open`). In
+  multi-file mode, opens every produced PDF. The open is detached
+  (non-blocking) and a missing viewer does not abort the conversion.
+
+* **`open: true` config option** (`config.yml`) to enable it by default
+  without re-typing `-O`. The flag and the config are additive (either
+  triggers it). Ignored with `--no-user-config`. 2 unit specs.
+
 == v2.3.24.105 — 2026-07-04
 
 === Fixed (justification of cell paragraphs)

@@ -1,3 +1,17 @@
+== v2.3.24.106 — 2026-07-04
+
+=== Ajouté (ouverture du PDF après génération)
+
+* **Nouveau flag `-O` / `--open` : ouvre le PDF généré dans le lecteur
+  par défaut du système** (macOS : Aperçu via `open` ; Linux :
+  `xdg-open`). En mode multi-fichiers, ouvre chaque PDF produit.
+  L'ouverture est détachée (non bloquante) et un lecteur absent
+  n'interrompt pas la conversion.
+
+* **Option de config `open: true`** (`config.yml`) pour l'activer par
+  défaut sans retaper `-O`. Le flag et la config sont additifs (l'un
+  suffit). Ignorée avec `--no-user-config`. 2 specs unitaires.
+
 == v2.3.24.105 — 2026-07-04
 
 === Corrigé (justification des paragraphes en cellule)

@@ -71,6 +71,13 @@ module AsciidoctorPDF
     @[YAML::Field(key: "organization")]
     getter organization : String? = nil
 
+    # Ouvrir automatiquement le PDF généré dans le lecteur par défaut
+    # (équivaut à passer `--open` à chaque conversion). `false` par
+    # défaut. Le flag CLI `-O`/`--open` reste toujours disponible et
+    # additif (l'un OU l'autre déclenche l'ouverture).
+    @[YAML::Field(key: "open")]
+    getter open : Bool = false
+
     # Répertoire où vit la configuration courante (issu de
     # `UserConfig.find_dir`, ou `nil` si aucun n'a été trouvé).
     # Sert à résoudre les thèmes utilisateurs (sous `themes/`).

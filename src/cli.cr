@@ -15,6 +15,7 @@ output_file = ""
 theme_file = ""
 sample_mode = false
 no_user_config = false
+open_after = false
 attributes = {} of String => String
 
 OptionParser.parse do |parser|
@@ -26,6 +27,7 @@ OptionParser.parse do |parser|
     attributes[parts[0]] = parts.size > 1 ? parts[1] : ""
   end
   parser.on("-N", "--no-user-config", "Ignorer la configuration utilisateur (#{AsciidoctorPDF::UserConfig.expected_dir}/config.yml)") { no_user_config = true }
+  parser.on("-O", "--open", "Ouvrir le PDF généré dans le lecteur par défaut (macOS : Aperçu)") { open_after = true }
   parser.on("--sample", "Générer le document de référence (reference.adoc + PDF)") { sample_mode = true }
   parser.on("-h", "--help", "Afficher l'aide") { puts parser; exit 0 }
   parser.on("-v", "--version", "Afficher la version") { puts "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"; exit 0 }
@@ -35,6 +37,10 @@ end
 # Chargement de la configuration utilisateur (XDG).
 # Court-circuité par `--no-user-config`.
 user_config = no_user_config ? AsciidoctorPDF::UserConfig.empty : AsciidoctorPDF::UserConfig.load
+
+# L'ouverture auto peut être demandée par le flag `-O`/`--open` OU par
+# `open: true` dans la config utilisateur (additif : l'un suffit).
+open_after ||= user_config.open
 
 if sample_mode
   # Le fichier de référence est dans crystal-asciidoctor (le shard cœur)
@@ -136,6 +142,30 @@ input_files.each do |input_file|
     converter.convert(doc)
 
     puts "PDF généré : #{out_file}"
+
+    # `--open` : ouvrir le PDF dans le lecteur par défaut du système.
+    # macOS → `open` (Aperçu si c'est le défaut) ; Linux → `xdg-open`.
+    # Détaché et non bloquant : la conversion des fichiers suivants
+    # (mode `*.adoc`) n'attend pas la fermeture du lecteur. Un échec
+    # d'ouverture (lecteur absent) n'interrompt pas le lot.
+    if open_after
+      opener = {% if flag?(:darwin) %}
+                 "open"
+               {% elsif flag?(:linux) %}
+                 "xdg-open"
+               {% else %}
+                 nil
+               {% end %}
+      if opener
+        begin
+          Process.new(opener, [out_file], output: Process::Redirect::Close, error: Process::Redirect::Close)
+        rescue error
+          STDERR.puts "Warning : impossible d'ouvrir '#{out_file}' (#{opener}) : #{error.message}"
+        end
+      else
+        STDERR.puts "Warning : --open non supporté sur cette plateforme (ni macOS ni Linux)."
+      end
+    end
   rescue ex
     # En lot, l'échec d'un fichier ne doit pas interrompre les autres :
     # on signale et on poursuit, avec un code de sortie non nul au final.
