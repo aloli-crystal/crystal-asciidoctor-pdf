@@ -207,8 +207,8 @@ describe AsciidoctorPDF::ParagraphComposer do
       # produire des fragments cassables aux charnières `_` et `(`.
       mono = InlineSegment.new(text: "branch_for(plat)", mono: true)
       tokens = ParagraphComposer.tokenize([mono], 10.0, &WIDTH_OF_CHAR)
-      boxes = tokens.select(&.is_a?(ParagraphComposer::Box))
-        .map { |b| b.as(ParagraphComposer::Box).segment.text }
+      boxes = tokens.select(ParagraphComposer::Box)
+        .map(&.segment.text)
       boxes.should eq(["branch_", "for(", "plat)"])
       # Une Penalty (breakpoint potentiel) entre chaque fragment.
       tokens.count(&.is_a?(ParagraphComposer::Penalty)).should eq(2)
@@ -219,8 +219,8 @@ describe AsciidoctorPDF::ParagraphComposer do
       # le point de phrase suivant un codespan finissant par `.`.
       mono = InlineSegment.new(text: "foo.bar", mono: true)
       tokens = ParagraphComposer.tokenize([mono], 10.0, &WIDTH_OF_CHAR)
-      boxes = tokens.select(&.is_a?(ParagraphComposer::Box))
-        .map { |b| b.as(ParagraphComposer::Box).segment.text }
+      boxes = tokens.select(ParagraphComposer::Box)
+        .map(&.segment.text)
       boxes.should eq(["foo.bar"])
     end
   end
