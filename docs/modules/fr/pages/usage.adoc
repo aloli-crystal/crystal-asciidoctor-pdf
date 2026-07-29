@@ -4,7 +4,7 @@
 
 [source,crystal]
 ----
-require "crystal-asciidoctor-pdf"
+require "asciicrystal-pdf"
 
 input = <<-ADOC
 = Mon Document
@@ -38,7 +38,7 @@ converter = AsciidoctorPDF::Converter.new("pdf", theme)
 
 [source,bash]
 ----
-crystal-asciidoctor-pdf mon_document.adoc
+asciicrystal-pdf mon_document.adoc
 ----
 
 === Options

@@ -1,8 +1,8 @@
 require "./spec_helper"
 
-include AsciidoctorPDF
+include AsciicrystalPDF
 
-describe AsciidoctorPDF::Hyphenation::Trie do
+describe AsciicrystalPDF::Hyphenation::Trie do
   it "extrait correctement chars et values d'un pattern" do
     trie = Hyphenation::Trie.new
     trie.insert("1ba")
@@ -38,7 +38,7 @@ describe AsciidoctorPDF::Hyphenation::Trie do
   end
 end
 
-describe AsciidoctorPDF::Hyphenation::Hyphenator do
+describe AsciicrystalPDF::Hyphenation::Hyphenator do
   it "retourne les exceptions sans passer par le trie" do
     trie = Hyphenation::Trie.new
     excepts = {"syllabus" => [3, 5]}
@@ -64,7 +64,7 @@ describe AsciidoctorPDF::Hyphenation::Hyphenator do
   end
 end
 
-describe AsciidoctorPDF::Hyphenation::Loader do
+describe AsciicrystalPDF::Hyphenation::Loader do
   it "charge l'hyphenator français depuis les patterns embarqués" do
     hyph = Hyphenation::Loader.for("fr")
     hyph.should_not be_nil

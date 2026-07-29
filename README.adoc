@@ -1,6 +1,6 @@
-= crystal-asciidoctor-pdf
+= asciicrystal-pdf
 
-An AsciiDoc-to-PDF converter for Crystal, built on `crystal-asciidoctor` for parsing and `pdf` for PDF generation.
+An AsciiDoc-to-PDF converter for Crystal, built on `asciicrystal` for parsing and `pdf` for PDF generation.
 
 NOTE: A French version of this README is available — see link:README.fr.adoc[README.fr.adoc].
 
@@ -14,16 +14,16 @@ NOTE: A French version of this README is available — see link:README.fr.adoc[R
 | 2.3.24
 | 2025-11-15
 
-| *Ruby gem asciidoctor (parser, via crystal-asciidoctor)*
+| *Ruby gem asciidoctor (parser, via asciicrystal)*
 | 2.0.26
 | 2025-10-24
 
-| *Crystal shard crystal-asciidoctor-pdf*
+| *Crystal shard asciicrystal-pdf*
 | 2.3.24
 | 2026-04-10
 |===
 
-NOTE: This shard is a port of the Ruby gem asciidoctor-pdf **2.3.24** and relies on crystal-asciidoctor, which itself is ported from asciidoctor **2.0.26**.
+NOTE: This shard is a port of the Ruby gem asciidoctor-pdf **2.3.24** and relies on asciicrystal, which itself is ported from asciidoctor **2.0.26**.
 Check versions on RubyGems : https://rubygems.org/gems/asciidoctor-pdf/versions[asciidoctor-pdf] | https://rubygems.org/gems/asciidoctor/versions[asciidoctor].
 
 == Features
@@ -90,7 +90,7 @@ Three knobs control this behaviour :
   first content page, preceded by the `:title-logo-image:` logo if defined,
   followed by an "author · date" caption in grey, a separator, and the preamble.
   Functional equivalent of the standard `:!title-page:` (which is not detectable
-  on the crystal-asciidoctor side — the negation leaves no trace readable via
+  on the asciicrystal side — the negation leaves no trace readable via
   `attr?` / `attr`).
 
 * `theme.title_page_enabled: false` (YAML theme) — default with no title page ;
@@ -224,7 +224,7 @@ identically :
 | Channel | Syntax
 
 | CLI
-| `crystal-asciidoctor-pdf --theme fr my-doc.adoc`
+| `asciicrystal-pdf --theme fr my-doc.adoc`
 
 | AsciiDoc source
 | `:pdf-theme: fr` in the document header
@@ -359,7 +359,7 @@ admonition_important_label: IMPORTANT
 
 . Document attribute `:<name>-caption:` (if it differs from the default
   *Note* / *Tip* / *Warning* / *Caution* / *Important* injected by the
-  crystal-asciidoctor parser — otherwise it is ignored as "not overridden").
+  asciicrystal parser — otherwise it is ignored as "not overridden").
 . Theme property `admonition_<name>_label`.
 . Ultimate fallback : `name.upcase`.
 
@@ -367,7 +367,7 @@ admonition_important_label: IMPORTANT
 ==== `x-` convention for non-standard extensions
 
 Any AsciiDoc attribute prefixed `x-` (and any theme property prefixed `x_`
-in YAML) is a *proprietary extension* to `crystal-asciidoctor-pdf`, with no
+in YAML) is a *proprietary extension* to `asciicrystal-pdf`, with no
 native equivalent in standard AsciiDoc nor in Ruby `asciidoctor-pdf`. Use
 knowingly if portability of the source to other converters matters to you.
 
@@ -408,8 +408,9 @@ Typical use cases : quizzes, job descriptions, short notes meant to fit on
 [source,yaml]
 ----
 dependencies:
-  crystal-asciidoctor-pdf:
-    github: aloli-crystal/crystal-asciidoctor-pdf
+  asciicrystal-pdf:
+    github: aloli-crystal/asciicrystal-pdf
+    version: "~> 2.3.24.108"
 ----
 . Run `shards install`
 
@@ -417,7 +418,7 @@ dependencies:
 
 [source,crystal]
 ----
-require "crystal-asciidoctor-pdf"
+require "asciicrystal-pdf"
 
 input = <<-ADOC
 = My Document
@@ -441,24 +442,24 @@ AsciidoctorPDF::Converter.new.convert(doc)
 
 == Command line
 
-This shard also ships a `crystal-asciidoctor-pdf` executable.
+This shard also ships a `asciicrystal-pdf` executable.
 
 === Build the binary
 
 [source,bash]
 ----
-git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
-cd crystal-asciidoctor-pdf
+git clone https://github.com/aloli-crystal/asciicrystal-pdf.git
+cd asciicrystal-pdf
 shards build --release
 ----
 
-The binary is produced at `bin/crystal-asciidoctor-pdf`. Rather than copying it
+The binary is produced at `bin/asciicrystal-pdf`. Rather than copying it
 to a system directory, create a symlink in `~/bin/` (which must be on your
 `PATH`) :
 
 [source,bash]
 ----
-ln -s "$PWD/bin/crystal-asciidoctor-pdf" ~/bin/
+ln -s "$PWD/bin/asciicrystal-pdf" ~/bin/
 ----
 
 That way every `shards build --release` automatically refreshes the target
@@ -468,7 +469,7 @@ binary — no reinstall needed.
 
 [source,bash]
 ----
-crystal-asciidoctor-pdf my_document.adoc
+asciicrystal-pdf my_document.adoc
 ----
 
 By default the command produces a `my_document.adoc.pdf` file.
@@ -511,7 +512,7 @@ without repeating them in every document.
 
 [source]
 ----
-${XDG_CONFIG_HOME:-~/.config}/crystal-asciidoctor-pdf/
+${XDG_CONFIG_HOME:-~/.config}/asciicrystal-pdf/
 ├── config.yml          ← main preferences
 └── themes/             ← user themes (optional)
     └── aloli.yml
@@ -568,7 +569,7 @@ To reproduce "vanilla" behaviour (CI, debug, tests) :
 
 [source,bash]
 ----
-crystal-asciidoctor-pdf --no-user-config my_document.adoc
+asciicrystal-pdf --no-user-config my_document.adoc
 ----
 
 === Reference document
@@ -579,7 +580,7 @@ formulas, diagrams, etc.) :
 
 [source,bash]
 ----
-crystal-asciidoctor-pdf --sample
+asciicrystal-pdf --sample
 # → reference.adoc + reference.adoc.pdf
 ----
 
@@ -637,12 +638,12 @@ buttons, etc.
 * **Registration forms** or **GDPR consent declarations** signable locally.
 
 A worked example is provided in `examples/x-form-audit-iso27001.adoc`
-(regenerate the PDF with `crystal-asciidoctor-pdf examples/x-form-audit-iso27001.adoc`).
+(regenerate the PDF with `asciicrystal-pdf examples/x-form-audit-iso27001.adoc`).
 
 === `x-` convention
 
 The `x-` prefix (like `x-title-page-toc`, `x-score-*`) marks a *non-standard
-extension* that works only with `crystal-asciidoctor-pdf` — not with the Ruby
+extension* that works only with `asciicrystal-pdf` — not with the Ruby
 gem `asciidoctor-pdf` nor with other AsciiDoc converters.
 
 == Development
@@ -651,20 +652,20 @@ To contribute, clone the three repositories at the same level :
 
 [source,bash]
 ----
-git clone https://github.com/aloli-crystal/crystal-asciidoctor.git
+git clone https://github.com/aloli-crystal/asciicrystal.git
 git clone https://github.com/aloli-crystal/pdf.git
-git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
-cd crystal-asciidoctor-pdf
+git clone https://github.com/aloli-crystal/asciicrystal-pdf.git
+cd asciicrystal-pdf
 shards install
 crystal spec
 ----
 
-Local dependencies (`path: ../crystal-asciidoctor` and `path: ../pdf`) are
+Local dependencies (`path: ../asciicrystal` and `path: ../pdf`) are
 used for development.
 
 == Contributing
 
-. Fork the project ( https://github.com/aloli-crystal/crystal-asciidoctor-pdf/fork )
+. Fork the project ( https://github.com/aloli-crystal/asciicrystal-pdf/fork )
 . Create your feature branch (`git checkout -b my-new-feature`)
 . Commit your changes (`git commit -am 'Add a new feature'`)
 . Push the branch (`git push origin my-new-feature`)

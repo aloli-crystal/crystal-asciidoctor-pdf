@@ -1,15 +1,15 @@
-require "crystal-asciidoctor"
+require "asciicrystal"
 require "pdf"
 require "country-flags"
 require "emojis"
 require "noto-cjk"
 require "./inline_flags"
 
-module AsciidoctorPDF
-  # Convertisseur AsciiDoc → PDF pour crystal-asciidoctor.
-  # Suit le pattern des convertisseurs crystal-asciidoctor (HTML5, DocBook5, ManPage).
+module AsciicrystalPDF
+  # Convertisseur AsciiDoc → PDF pour asciicrystal.
+  # Suit le pattern des convertisseurs asciicrystal (HTML5, DocBook5, ManPage).
   # S'enregistre sous le backend "pdf".
-  class Converter < Asciidoctor::Converter::Base
+  class Converter < Asciicrystal::Converter::Base
     register_for "pdf"
 
     # Métadonnées de page pour les en-têtes/pieds de page.
@@ -164,7 +164,7 @@ module AsciidoctorPDF
       @theme_provided = !theme.nil?
       @theme = theme || Theme.new
       @doc = PDF::Document.new
-      @backend_traits = Asciidoctor::Converter::BackendTraits.new(
+      @backend_traits = Asciicrystal::Converter::BackendTraits.new(
         basebackend: "pdf",
         filetype: "pdf",
         outfilesuffix: ".pdf"
@@ -194,12 +194,12 @@ module AsciidoctorPDF
     end
 
     # Point d'entrée principal : convertit le document et écrit le PDF
-    def convert(node : Asciidoctor::AbstractNode, transform : String? = nil) : String
+    def convert(node : Asciicrystal::AbstractNode, transform : String? = nil) : String
       transform ||= node.node_name
       dispatch(node, transform)
     end
 
-    def dispatch(node : Asciidoctor::AbstractNode, transform : String) : String
+    def dispatch(node : Asciicrystal::AbstractNode, transform : String) : String
       case transform
       when "document"         then convert_document(node)
       when "section"          then convert_section(node)
@@ -247,8 +247,8 @@ module AsciidoctorPDF
     # Document
     # =========================================================================
 
-    def convert_document(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Document)
+    def convert_document(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Document)
 
       # Decode HTML entities in the document title once here so every
       # downstream renderer (title page, headers, PDF metadata, index
@@ -317,7 +317,7 @@ module AsciidoctorPDF
       if node.attr?("creator")
         @doc.creator = node.attr("creator")
       end
-      @doc.producer = "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"
+      @doc.producer = "asciicrystal-pdf #{AsciicrystalPDF::VERSION}"
 
       # Numérotation front-matter en chiffres romains : activée par
       # l'attribut document `:pdf-front-matter-numbering: roman`
@@ -334,7 +334,7 @@ module AsciidoctorPDF
       #   :title-page:        ⇒ activée explicitement
       #   :title-page: false  ⇒ désactivée explicitement (équivalent
       #                          standard à `:!title-page:` — non
-      #                          détectable côté crystal-asciidoctor,
+      #                          détectable côté asciicrystal,
       #                          d'où l'usage de la valeur explicite)
       #   absent              ⇒ défaut du thème (`title_page_enabled`)
       title_rendered = false
@@ -438,8 +438,8 @@ module AsciidoctorPDF
       ""
     end
 
-    def convert_embedded(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Document)
+    def convert_embedded(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Document)
       node.blocks.each { |b| convert(b) }
       ""
     end
@@ -448,8 +448,8 @@ module AsciidoctorPDF
     # Sections
     # =========================================================================
 
-    def convert_section(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Section)
+    def convert_section(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Section)
 
       level = node.level
       raw_title = node.title || ""
@@ -551,8 +551,8 @@ module AsciidoctorPDF
     # Paragraphes
     # =========================================================================
 
-    def convert_paragraph(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_paragraph(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
 
       # Style spécial `[abstract]` : présentation distincte d'un
       # paragraphe d'introduction (résumé ISO, executive summary,
@@ -589,7 +589,7 @@ module AsciidoctorPDF
     # Rend un paragraphe en style abstract : indenté + italique + couleur
     # plus discrète. Tous les segments inline forcés en italique (sauf
     # ceux déjà italiques pour ne pas inverser).
-    private def render_abstract_paragraph(node : Asciidoctor::Block) : String
+    private def render_abstract_paragraph(node : Asciicrystal::Block) : String
       ensure_page
       raw = node.content
       html = raw.is_a?(Array) ? raw.join("\n") : raw.to_s
@@ -638,12 +638,12 @@ module AsciidoctorPDF
     # Blocs de code (listing, literal)
     # =========================================================================
 
-    def convert_listing(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_listing(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
 
       # Extension : bloc `[x-form, id=..., action=...]` — formulaire
       # PDF interactif décrit en YAML (cf. doc/x-form-spec.adoc).
-      # Asciidoctor laisse `node.style` à "listing" pour un bloc
+      # Asciicrystal laisse `node.style` à "listing" pour un bloc
       # délimité par `----`, mais conserve "x-form" dans
       # `attributes["style"]` (1er attribut positional).
       return render_x_form_block(node) if node.attributes["style"]? == "x-form"
@@ -651,12 +651,12 @@ module AsciidoctorPDF
       render_code_block(node)
     end
 
-    def convert_literal(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_literal(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       render_code_block(node)
     end
 
-    private def render_code_block(node : Asciidoctor::Block) : String
+    private def render_code_block(node : Asciicrystal::Block) : String
       ensure_page
 
       source = node.source
@@ -947,13 +947,13 @@ module AsciidoctorPDF
     # Admonitions
     # =========================================================================
 
-    def convert_admonition(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_admonition(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
 
       ensure_page
       name = node.attr("name") || "note"
       # `node.content` retourne le HTML inline déjà substitué par
-      # crystal-asciidoctor (`<strong>`, `<em>`, `<code>`, …) qu'on
+      # asciicrystal (`<strong>`, `<em>`, `<code>`, …) qu'on
       # parse ici en segments stylisés via `InlineRenderer.parse`.
       # L'ancien comportement (`strip_inline_markup`) effaçait *gras*,
       # _italique_, `mono` — bug confirmé sur les fiches de quiz.
@@ -1100,7 +1100,7 @@ module AsciidoctorPDF
       end
     end
 
-    # Défauts injectés par crystal-asciidoctor (title-case, pour rendu
+    # Défauts injectés par asciicrystal (title-case, pour rendu
     # HTML). On les ignore lors de la lookup pour que le thème
     # (`admonition_<name>_label = "WARNING"`) reste autoritaire tant que
     # l'utilisateur n'a pas vraiment défini un override.
@@ -1114,17 +1114,17 @@ module AsciidoctorPDF
 
     # Résout le label d'une admonition selon la cascade :
     # `<name>-caption` (attr du node ou du document, **si différent du
-    # défaut injecté par crystal-asciidoctor**) →
+    # défaut injecté par asciicrystal**) →
     # `theme.admonition_<name>_label` → `name.upcase`.
     # Permet la traduction sans patcher le code via, p. ex.,
     # `:caution-caption: ATTENTION` au niveau document.
-    private def admonition_label(node : Asciidoctor::Block, name : String) : String
+    private def admonition_label(node : Asciicrystal::Block, name : String) : String
       key = name.downcase
       attr_key = "#{key}-caption"
       caption = node.attr(attr_key) || node.document.attr(attr_key)
       caption_str = caption.to_s
       # Override explicite : valeur non vide ET différente du défaut
-      # injecté par le parser crystal-asciidoctor.
+      # injecté par le parser asciicrystal.
       if !caption_str.empty? && DEFAULT_ADMONITION_CAPTIONS[key]? != caption_str
         return caption_str
       end
@@ -1148,7 +1148,7 @@ module AsciidoctorPDF
     # `excellent`, `tres-bien`, `bien`, `insuffisant`, `a-revoir`.
     private X_SCORE_LEVELS = %w(excellent tres-bien bien insuffisant a-revoir)
 
-    private def detect_x_score_level(node : Asciidoctor::AbstractBlock) : String?
+    private def detect_x_score_level(node : Asciicrystal::AbstractBlock) : String?
       X_SCORE_LEVELS.each do |level|
         return level if node.has_role?("x-score-#{level}")
       end
@@ -1159,7 +1159,7 @@ module AsciidoctorPDF
     # avec les admonitions). Bande colorée à gauche + label en gras +
     # contenu indenté. La couleur et le libellé sont configurables
     # par le thème (`x_score_<niveau>_color/label`).
-    private def render_x_score_block(node : Asciidoctor::Block, level : String) : String
+    private def render_x_score_block(node : Asciicrystal::Block, level : String) : String
       ensure_page
 
       label_text, color = x_score_label_and_color(level)
@@ -1251,7 +1251,7 @@ module AsciidoctorPDF
     # Cf. doc/x-form-spec.adoc et src/asciidoctor_pdf/form_builder.cr
     # =========================================================================
 
-    private def collect_x_form_block_attrs(node : Asciidoctor::Block) : Hash(String, String)
+    private def collect_x_form_block_attrs(node : Asciicrystal::Block) : Hash(String, String)
       attrs = {} of String => String
       {"id", "action", "method", "read-only"}.each do |key|
         v = node.attr(key)
@@ -1263,14 +1263,14 @@ module AsciidoctorPDF
     # Point d'entrée du rendu : parse le YAML, dessine titre +
     # sections/champs en flow auto, attache les widgets AcroForm
     # via le shard `pdf`.
-    private def render_x_form_block(node : Asciidoctor::Block) : String
+    private def render_x_form_block(node : Asciicrystal::Block) : String
       ensure_page
       page = @current_page.not_nil!
 
       block_attrs = collect_x_form_block_attrs(node)
       begin
-        form = AsciidoctorPDF::FormBuilder.parse(node.source, block_attrs)
-      rescue ex : AsciidoctorPDF::FormError
+        form = AsciicrystalPDF::FormBuilder.parse(node.source, block_attrs)
+      rescue ex : AsciicrystalPDF::FormError
         STDERR.puts ex.message
         render_x_form_error_text(page, ex.message.to_s)
         return ""
@@ -1279,10 +1279,10 @@ module AsciidoctorPDF
       acroform = @doc.acroform
 
       if title = form.title
-        render_x_form_inline_label(page, title, font_size: AsciidoctorPDF::FormRenderer::FORM_TITLE_FONT_SIZE, gap_below: 6.0)
+        render_x_form_inline_label(page, title, font_size: AsciicrystalPDF::FormRenderer::FORM_TITLE_FONT_SIZE, gap_below: 6.0)
       end
       if desc = form.description
-        render_x_form_inline_label(page, desc, font_size: AsciidoctorPDF::FormRenderer::FORM_DESC_FONT_SIZE, gap_below: 8.0)
+        render_x_form_inline_label(page, desc, font_size: AsciicrystalPDF::FormRenderer::FORM_DESC_FONT_SIZE, gap_below: 8.0)
       end
 
       if form.sectioned?
@@ -1310,16 +1310,16 @@ module AsciidoctorPDF
       @current_y -= gap_below
     end
 
-    private def render_x_form_section(sec : AsciidoctorPDF::Section, page : PDF::Page, acroform : PDF::AcroForm::Form, *, first : Bool) : Nil
+    private def render_x_form_section(sec : AsciicrystalPDF::Section, page : PDF::Page, acroform : PDF::AcroForm::Form, *, first : Bool) : Nil
       @current_y -= 8.0 unless first
       if title = sec.title
         render_x_form_inline_label(page, title,
-          font_size: AsciidoctorPDF::FormRenderer::SECTION_TITLE_FONT_SIZE,
+          font_size: AsciicrystalPDF::FormRenderer::SECTION_TITLE_FONT_SIZE,
           gap_below: 4.0)
       end
       if desc = sec.description
         render_x_form_inline_label(page, desc,
-          font_size: AsciidoctorPDF::FormRenderer::SECTION_DESC_FONT_SIZE,
+          font_size: AsciicrystalPDF::FormRenderer::SECTION_DESC_FONT_SIZE,
           gap_below: 6.0)
       end
       render_x_form_field_group(sec.fields, sec.columns, page, acroform)
@@ -1329,16 +1329,16 @@ module AsciidoctorPDF
     # à l'intérieur d'une rangée, les colonnes partagent le même y
     # de départ. Quand un champ avec `cols: N` ne tient pas, on
     # ferme la rangée courante avant de l'émettre.
-    private def render_x_form_field_group(fields : Array(AsciidoctorPDF::FormField), columns : Int32, page : PDF::Page, acroform : PDF::AcroForm::Form) : Nil
-      gutter = AsciidoctorPDF::FormRenderer::DEFAULT_GUTTER
-      col_w = AsciidoctorPDF::FormRenderer.column_width(columns, @content_width, gutter)
+    private def render_x_form_field_group(fields : Array(AsciicrystalPDF::FormField), columns : Int32, page : PDF::Page, acroform : PDF::AcroForm::Form) : Nil
+      gutter = AsciicrystalPDF::FormRenderer::DEFAULT_GUTTER
+      col_w = AsciicrystalPDF::FormRenderer.column_width(columns, @content_width, gutter)
 
       current_col = 0
       row_top_y = @current_y
       row_max_h = 0.0
 
       fields.each do |field|
-        span = AsciidoctorPDF::FormRenderer.clamped_span(field, columns)
+        span = AsciicrystalPDF::FormRenderer.clamped_span(field, columns)
 
         if current_col + span > columns && current_col > 0
           @current_y = row_top_y - row_max_h
@@ -1372,18 +1372,18 @@ module AsciidoctorPDF
     # `@current_y` courant. Retourne la hauteur totale consommée
     # par le bloc (label + widget + help + spacing) — utilisée pour
     # synchroniser la hauteur de la rangée multi-colonnes.
-    private def render_x_form_one_field(field : AsciidoctorPDF::FormField, x : Float64, width : Float64, page : PDF::Page, acroform : PDF::AcroForm::Form) : Float64
+    private def render_x_form_one_field(field : AsciicrystalPDF::FormField, x : Float64, width : Float64, page : PDF::Page, acroform : PDF::AcroForm::Form) : Float64
       start_y = @current_y
 
       if label = field.label
         label_text = field.required ? "#{label} *" : label
-        @current_y -= AsciidoctorPDF::FormRenderer::LABEL_FONT_SIZE + 1.0
-        page.font("Helvetica", size: AsciidoctorPDF::FormRenderer::LABEL_FONT_SIZE)
+        @current_y -= AsciicrystalPDF::FormRenderer::LABEL_FONT_SIZE + 1.0
+        page.font("Helvetica", size: AsciicrystalPDF::FormRenderer::LABEL_FONT_SIZE)
         page.text(label_text, at: {x, @current_y})
-        @current_y -= AsciidoctorPDF::FormRenderer::LABEL_GAP
+        @current_y -= AsciicrystalPDF::FormRenderer::LABEL_GAP
       end
 
-      widget_h = AsciidoctorPDF::FormRenderer.widget_height(field)
+      widget_h = AsciicrystalPDF::FormRenderer.widget_height(field)
       widget_y = @current_y - widget_h
 
       begin
@@ -1397,10 +1397,10 @@ module AsciidoctorPDF
       @current_y -= widget_h + 4.0
 
       if help = field.help
-        @current_y -= AsciidoctorPDF::FormRenderer::HELP_FONT_SIZE
-        page.font("Helvetica", size: AsciidoctorPDF::FormRenderer::HELP_FONT_SIZE)
+        @current_y -= AsciicrystalPDF::FormRenderer::HELP_FONT_SIZE
+        page.font("Helvetica", size: AsciicrystalPDF::FormRenderer::HELP_FONT_SIZE)
         page.text(help, at: {x, @current_y})
-        @current_y -= AsciidoctorPDF::FormRenderer::HELP_GAP
+        @current_y -= AsciicrystalPDF::FormRenderer::HELP_GAP
       end
 
       @current_y -= 6.0
@@ -1410,7 +1410,7 @@ module AsciidoctorPDF
 
     # Place le widget AcroForm correspondant au type. Lève
     # ArgumentError si options/valeurs invalides (capturé en amont).
-    private def place_x_form_widget(field : AsciidoctorPDF::FormField, x : Float64, y : Float64, width : Float64, height : Float64, page : PDF::Page, acroform : PDF::AcroForm::Form) : Nil
+    private def place_x_form_widget(field : AsciicrystalPDF::FormField, x : Float64, y : Float64, width : Float64, height : Float64, page : PDF::Page, acroform : PDF::AcroForm::Form) : Nil
       case field.type
       when "text", "email", "url", "tel"
         acroform.text_field(field.id, page: page, x: x, y: y,
@@ -1437,7 +1437,7 @@ module AsciidoctorPDF
           required: field.required, read_only: field.read_only)
       when "checkbox"
         checked = field.value.try(&.as_bool?) || false
-        size = Math.min(width, AsciidoctorPDF::FormRenderer::DEFAULT_FIELD_H)
+        size = Math.min(width, AsciicrystalPDF::FormRenderer::DEFAULT_FIELD_H)
         acroform.checkbox(field.id, page: page, x: x, y: y,
           size: size, checked: checked,
           required: field.required, read_only: field.read_only)
@@ -1449,7 +1449,7 @@ module AsciidoctorPDF
         # est le coin bas-gauche du bloc complet.
         acroform.radio_group(field.id, page: page, options: options,
           x: x, y: y + height,
-          spacing: AsciidoctorPDF::FormRenderer::RADIO_OPTION_SPACING,
+          spacing: AsciicrystalPDF::FormRenderer::RADIO_OPTION_SPACING,
           selected: field.value_string,
           required: field.required, read_only: field.read_only)
       when "select"
@@ -1480,18 +1480,18 @@ module AsciidoctorPDF
     # Listes
     # =========================================================================
 
-    def convert_ulist(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::List)
+    def convert_ulist(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::List)
       render_list(node, ordered: false)
     end
 
-    def convert_olist(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::List)
+    def convert_olist(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::List)
       render_list(node, ordered: true)
     end
 
-    def convert_dlist(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::List)
+    def convert_dlist(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::List)
       style = node.responds_to?(:style) ? node.style : nil
       case style
       when "qanda"      then render_dlist_qanda(node)
@@ -1504,9 +1504,9 @@ module AsciidoctorPDF
     # Rendu par défaut : terme en gras sur sa ligne, définition (sous-blocs)
     # juste en dessous. C'était l'unique mode avant l'ajout de qanda /
     # horizontal — comportement préservé.
-    private def render_dlist_default(node : Asciidoctor::List) : Nil
+    private def render_dlist_default(node : Asciicrystal::List) : Nil
       node.items.each do |item|
-        next unless item.is_a?(Asciidoctor::ListItem)
+        next unless item.is_a?(Asciicrystal::ListItem)
         ensure_page
         page = @current_page.not_nil!
         term = strip_inline_markup(item.text || "")
@@ -1520,9 +1520,9 @@ module AsciidoctorPDF
 
     # Style FAQ : « Q1. » devant chaque question (numérotée), « → »
     # devant chaque réponse. Question en gras, réponse en flux normal.
-    private def render_dlist_qanda(node : Asciidoctor::List) : Nil
+    private def render_dlist_qanda(node : Asciicrystal::List) : Nil
       node.items.each_with_index do |item, idx|
-        next unless item.is_a?(Asciidoctor::ListItem)
+        next unless item.is_a?(Asciicrystal::ListItem)
         ensure_page
         page = @current_page.not_nil!
         font_size = @theme.base_font_size
@@ -1567,7 +1567,7 @@ module AsciidoctorPDF
     # définition à droite dans le reste. Pour les items où la
     # définition fait plusieurs lignes, le terme reste aligné en haut
     # de la première ligne.
-    private def render_dlist_horizontal(node : Asciidoctor::List) : Nil
+    private def render_dlist_horizontal(node : Asciicrystal::List) : Nil
       term_col_w = @content_width * 0.25
       def_col_x = @margin + term_col_w + 8.0
       def_col_w = @content_width - term_col_w - 8.0
@@ -1575,7 +1575,7 @@ module AsciidoctorPDF
       line_h = font_size * @theme.base_line_height
 
       node.items.each do |item|
-        next unless item.is_a?(Asciidoctor::ListItem)
+        next unless item.is_a?(Asciicrystal::ListItem)
         ensure_page
 
         term = strip_inline_markup(item.text || "")
@@ -1621,9 +1621,9 @@ module AsciidoctorPDF
       end
     end
 
-    private def render_list(node : Asciidoctor::List, ordered : Bool, indent : Float64 = 0.0) : String
+    private def render_list(node : Asciicrystal::List, ordered : Bool, indent : Float64 = 0.0) : String
       node.items.each_with_index do |item, idx|
-        next unless item.is_a?(Asciidoctor::ListItem)
+        next unless item.is_a?(Asciicrystal::ListItem)
         ensure_page
 
         # Le markup inline de l'item (gras, italique, code inline,
@@ -1671,9 +1671,9 @@ module AsciidoctorPDF
         # — typiquement un bloc source affiché à plat dans le
         # source AsciiDoc disparaissait du PDF final.
         item.blocks.each do |sub_block|
-          if sub_block.is_a?(Asciidoctor::List)
+          if sub_block.is_a?(Asciicrystal::List)
             render_list(sub_block, ordered: sub_block.context == :olist, indent: indent + @theme.list_indent)
-          elsif sub_block.is_a?(Asciidoctor::AbstractNode)
+          elsif sub_block.is_a?(Asciicrystal::AbstractNode)
             dispatch(sub_block, sub_block.context.to_s)
           end
         end
@@ -1685,8 +1685,8 @@ module AsciidoctorPDF
     # Tableaux
     # =========================================================================
 
-    def convert_table(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Table)
+    def convert_table(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Table)
 
       ensure_page
       @current_y -= @theme.table_margin_top
@@ -1937,8 +1937,8 @@ module AsciidoctorPDF
     # Images
     # =========================================================================
 
-    def convert_image(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_image(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
 
       target = node.attr("target") || ""
       return "" if target.empty?
@@ -1975,7 +1975,7 @@ module AsciidoctorPDF
 
     private def render_svg_image(
       path : String,
-      node : Asciidoctor::Block,
+      node : Asciicrystal::Block,
       width_attr : String?,
       height_attr : String?,
     ) : Nil
@@ -2008,7 +2008,7 @@ module AsciidoctorPDF
 
     private def render_raster_image(
       path : String,
-      node : Asciidoctor::Block,
+      node : Asciicrystal::Block,
       width_attr : String?,
       height_attr : String?,
     ) : Nil
@@ -2025,7 +2025,7 @@ module AsciidoctorPDF
       @current_y -= display_h + 8.0
     end
 
-    private def align_image_x(node : Asciidoctor::Block, display_w : Float64) : Float64
+    private def align_image_x(node : Asciicrystal::Block, display_w : Float64) : Float64
       case node.attr("align") || "left"
       when "center" then @margin + (@content_width - display_w) / 2
       when "right"  then @margin + @content_width - display_w
@@ -2033,7 +2033,7 @@ module AsciidoctorPDF
       end
     end
 
-    private def resolve_image_path(node : Asciidoctor::Block, target : String) : String?
+    private def resolve_image_path(node : Asciicrystal::Block, target : String) : String?
       return nil if target.empty?
       return target if File.exists?(target)
       if (docdir = node.document.attr("docdir"))
@@ -2064,7 +2064,7 @@ module AsciidoctorPDF
     # Sauts de page et séparateurs
     # =========================================================================
 
-    def convert_page_break(node : Asciidoctor::AbstractNode) : String
+    def convert_page_break(node : Asciicrystal::AbstractNode) : String
       # Saut de page de base (`<<<` ou `[%always]` — `always` est
       # accepté par parité Ruby asciidoctor-pdf bien qu'il ne change
       # rien au comportement, le saut étant déjà inconditionnel).
@@ -2074,7 +2074,7 @@ module AsciidoctorPDF
       # sur une page impaire (recto, page de droite en livre ouvert)
       # ou paire (verso, gauche). Si la nouvelle page créée n'est pas
       # du bon parité, on en génère une de plus, qui restera vide.
-      if node.is_a?(Asciidoctor::Block)
+      if node.is_a?(Asciicrystal::Block)
         if node.option?("recto") && @page_number.even?
           new_page
         elsif node.option?("verso") && @page_number.odd?
@@ -2084,7 +2084,7 @@ module AsciidoctorPDF
       ""
     end
 
-    def convert_thematic_break(node : Asciidoctor::AbstractNode) : String
+    def convert_thematic_break(node : Asciicrystal::AbstractNode) : String
       ensure_page
       page = @current_page.not_nil!
       @current_y -= 8.0
@@ -2099,8 +2099,8 @@ module AsciidoctorPDF
     # Audio inline : un PDF n'embarque pas d'audio lisible nativement.
     # On rend un bandeau visuel « ▶ Audio : <target> » qui pointe vers
     # l'URL en lien cliquable. Le caption éventuel est inclus.
-    def convert_audio(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_audio(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       target = node.attr("target") || ""
       caption = node.title
       render_media_placeholder("▶ Audio", target, caption)
@@ -2108,8 +2108,8 @@ module AsciidoctorPDF
     end
 
     # Video inline : même idée — placeholder cliquable vers la source.
-    def convert_video(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_video(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       target = node.attr("target") || ""
       caption = node.title
       render_media_placeholder("▶ Vidéo", target, caption)
@@ -2121,8 +2121,8 @@ module AsciidoctorPDF
     # encadré gris pâle (même style que les listings courts). Une vraie
     # implémentation demanderait l'embed d'un sous-ensemble MathJax ou
     # un rendu via katex-cli — reporté.
-    def convert_stem(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_stem(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       raw = node.content
       content = raw.is_a?(Array) ? raw.join("\n") : (raw || "").to_s
       render_media_placeholder("∑ Math", content, node.title, monospace: true)
@@ -2133,8 +2133,8 @@ module AsciidoctorPDF
     # cible le PDF, on dégrade vers du texte plat : on strippe le HTML
     # via Sanitizer et on l'inclut comme un paragraphe normal. Mieux
     # que de tout perdre.
-    def convert_pass(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_pass(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       raw = node.content
       content = raw.is_a?(Array) ? raw.join("\n") : (raw || "").to_s
       ensure_page
@@ -2220,26 +2220,26 @@ module AsciidoctorPDF
     # Blocs de citation, verse, sidebar, example, open, preamble
     # =========================================================================
 
-    def convert_quote(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_quote(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       ensure_page
       render_indented_block(node, left_bar_color: "aaaaaa", indent: 16.0, kind: :quote)
     end
 
-    def convert_verse(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_verse(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       ensure_page
       render_indented_block(node, left_bar_color: "aaaaaa", indent: 16.0, kind: :verse)
     end
 
-    def convert_sidebar(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_sidebar(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       render_panel(node, :sidebar)
       ""
     end
 
-    def convert_example(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_example(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
 
       # Extension : rôle `[.x-score-<niveau>]` sur un bloc example
       # (`====`) le transforme en bloc de score coloré.
@@ -2263,7 +2263,7 @@ module AsciidoctorPDF
     # un peu plus court ou un peu trop long ; on accepte cet écart
     # visuel mineur en échange de la simplicité (pas de mode
     # « deux passes » avec dry-run du rendu).
-    private def render_panel(node : Asciidoctor::Block, kind : Symbol, collapsible : Bool = false) : Nil
+    private def render_panel(node : Asciicrystal::Block, kind : Symbol, collapsible : Bool = false) : Nil
       ensure_page
 
       bg, border, border_w, padding, mtop, mbot, title_color, title_size =
@@ -2359,8 +2359,8 @@ module AsciidoctorPDF
       @current_y -= mbot
     end
 
-    def convert_open(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_open(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
 
       # Extension : rôle `[.x-score-<niveau>]` sur un open block
       # (`--`) le transforme en bloc de score coloré.
@@ -2403,7 +2403,7 @@ module AsciidoctorPDF
     # rendu. Utilisé par `convert_open` (option `[%unbreakable]`) pour
     # décider d'un saut de page anticipé. Volontairement pessimiste
     # (mieux vaut sauter trop que pas assez).
-    private def estimate_block_height(block : Asciidoctor::AbstractBlock) : Float64
+    private def estimate_block_height(block : Asciicrystal::AbstractBlock) : Float64
       case block.context.to_s
       when "paragraph"
         raw = block.content
@@ -2439,7 +2439,7 @@ module AsciidoctorPDF
       end
     end
 
-    private def estimate_table_height(block : Asciidoctor::AbstractBlock) : Float64
+    private def estimate_table_height(block : Asciicrystal::AbstractBlock) : Float64
       return 40.0 unless block.responds_to?(:rows)
       font_size = @theme.base_font_size
       line_h = font_size * @theme.base_line_height
@@ -2465,28 +2465,28 @@ module AsciidoctorPDF
       total
     end
 
-    private def estimate_listing_height(block : Asciidoctor::AbstractBlock) : Float64
+    private def estimate_listing_height(block : Asciicrystal::AbstractBlock) : Float64
       return 40.0 unless block.responds_to?(:lines)
       line_h = @theme.code_font_size * @theme.base_line_height
       block.lines.size * line_h + 2 * @theme.code_padding +
         @theme.code_margin_top + @theme.code_margin_bottom
     end
 
-    private def estimate_list_height(block : Asciidoctor::AbstractBlock) : Float64
+    private def estimate_list_height(block : Asciicrystal::AbstractBlock) : Float64
       return 40.0 unless block.responds_to?(:items)
       line_h = @theme.base_font_size * @theme.base_line_height
       # Approximation : chaque item ≈ 1 ligne + petit espacement.
       block.items.size * (line_h + 4.0) + 8.0
     end
 
-    def convert_preamble(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_preamble(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       node.blocks.each { |b| convert(b) }
       ""
     end
 
-    def convert_floating_title(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Block)
+    def convert_floating_title(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Block)
       ensure_page
       level = node.level
       title = node.title || ""
@@ -2500,8 +2500,8 @@ module AsciidoctorPDF
       ""
     end
 
-    def convert_inline_indexterm(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_indexterm(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       term = node.text || ""
       @index_entries << IndexEntry.new(term, @page_number) unless term.empty?
       ""
@@ -2510,8 +2510,8 @@ module AsciidoctorPDF
     # Callout inline `<1>` `<2>` … dans un bloc listing.
     # Rendu : un disque sombre avec le numéro en blanc, mêlé au flux
     # de code. Parité Ruby : `<b class="conum">(1)</b>`.
-    def convert_inline_callout(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_callout(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       text = node.text || ""
       # Encodage typographique simple : utiliser les chiffres
       # entourés d'un cercle (Unicode ① ② … ⑳) quand possible. Au-delà,
@@ -2529,8 +2529,8 @@ module AsciidoctorPDF
     # Liste de callouts (colist) qui suit un listing annoté.
     # Format AsciiDoc : `<1> Description du premier callout.`
     # Rendu : liste à marqueurs ① ② … alignés sur le bloc texte.
-    def convert_colist(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::List)
+    def convert_colist(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::List)
       ensure_page
 
       font_size = @theme.base_font_size
@@ -2576,8 +2576,8 @@ module AsciidoctorPDF
     # / mark / quotes) en HTML, qui sera ensuite digéré par
     # `InlineRenderer.parse` avec son markup. Parité de la table
     # `QUOTE_TAGS` côté HTML5 d'asciidoctor (Ruby et Crystal).
-    def convert_inline_quoted(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_quoted(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       type = node.type || :strong
       text = node.text || ""
       case type
@@ -2596,8 +2596,8 @@ module AsciidoctorPDF
     # `kbd:[Ctrl+C]` — produit le HTML keyseq parité Ruby/HTML5.
     # `InlineRenderer` mappera `<kbd>` sur monospace + traitement
     # spécifique (réservé pour un futur encadré).
-    def convert_inline_kbd(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_kbd(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       keys_str = node.attr("keys") || ""
       keys = keys_str.split('+').map(&.strip).reject(&.empty?)
       return "" if keys.empty?
@@ -2609,8 +2609,8 @@ module AsciidoctorPDF
     end
 
     # `btn:[OK]` — bouton d'interface utilisateur. HTML : <b class="button">.
-    def convert_inline_button(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_button(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       "<b class=\"button\">#{node.text}</b>"
     end
 
@@ -2621,8 +2621,8 @@ module AsciidoctorPDF
     # l'instant un placeholder textuel `[<nom>]` faute de bibliothèque
     # d'icônes intégrée. Une vraie roadmap demanderait Font Awesome /
     # icônes Twemoji.
-    def convert_inline_image(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_image(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       target = node.target || ""
       return "" if target.empty?
 
@@ -2651,8 +2651,8 @@ module AsciidoctorPDF
     end
 
     # `menu:[Fichier > Quitter]` — chaîne de menus. HTML standard.
-    def convert_inline_menu(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_menu(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       menu = node.attr("menu") || ""
       menuitem = node.attr("menuitem") || ""
       submenus = node.attr("submenus") || ""
@@ -2671,8 +2671,8 @@ module AsciidoctorPDF
 
     # Gestion des notes de bas de page
     # Les notes sont collectées pendant le rendu, puis affichées en bas de chaque page.
-    def convert_inline_footnote(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_footnote(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       index_str = node.attr("index")
       index = index_str ? index_str.to_i : (@footnotes.size + 1)
       text = node.text || ""
@@ -2722,8 +2722,8 @@ module AsciidoctorPDF
     # Gestion des liens et références internes (XRefs)
     # Les liens sont rendus en couleur bleue soulignée dans le PDF.
     # Pour les références internes, le texte de la référence est affiché entre crochets.
-    def convert_inline_anchor(node : Asciidoctor::AbstractNode) : String
-      return "" unless node.is_a?(Asciidoctor::Inline)
+    def convert_inline_anchor(node : Asciicrystal::AbstractNode) : String
+      return "" unless node.is_a?(Asciicrystal::Inline)
       case node.type
       when :xref
         # Référence interne : afficher le texte ou l'id entre crochets
@@ -2780,7 +2780,7 @@ module AsciidoctorPDF
     # =========================================================================
 
     private def render_indented_block(
-      node : Asciidoctor::Block,
+      node : Asciicrystal::Block,
       left_bar_color : String,
       indent : Float64,
       kind : Symbol = :quote,
@@ -3137,11 +3137,11 @@ module AsciidoctorPDF
     #   :title-page:        ⇒ true (forcé)
     #   :title-page: false  ⇒ false (forcé)  — équivalent fonctionnel
     #                         de `:!title-page:` qui n'est pas
-    #                         détectable côté crystal-asciidoctor (la
+    #                         détectable côté asciicrystal (la
     #                         négation ne laisse pas de trace dans
     #                         `attr?`/`attr`, indiscernable de l'absence)
     #   absent              ⇒ défaut du thème (`title_page_enabled`)
-    private def title_page_active?(doc : Asciidoctor::Document) : Bool
+    private def title_page_active?(doc : Asciicrystal::Document) : Bool
       raw = doc.attr("title-page")
       case raw
       when nil
@@ -3166,7 +3166,7 @@ module AsciidoctorPDF
     # Le logo `:title-logo-image:`, le sous-titre, l'auteur et la date —
     # quand fournis — sont placés autour du titre comme une mini-
     # manchette d'entête.
-    private def render_inline_doctitle(doc : Asciidoctor::Document) : Nil
+    private def render_inline_doctitle(doc : Asciicrystal::Document) : Nil
       ensure_page
       page = @current_page.not_nil!
 
@@ -3259,7 +3259,7 @@ module AsciidoctorPDF
     #   1. attribut document `:title-page-align: <left|center|right>`
     #   2. propriété de thème `title_page_align`
     #   3. défaut "left"
-    private def resolve_title_align(doc : Asciidoctor::Document) : String
+    private def resolve_title_align(doc : Asciicrystal::Document) : String
       attr = doc.attr("title-page-align")
       case attr.to_s.downcase
       when "left", "center", "right" then attr.to_s.downcase
@@ -3337,7 +3337,7 @@ module AsciidoctorPDF
       end
     end
 
-    private def title_page_toc_enabled?(doc : Asciidoctor::Document) : Bool
+    private def title_page_toc_enabled?(doc : Asciicrystal::Document) : Bool
       # `x-title-page-toc` (et le défaut de thème `x_title_page_with_toc`)
       # ne décident que de l'EMPLACEMENT de la TOC (sur la page de
       # garde), pas de sa PRÉSENCE. Celle-ci reste gouvernée par
@@ -3358,7 +3358,7 @@ module AsciidoctorPDF
       end
     end
 
-    private def render_title_page(doc : Asciidoctor::Document) : Nil
+    private def render_title_page(doc : Asciicrystal::Document) : Nil
       # Page de garde sans header / footer / footnotes (convention
       # typographique : la page de titre est « nue »).
       # Garde : pas de chrome ET pas de compteur (sinon elle prend
@@ -3372,7 +3372,7 @@ module AsciidoctorPDF
       end
     end
 
-    private def render_title_page_standard(doc : Asciidoctor::Document) : Nil
+    private def render_title_page_standard(doc : Asciicrystal::Document) : Nil
       page = @current_page.not_nil!
       center_x = @page_width / 2
 
@@ -3463,7 +3463,7 @@ module AsciidoctorPDF
     #   │ ──────────────────────── │  ← séparateur bas
     #   │ Auteur / Date            │  ← bas
     #   └──────────────────────────┘
-    private def render_title_page_with_toc(doc : Asciidoctor::Document) : Nil
+    private def render_title_page_with_toc(doc : Asciicrystal::Document) : Nil
       page = @current_page.not_nil!
 
       # Logo (optionnel) tout en haut.
@@ -3549,7 +3549,7 @@ module AsciidoctorPDF
     # bord supérieur). Retourne la hauteur effectivement consommée par
     # le logo, ou 0.0 si rien n'a été dessiné.
     private def render_title_logo(
-      doc : Asciidoctor::Document, page : PDF::Page, y_top : Float64,
+      doc : Asciicrystal::Document, page : PDF::Page, y_top : Float64,
     ) : Float64
       raw = doc.attr("title-logo-image")
       return 0.0 if raw.nil?
@@ -3651,7 +3651,7 @@ module AsciidoctorPDF
       {s, opts}
     end
 
-    private def resolve_image_path_str(doc : Asciidoctor::Document, target : String) : String?
+    private def resolve_image_path_str(doc : Asciicrystal::Document, target : String) : String?
       return nil if target.empty?
       return target if File.exists?(target)
 
@@ -3913,7 +3913,7 @@ module AsciidoctorPDF
       File.write(@output_path, @doc.to_slice)
     end
 
-    private def determine_output_path(doc : Asciidoctor::Document) : String
+    private def determine_output_path(doc : Asciicrystal::Document) : String
       if (outfile = doc.attr("outfile"))
         outfile
       elsif (docfile = doc.attr("docfile"))

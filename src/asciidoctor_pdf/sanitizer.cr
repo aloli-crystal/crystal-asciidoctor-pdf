@@ -1,4 +1,4 @@
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Utilitaires texte pour le pipeline asciidoctor-pdf : strip de
   # balises XML / HTML, résolution d'entités HTML, encodage XML.
   #
@@ -28,7 +28,7 @@ module AsciidoctorPDF
     INVERSE_XML_SPECIAL_CHARS_RX = /[<>&]/
 
     # Entités nommées HTML les plus fréquentes. Compatible avec ce que
-    # crystal-asciidoctor produit en sortie. La valeur de fallback (`?`)
+    # asciicrystal produit en sortie. La valeur de fallback (`?`)
     # est utilisée pour les entités inconnues afin de signaler la perte
     # plutôt que de la cacher silencieusement.
     BUILT_IN_NAMED_ENTITIES = {

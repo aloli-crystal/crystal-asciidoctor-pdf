@@ -3,7 +3,7 @@
 # generate-pdfs-gold.sh — Génère des PDFs de référence pour tous les README
 # du dossier prod-crystal, afin de servir de baseline pour la détection de
 # régressions visuelles lors des modifications du moteur de composition de
-# crystal-asciidoctor-pdf.
+# asciicrystal-pdf.
 #
 # Pour chaque dossier projet (sous PROD_DIR) qui contient un README :
 #   - Privilégie README.fr.adoc avec le thème `fr` (typographie française).
@@ -19,7 +19,7 @@
 #
 # Variables d'environnement (avec valeurs par défaut) :
 #   CRYSTAL_PDF_BIN  Binaire à utiliser pour la génération.
-#                    Défaut : ./bin/crystal-asciidoctor-pdf
+#                    Défaut : ./bin/asciicrystal-pdf
 #   GOLD_DIR         Dossier de sortie des PDFs.
 #                    Défaut : /tmp/pdfs-gold
 #   PROD_DIR         Racine des projets Crystal à parcourir.
@@ -36,13 +36,13 @@
 
 set -uo pipefail
 
-CRYSTAL_PDF_BIN="${CRYSTAL_PDF_BIN:-$(cd "$(dirname "$0")/.." && pwd)/bin/crystal-asciidoctor-pdf}"
+CRYSTAL_PDF_BIN="${CRYSTAL_PDF_BIN:-$(cd "$(dirname "$0")/.." && pwd)/bin/asciicrystal-pdf}"
 GOLD_DIR="${GOLD_DIR:-/tmp/pdfs-gold}"
 PROD_DIR="${PROD_DIR:-/Users/philippe/prod-crystal}"
 
 if [[ ! -x "$CRYSTAL_PDF_BIN" ]]; then
   echo "Erreur : binaire introuvable ou non exécutable : $CRYSTAL_PDF_BIN" >&2
-  echo "Lancez d'abord : (cd crystal-asciidoctor-pdf && shards build)" >&2
+  echo "Lancez d'abord : (cd asciicrystal-pdf && shards build)" >&2
   exit 1
 fi
 

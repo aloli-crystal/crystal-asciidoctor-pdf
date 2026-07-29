@@ -5,7 +5,7 @@ require "json"
 require "./hyphenation"
 require "./hyphenation/manifest"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Sous-commande CLI `hyph` : gestion utilisateur des patterns
   # de césure Liang. Modèle d'inspiration : `tlmgr` (TeX Live
   # Manager) — pas de téléchargement automatique au runtime,
@@ -82,7 +82,7 @@ module AsciidoctorPDF
       else
         STDERR.puts "Erreur : sous-commande `hyph #{sub}` inconnue."
         STDERR.puts "Sous-commandes valides : list, available, install, remove, update, show, help"
-        STDERR.puts "Pour l'aide : crystal-asciidoctor-pdf hyph help"
+        STDERR.puts "Pour l'aide : asciicrystal-pdf hyph help"
         exit EXIT_USAGE
       end
     end
@@ -95,7 +95,7 @@ module AsciidoctorPDF
               hyph list — liste les patterns de césure disponibles
 
           SYNOPSIS
-              crystal-asciidoctor-pdf hyph list [-j|--json]
+              asciicrystal-pdf hyph list [-j|--json]
 
           OPTIONS
               -j, --json    Sortie JSON parseable
@@ -106,7 +106,7 @@ module AsciidoctorPDF
               hyph available — liste les patterns publiés sur CTAN
 
           SYNOPSIS
-              crystal-asciidoctor-pdf hyph available [-r|--refresh-cache] [-j|--json] [-o|--offline]
+              asciicrystal-pdf hyph available [-r|--refresh-cache] [-j|--json] [-o|--offline]
 
           OPTIONS
               -r, --refresh-cache  Ignore le cache local et re-interroge CTAN
@@ -126,7 +126,7 @@ module AsciidoctorPDF
               hyph install — installe un pattern depuis CTAN
 
           SYNOPSIS
-              crystal-asciidoctor-pdf hyph install <lang> [-s|--sha256 <hash>] [-u|--from <url>] [-f|--force]
+              asciicrystal-pdf hyph install <lang> [-s|--sha256 <hash>] [-u|--from <url>] [-f|--force]
 
           OPTIONS
               -s, --sha256 <hash>  SHA-256 attendu (obligatoire si langue hors manifest)
@@ -134,8 +134,8 @@ module AsciidoctorPDF
               -f, --force          Écrase un pattern déjà installé
 
           EXEMPLES
-              crystal-asciidoctor-pdf hyph install ja
-              crystal-asciidoctor-pdf hyph install xx --sha256 abc123... --from https://...
+              asciicrystal-pdf hyph install ja
+              asciicrystal-pdf hyph install xx --sha256 abc123... --from https://...
           HELP
       else
         puts <<-HELP
@@ -152,10 +152,10 @@ module AsciidoctorPDF
               help       Affiche cette aide (ou détails d'une sous-commande)
 
           EXEMPLES
-              crystal-asciidoctor-pdf hyph list
-              crystal-asciidoctor-pdf hyph install ja
-              crystal-asciidoctor-pdf hyph remove ja
-              crystal-asciidoctor-pdf hyph help install
+              asciicrystal-pdf hyph list
+              asciicrystal-pdf hyph install ja
+              asciicrystal-pdf hyph remove ja
+              asciicrystal-pdf hyph help install
           HELP
       end
     end

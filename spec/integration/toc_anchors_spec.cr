@@ -98,7 +98,7 @@ describe "Integration · TOC anchors" do
 
     path = IntegrationHelper.convert(source)
     begin
-      # The crystal-asciidoctor parser auto-generates an id (`_overview`
+      # The asciicrystal parser auto-generates an id (`_overview`
       # by default) for each section. That id surfaces verbatim as a
       # PDF named destination — explicit `[[overview]]` ids would too.
       IntegrationHelper.count_byte_pattern(path, "(_overview)").should be > 0

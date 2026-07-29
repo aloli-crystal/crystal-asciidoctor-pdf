@@ -1,3 +1,13 @@
+== v2.3.24.108 — 2026-07-28
+
+=== Changé (renommage)
+
+* Renommage du shard `crystal-asciidoctor-pdf` → `asciicrystal-pdf` (abandon du préfixe `crystal-` et transformation de `doctor` en `crystal`).
+* Renommage du module `AsciidoctorPDF` → `AsciicrystalPDF` ; le namespace du cœur `Asciidoctor::` devient `Asciicrystal::` (via la dépendance `asciicrystal`, ex-`crystal-asciidoctor`).
+* Le répertoire de configuration utilisateur suit le nouveau nom : `${XDG_CONFIG_HOME:-~/.config}/asciicrystal-pdf/`.
+* La chaîne `/Producer` du PDF et la sortie `--version` affichent désormais `asciicrystal-pdf`.
+* Les mentions de provenance Ruby (gem `asciidoctor-pdf`) sont conservées dans la description et les commentaires.
+
 == v2.3.24.107 — 2026-07-04
 
 === Changé / Corrigé (ouverture par défaut + robustesse CLI)

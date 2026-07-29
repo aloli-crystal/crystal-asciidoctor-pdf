@@ -1,6 +1,6 @@
-# Configuration utilisateur pour crystal-asciidoctor-pdf.
+# Configuration utilisateur pour asciicrystal-pdf.
 #
-# Copier vers : ${XDG_CONFIG_HOME:-~/.config}/crystal-asciidoctor-pdf/config.yml
+# Copier vers : ${XDG_CONFIG_HOME:-~/.config}/asciicrystal-pdf/config.yml
 #
 # Cascade de priorité (du plus fort au plus faible) :
 #   1. Flags CLI (-T, -a, ...)
@@ -8,7 +8,7 @@
 #   3. Ce fichier (user config XDG)
 #   4. Defaults compilés dans le shard
 #
-# Pour ignorer ponctuellement ce fichier : crystal-asciidoctor-pdf --no-user-config
+# Pour ignorer ponctuellement ce fichier : asciicrystal-pdf --no-user-config
 # ----------------------------------------------------------------
 
 # Thème par défaut. Trois formes possibles :

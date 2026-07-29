@@ -1,4 +1,4 @@
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Rendu d'un bloc `[x-form]` parsé par `FormBuilder` vers du PDF
   # interactif (widgets AcroForm) avec labels visuels.
   #

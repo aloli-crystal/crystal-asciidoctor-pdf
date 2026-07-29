@@ -5,7 +5,7 @@
 :source-highlighter: rouge
 
 Cette spec décrit l'extension *non standard* `x-form` de
-`crystal-asciidoctor-pdf` qui permet de décrire dans le source
+`asciicrystal-pdf` qui permet de décrire dans le source
 AsciiDoc un formulaire qui sera transformé en *formulaire PDF
 interactif* (champs remplissables, cases à cocher, listes
 déroulantes, signatures) au moment du rendu.
@@ -18,7 +18,7 @@ https://github.com/aloli-crystal/pdf[pdf] (conforme ISO 32000-1
 
 Le préfixe `x-` signale une extension *non standard* (n'existe pas
 dans la spec AsciiDoc upstream ni dans `asciidoctor-pdf` Ruby) ;
-elle ne marchera donc qu'avec `crystal-asciidoctor-pdf`. Convention
+elle ne marchera donc qu'avec `asciicrystal-pdf`. Convention
 empruntée à HTTP/MIME (`X-Custom-Header`, `application/x-...`).
 
 == Syntaxe
@@ -365,10 +365,10 @@ shard https://github.com/aloli-crystal/pdf-signature[pdf-signature]
 (PAdES).
 
 [NOTE]
-.Statut en v1.0.1 (crystal-asciidoctor-pdf 2.3.24.59 + pdf 0.5.9)
+.Statut en v1.0.1 (asciicrystal-pdf 2.3.24.59 + pdf 0.5.9)
 ====
 Le champ `signature` est *pleinement fonctionnel côté PDF* depuis
-crystal-asciidoctor-pdf 2.3.24.59 + pdf 0.5.9 : le converter émet
+asciicrystal-pdf 2.3.24.59 + pdf 0.5.9 : le converter émet
 un widget `/Sig` AcroForm valide avec `/SigFlags 3` sur le
 formulaire racine. Le slot est cliquable dans Acrobat, Preview,
 Foxit — l'utilisateur peut y déposer une signature.

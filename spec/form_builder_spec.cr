@@ -4,20 +4,20 @@ require "./spec_helper"
 private def parse(yaml : String, **attrs)
   block_attrs = {"id" => "test-form"} of String => String
   attrs.each { |k, v| block_attrs[k.to_s] = v.to_s }
-  AsciidoctorPDF::FormBuilder.parse(yaml, block_attrs)
+  AsciicrystalPDF::FormBuilder.parse(yaml, block_attrs)
 end
 
-describe AsciidoctorPDF::FormBuilder do
+describe AsciicrystalPDF::FormBuilder do
   describe ".parse — attributs du bloc" do
     it "lève FormError si `id` manquant" do
-      expect_raises(AsciidoctorPDF::FormError, /`id=` requis/) do
-        AsciidoctorPDF::FormBuilder.parse("fields: [{id: x, type: text}]", {} of String => String)
+      expect_raises(AsciicrystalPDF::FormError, /`id=` requis/) do
+        AsciicrystalPDF::FormBuilder.parse("fields: [{id: x, type: text}]", {} of String => String)
       end
     end
 
     it "lève FormError si `id` vide" do
-      expect_raises(AsciidoctorPDF::FormError, /`id=` requis/) do
-        AsciidoctorPDF::FormBuilder.parse("fields: [{id: x, type: text}]", {"id" => ""})
+      expect_raises(AsciicrystalPDF::FormError, /`id=` requis/) do
+        AsciicrystalPDF::FormBuilder.parse("fields: [{id: x, type: text}]", {"id" => ""})
       end
     end
 
@@ -38,7 +38,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette une `method` invalide" do
-      expect_raises(AsciidoctorPDF::FormError, /`method=put` invalide/) do
+      expect_raises(AsciicrystalPDF::FormError, /`method=put` invalide/) do
         parse("fields: [{id: x, type: text}]", method: "put")
       end
     end
@@ -51,13 +51,13 @@ describe AsciidoctorPDF::FormBuilder do
 
   describe ".parse — racine YAML" do
     it "rejette si ni sections: ni fields:" do
-      expect_raises(AsciidoctorPDF::FormError, /sections.*OU.*fields/) do
+      expect_raises(AsciicrystalPDF::FormError, /sections.*OU.*fields/) do
         parse("title: 'Hello'\n")
       end
     end
 
     it "rejette si sections: ET fields: tous deux présents" do
-      expect_raises(AsciidoctorPDF::FormError, /mutuellement exclusifs/) do
+      expect_raises(AsciicrystalPDF::FormError, /mutuellement exclusifs/) do
         parse(<<-YAML)
           fields: [{id: x, type: text}]
           sections:
@@ -68,7 +68,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette un YAML cassé avec message descriptif" do
-      expect_raises(AsciidoctorPDF::FormError, /YAML invalide/) do
+      expect_raises(AsciicrystalPDF::FormError, /YAML invalide/) do
         parse(":\n  not: valid: yaml: at all\n  ")
       end
     end
@@ -101,7 +101,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette columns < 1" do
-      expect_raises(AsciidoctorPDF::FormError, /`columns` doit être ≥ 1/) do
+      expect_raises(AsciicrystalPDF::FormError, /`columns` doit être ≥ 1/) do
         parse(<<-YAML)
           columns: 0
           fields: [{id: x, type: text}]
@@ -151,24 +151,24 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette un champ sans id" do
-      expect_raises(AsciidoctorPDF::FormError, /`id` requis/) do
+      expect_raises(AsciicrystalPDF::FormError, /`id` requis/) do
         parse("fields: [{type: text}]")
       end
     end
 
     it "rejette un champ sans type" do
-      expect_raises(AsciidoctorPDF::FormError, /`type` requis/) do
+      expect_raises(AsciicrystalPDF::FormError, /`type` requis/) do
         parse("fields: [{id: x}]")
       end
     end
 
     it "rejette un type inconnu avec liste des disponibles" do
-      expect_raises(AsciidoctorPDF::FormError, /type `xyz` inconnu/) do
+      expect_raises(AsciicrystalPDF::FormError, /type `xyz` inconnu/) do
         parse("fields: [{id: x, type: xyz}]")
       end
     end
 
-    it "accepte type `signature` (depuis pdf 0.5.9 + crystal-asciidoctor-pdf 2.3.24.59)" do
+    it "accepte type `signature` (depuis pdf 0.5.9 + asciicrystal-pdf 2.3.24.59)" do
       form = parse("fields: [{id: sig, type: signature, label: Signature}]")
       f = form.fields.first
       f.type.should eq("signature")
@@ -176,7 +176,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette les ids dupliqués" do
-      expect_raises(AsciidoctorPDF::FormError, /id `nom` dupliqué/) do
+      expect_raises(AsciicrystalPDF::FormError, /id `nom` dupliqué/) do
         parse(<<-YAML)
           fields:
             - id: nom
@@ -188,13 +188,13 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette cols < 1" do
-      expect_raises(AsciidoctorPDF::FormError, /`cols` doit être ≥ 1/) do
+      expect_raises(AsciicrystalPDF::FormError, /`cols` doit être ≥ 1/) do
         parse("fields: [{id: x, type: text, cols: 0}]")
       end
     end
 
     it "rejette rows < 1 (textarea)" do
-      expect_raises(AsciidoctorPDF::FormError, /`rows` doit être ≥ 1/) do
+      expect_raises(AsciicrystalPDF::FormError, /`rows` doit être ≥ 1/) do
         parse("fields: [{id: x, type: textarea, rows: 0}]")
       end
     end
@@ -289,19 +289,19 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette options absentes pour radio" do
-      expect_raises(AsciidoctorPDF::FormError, /`options` requis pour type `radio`/) do
+      expect_raises(AsciicrystalPDF::FormError, /`options` requis pour type `radio`/) do
         parse("fields: [{id: r, type: radio}]")
       end
     end
 
     it "rejette options vides pour select" do
-      expect_raises(AsciidoctorPDF::FormError, /ne peut pas être vide/) do
+      expect_raises(AsciicrystalPDF::FormError, /ne peut pas être vide/) do
         parse("fields: [{id: s, type: select, options: []}]")
       end
     end
 
     it "rejette un type YAML invalide pour options" do
-      expect_raises(AsciidoctorPDF::FormError, /doit être une liste ou un hash/) do
+      expect_raises(AsciicrystalPDF::FormError, /doit être une liste ou un hash/) do
         parse(<<-YAML)
           fields:
             - id: r
@@ -359,7 +359,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette une section sans fields" do
-      expect_raises(AsciidoctorPDF::FormError, /`fields:` requis/) do
+      expect_raises(AsciicrystalPDF::FormError, /`fields:` requis/) do
         parse(<<-YAML)
           sections:
             - title: "A"
@@ -368,7 +368,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "détecte les ids dupliqués entre sections" do
-      expect_raises(AsciidoctorPDF::FormError, /id `nom` dupliqué/) do
+      expect_raises(AsciicrystalPDF::FormError, /id `nom` dupliqué/) do
         parse(<<-YAML)
           sections:
             - title: A
@@ -380,7 +380,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette section.columns < 1" do
-      expect_raises(AsciidoctorPDF::FormError, /`columns` doit être ≥ 1/) do
+      expect_raises(AsciicrystalPDF::FormError, /`columns` doit être ≥ 1/) do
         parse(<<-YAML)
           sections:
             - title: A
@@ -416,7 +416,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette submit.method invalide" do
-      expect_raises(AsciidoctorPDF::FormError, /`submit\.method=patch` invalide/) do
+      expect_raises(AsciicrystalPDF::FormError, /`submit\.method=patch` invalide/) do
         parse(<<-YAML)
           fields: [{id: x, type: text}]
           submit:
@@ -457,7 +457,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette bouton sans label" do
-      expect_raises(AsciidoctorPDF::FormError, /`label` requis/) do
+      expect_raises(AsciicrystalPDF::FormError, /`label` requis/) do
         parse(<<-YAML)
           fields: [{id: x, type: text}]
           buttons:
@@ -467,7 +467,7 @@ describe AsciidoctorPDF::FormBuilder do
     end
 
     it "rejette bouton sans action" do
-      expect_raises(AsciidoctorPDF::FormError, /`action` requis/) do
+      expect_raises(AsciicrystalPDF::FormError, /`action` requis/) do
         parse(<<-YAML)
           fields: [{id: x, type: text}]
           buttons:
@@ -535,55 +535,55 @@ describe AsciidoctorPDF::FormBuilder do
   describe "FormField helpers" do
     it "has_options? est true pour radio/select/select-multi" do
       %w[radio select select-multi].each do |t|
-        f = AsciidoctorPDF::FormField.new(id: "x", type: t, options: ["A"])
+        f = AsciicrystalPDF::FormField.new(id: "x", type: t, options: ["A"])
         f.has_options?.should be_true
       end
     end
 
     it "has_options? est false pour text/email/checkbox" do
       %w[text email checkbox textarea number date password url tel].each do |t|
-        f = AsciidoctorPDF::FormField.new(id: "x", type: t)
+        f = AsciicrystalPDF::FormField.new(id: "x", type: t)
         f.has_options?.should be_false
       end
     end
 
     it "option_codes retourne [] sans options" do
-      f = AsciidoctorPDF::FormField.new(id: "x", type: "text")
+      f = AsciicrystalPDF::FormField.new(id: "x", type: "text")
       f.option_codes.should eq([] of String)
     end
 
     it "option_codes retourne la liste pour Array options" do
-      f = AsciidoctorPDF::FormField.new(id: "x", type: "radio", options: ["A", "B"])
+      f = AsciicrystalPDF::FormField.new(id: "x", type: "radio", options: ["A", "B"])
       f.option_codes.should eq(["A", "B"])
     end
 
     it "option_codes retourne les clés pour Hash options" do
-      f = AsciidoctorPDF::FormField.new(id: "x", type: "radio", options: {"A" => "Alpha", "B" => "Beta"})
+      f = AsciicrystalPDF::FormField.new(id: "x", type: "radio", options: {"A" => "Alpha", "B" => "Beta"})
       f.option_codes.should eq(["A", "B"])
       f.option_labels.should eq({"A" => "Alpha", "B" => "Beta"})
     end
 
     it "value_string retourne la chaîne ou nil" do
-      f = AsciidoctorPDF::FormField.new(id: "x", type: "text", value: YAML::Any.new("hello"))
+      f = AsciicrystalPDF::FormField.new(id: "x", type: "text", value: YAML::Any.new("hello"))
       f.value_string.should eq("hello")
 
-      f2 = AsciidoctorPDF::FormField.new(id: "x", type: "text")
+      f2 = AsciicrystalPDF::FormField.new(id: "x", type: "text")
       f2.value_string.should be_nil
     end
 
     it "value_array retourne une liste depuis YAML::Any array" do
       v = YAML.parse("[A, B, C]")
-      f = AsciidoctorPDF::FormField.new(id: "x", type: "select-multi", value: v)
+      f = AsciicrystalPDF::FormField.new(id: "x", type: "select-multi", value: v)
       f.value_array.should eq(["A", "B", "C"])
     end
 
     it "value_array enveloppe une chaîne unique dans une liste" do
-      f = AsciidoctorPDF::FormField.new(id: "x", type: "select-multi", value: YAML::Any.new("solo"))
+      f = AsciicrystalPDF::FormField.new(id: "x", type: "select-multi", value: YAML::Any.new("solo"))
       f.value_array.should eq(["solo"])
     end
 
     it "value_array retourne nil si pas de valeur" do
-      f = AsciidoctorPDF::FormField.new(id: "x", type: "select-multi")
+      f = AsciicrystalPDF::FormField.new(id: "x", type: "select-multi")
       f.value_array.should be_nil
     end
   end

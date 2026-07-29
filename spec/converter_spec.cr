@@ -9,8 +9,8 @@ Dir.mkdir_p(OUTPUT_DIR)
 # Utilitaire : convertit un contenu AsciiDoc et retourne le chemin du PDF
 private def convert_to_pdf(content : String, filename : String) : String
   output_path = "#{OUTPUT_DIR}/#{filename}.pdf"
-  doc = Asciidoctor.load(content, options: {"safe" => "safe", "outfile" => output_path})
-  converter = AsciidoctorPDF::Converter.new
+  doc = Asciicrystal.load(content, options: {"safe" => "safe", "outfile" => output_path})
+  converter = AsciicrystalPDF::Converter.new
   converter.convert(doc)
   output_path
 end
@@ -23,7 +23,7 @@ private def assert_pdf_generated(content : String, filename : String) : Nil
   File.delete(path)
 end
 
-describe AsciidoctorPDF::Converter do
+describe AsciicrystalPDF::Converter do
   # =========================================================================
   # Blocs de base
   # =========================================================================
@@ -151,13 +151,13 @@ describe AsciidoctorPDF::Converter do
   # =========================================================================
 
   it "should use a custom theme" do
-    theme = AsciidoctorPDF::Theme.new
+    theme = AsciicrystalPDF::Theme.new
     theme.base_font_size = 14.0
     theme.base_font_color = "0000ff"
 
     output_path = "#{OUTPUT_DIR}/custom_theme.pdf"
-    doc = Asciidoctor.load("Texte avec thème personnalisé.", options: {"safe" => "safe", "outfile" => output_path})
-    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    doc = Asciicrystal.load("Texte avec thème personnalisé.", options: {"safe" => "safe", "outfile" => output_path})
+    converter = AsciicrystalPDF::Converter.new("pdf", theme)
     converter.convert(doc)
 
     File.exists?(output_path).should be_true
@@ -214,7 +214,7 @@ describe AsciidoctorPDF::Converter do
 
   it "should collect index terms and generate index page" do
     # Le thème doit avoir index_enabled = true pour déclencher le rendu
-    theme = AsciidoctorPDF::Theme.new
+    theme = AsciicrystalPDF::Theme.new
     theme.index_enabled = true
 
     input = <<-ADOC
@@ -231,8 +231,8 @@ describe AsciidoctorPDF::Converter do
     ADOC
 
     output_path = "#{OUTPUT_DIR}/index_test.pdf"
-    doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => output_path})
-    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    doc = Asciicrystal.load(input, options: {"safe" => "safe", "outfile" => output_path})
+    converter = AsciicrystalPDF::Converter.new("pdf", theme)
     converter.convert(doc)
 
     File.exists?(output_path).should be_true
@@ -241,13 +241,13 @@ describe AsciidoctorPDF::Converter do
   end
 
   it "should not generate index page when index_enabled is false" do
-    theme = AsciidoctorPDF::Theme.new
+    theme = AsciicrystalPDF::Theme.new
     theme.index_enabled = false
 
     input = "Texte avec Crystal((Crystal)) indexé."
     output_path = "#{OUTPUT_DIR}/no_index_test.pdf"
-    doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => output_path})
-    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    doc = Asciicrystal.load(input, options: {"safe" => "safe", "outfile" => output_path})
+    converter = AsciicrystalPDF::Converter.new("pdf", theme)
     converter.convert(doc)
 
     File.exists?(output_path).should be_true
@@ -256,7 +256,7 @@ describe AsciidoctorPDF::Converter do
   end
 
   it "should generate index with multiple columns" do
-    theme = AsciidoctorPDF::Theme.new
+    theme = AsciicrystalPDF::Theme.new
     theme.index_enabled = true
     theme.index_columns = 3
 
@@ -268,8 +268,8 @@ describe AsciidoctorPDF::Converter do
     ADOC
 
     output_path = "#{OUTPUT_DIR}/index_multicolumn.pdf"
-    doc = Asciidoctor.load(input, options: {"safe" => "safe", "outfile" => output_path})
-    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    doc = Asciicrystal.load(input, options: {"safe" => "safe", "outfile" => output_path})
+    converter = AsciicrystalPDF::Converter.new("pdf", theme)
     converter.convert(doc)
 
     File.exists?(output_path).should be_true
@@ -323,7 +323,7 @@ describe AsciidoctorPDF::Converter do
     path = convert_to_pdf("Contenu simple.", "metadata_producer")
     content = String.new(File.read(path).to_slice)
     content.should contain("/Producer")
-    content.should contain("crystal-asciidoctor-pdf")
+    content.should contain("asciicrystal-pdf")
     File.delete(path)
   end
 

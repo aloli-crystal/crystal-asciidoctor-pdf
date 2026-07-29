@@ -1,6 +1,6 @@
 require "country-flags"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Inline flag handling for PDF rendering.
   #
   # Country flag emojis in AsciiDoc are encoded as pairs of consecutive

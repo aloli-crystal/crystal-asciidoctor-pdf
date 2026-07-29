@@ -22,27 +22,27 @@ private def with_xdg_dir(&)
 end
 
 private def write_config(xdg_dir : String, content : String) : String
-  shard_dir = File.join(xdg_dir, AsciidoctorPDF::UserConfig::SHARD_NAME)
+  shard_dir = File.join(xdg_dir, AsciicrystalPDF::UserConfig::SHARD_NAME)
   Dir.mkdir_p(shard_dir)
-  config_path = File.join(shard_dir, AsciidoctorPDF::UserConfig::CONFIG_FILENAME)
+  config_path = File.join(shard_dir, AsciicrystalPDF::UserConfig::CONFIG_FILENAME)
   File.write(config_path, content)
   shard_dir
 end
 
-describe AsciidoctorPDF::UserConfig do
+describe AsciicrystalPDF::UserConfig do
   describe ".expected_dir" do
     it "respecte XDG_CONFIG_HOME quand la variable est définie" do
       with_xdg_dir do |tmp|
-        AsciidoctorPDF::UserConfig.expected_dir.should eq(File.join(tmp, "crystal-asciidoctor-pdf"))
+        AsciicrystalPDF::UserConfig.expected_dir.should eq(File.join(tmp, "asciicrystal-pdf"))
       end
     end
 
-    it "tombe sur ~/.config/crystal-asciidoctor-pdf si XDG_CONFIG_HOME est vide" do
+    it "tombe sur ~/.config/asciicrystal-pdf si XDG_CONFIG_HOME est vide" do
       previous = ENV["XDG_CONFIG_HOME"]?
       ENV["XDG_CONFIG_HOME"] = ""
       begin
-        expected = File.join(AsciidoctorPDF::UserConfig.home_dir, ".config", "crystal-asciidoctor-pdf")
-        AsciidoctorPDF::UserConfig.expected_dir.should eq(expected)
+        expected = File.join(AsciicrystalPDF::UserConfig.home_dir, ".config", "asciicrystal-pdf")
+        AsciicrystalPDF::UserConfig.expected_dir.should eq(expected)
       ensure
         if previous
           ENV["XDG_CONFIG_HOME"] = previous
@@ -56,7 +56,7 @@ describe AsciidoctorPDF::UserConfig do
   describe ".load" do
     it "retourne une config vide si le répertoire n'existe pas" do
       with_xdg_dir do
-        cfg = AsciidoctorPDF::UserConfig.load
+        cfg = AsciicrystalPDF::UserConfig.load
         cfg.empty?.should be_true
       end
     end
@@ -74,7 +74,7 @@ describe AsciidoctorPDF::UserConfig do
           organization: ALOLI sas
         YAML
 
-        cfg = AsciidoctorPDF::UserConfig.load
+        cfg = AsciicrystalPDF::UserConfig.load
         cfg.theme.should eq("fr")
         cfg.attributes["title-page-toc"].should eq("true")
         cfg.attributes["toc"].should eq("macro")
@@ -87,19 +87,19 @@ describe AsciidoctorPDF::UserConfig do
     end
 
     it "lit `open:` (true / false) pour piloter l'ouverture auto" do
-      AsciidoctorPDF::UserConfig.from_yaml("open: true").open.should be_true
-      AsciidoctorPDF::UserConfig.from_yaml("open: false").open.should be_false
+      AsciicrystalPDF::UserConfig.from_yaml("open: true").open.should be_true
+      AsciicrystalPDF::UserConfig.from_yaml("open: false").open.should be_false
     end
 
     it "`open` vaut nil quand la clé est absente (⇒ ouverture par défaut)" do
-      AsciidoctorPDF::UserConfig.empty.open.should be_nil
-      AsciidoctorPDF::UserConfig.from_yaml("theme: fr").open.should be_nil
+      AsciicrystalPDF::UserConfig.empty.open.should be_nil
+      AsciicrystalPDF::UserConfig.from_yaml("theme: fr").open.should be_nil
     end
 
     it "tolère un YAML cassé en retournant une config vide" do
       with_xdg_dir do |tmp|
         write_config(tmp, ":\n  not valid: yaml: at all\n  ")
-        cfg = AsciidoctorPDF::UserConfig.load
+        cfg = AsciicrystalPDF::UserConfig.load
         cfg.empty?.should be_true
       end
     end
@@ -107,7 +107,7 @@ describe AsciidoctorPDF::UserConfig do
 
   describe "#merge_into" do
     it "n'écrase PAS les attributs déjà présents (priorité au document/CLI)" do
-      cfg = AsciidoctorPDF::UserConfig.from_yaml(<<-YAML)
+      cfg = AsciicrystalPDF::UserConfig.from_yaml(<<-YAML)
         attributes:
           toc: macro
           pdf-page-size: A4
@@ -124,7 +124,7 @@ describe AsciidoctorPDF::UserConfig do
     end
 
     it "ajoute auteur/email/organization (en soft-set) si absents" do
-      cfg = AsciidoctorPDF::UserConfig.from_yaml(<<-YAML)
+      cfg = AsciicrystalPDF::UserConfig.from_yaml(<<-YAML)
         author: Philippe
         email: p@aloli.fr
         organization: ALOLI
@@ -141,7 +141,7 @@ describe AsciidoctorPDF::UserConfig do
     end
 
     it "respecte un author déjà présent" do
-      cfg = AsciidoctorPDF::UserConfig.from_yaml("author: Philippe")
+      cfg = AsciicrystalPDF::UserConfig.from_yaml("author: Philippe")
       target = {"author" => "Marie"} of String => String
       cfg.merge_into(target)
       target["author"].should eq("Marie")
@@ -150,21 +150,21 @@ describe AsciidoctorPDF::UserConfig do
 
   describe "#resolve_theme" do
     it "retourne nil si aucun theme n'est déclaré" do
-      cfg = AsciidoctorPDF::UserConfig.empty
+      cfg = AsciicrystalPDF::UserConfig.empty
       cfg.resolve_theme.should be_nil
     end
 
     it "résout un nom embarqué (fr)" do
-      cfg = AsciidoctorPDF::UserConfig.from_yaml("theme: fr")
+      cfg = AsciicrystalPDF::UserConfig.from_yaml("theme: fr")
       theme = cfg.resolve_theme
       theme.should_not be_nil
       # Le thème fr a au moins une langue/locale ; on vérifie juste qu'on en a un
-      theme.is_a?(AsciidoctorPDF::Theme).should be_true
+      theme.is_a?(AsciicrystalPDF::Theme).should be_true
     end
 
     it "résout un thème utilisateur dans <base_dir>/themes/<name>.yml" do
       with_xdg_dir do |tmp|
-        shard_dir = File.join(tmp, AsciidoctorPDF::UserConfig::SHARD_NAME)
+        shard_dir = File.join(tmp, AsciicrystalPDF::UserConfig::SHARD_NAME)
         themes_dir = File.join(shard_dir, "themes")
         Dir.mkdir_p(themes_dir)
         File.write(File.join(themes_dir, "aloli.yml"), <<-YAML)
@@ -173,7 +173,7 @@ describe AsciidoctorPDF::UserConfig do
         YAML
         File.write(File.join(shard_dir, "config.yml"), "theme: aloli\n")
 
-        cfg = AsciidoctorPDF::UserConfig.load
+        cfg = AsciicrystalPDF::UserConfig.load
         theme = cfg.resolve_theme
         theme.should_not be_nil
         theme.not_nil!.base_font_size.should eq(11.5)
@@ -184,7 +184,7 @@ describe AsciidoctorPDF::UserConfig do
       tmp_theme = File.tempname("theme", ".yml")
       File.write(tmp_theme, "base_font_size: 13.0\n")
       begin
-        cfg = AsciidoctorPDF::UserConfig.from_yaml("theme: #{tmp_theme}")
+        cfg = AsciicrystalPDF::UserConfig.from_yaml("theme: #{tmp_theme}")
         theme = cfg.resolve_theme
         theme.should_not be_nil
         theme.not_nil!.base_font_size.should eq(13.0)
@@ -196,13 +196,13 @@ describe AsciidoctorPDF::UserConfig do
 
   describe "#empty?" do
     it "vrai pour une config sans rien" do
-      AsciidoctorPDF::UserConfig.empty.empty?.should be_true
+      AsciicrystalPDF::UserConfig.empty.empty?.should be_true
     end
 
     it "faux dès qu'un seul champ est rempli" do
-      AsciidoctorPDF::UserConfig.from_yaml("theme: fr").empty?.should be_false
-      AsciidoctorPDF::UserConfig.from_yaml("author: X").empty?.should be_false
-      AsciidoctorPDF::UserConfig.from_yaml("attributes:\n  toc: macro").empty?.should be_false
+      AsciicrystalPDF::UserConfig.from_yaml("theme: fr").empty?.should be_false
+      AsciicrystalPDF::UserConfig.from_yaml("author: X").empty?.should be_false
+      AsciicrystalPDF::UserConfig.from_yaml("attributes:\n  toc: macro").empty?.should be_false
     end
   end
 end

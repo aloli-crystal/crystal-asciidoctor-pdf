@@ -1,4 +1,4 @@
-# Thème français livré avec crystal-asciidoctor-pdf.
+# Thème français livré avec asciicrystal-pdf.
 #
 # Reprend les défauts du thème de base (Helvetica, marges A4, couleurs
 # d'admonitions classiques) et y ajoute la francisation des libellés :
@@ -9,7 +9,7 @@
 #
 # Activable via :
 #
-#     crystal-asciidoctor-pdf --theme fr mon-doc.adoc        (CLI)
+#     asciicrystal-pdf --theme fr mon-doc.adoc        (CLI)
 #     :pdf-theme: fr                                          (source)
 #     ThemeLoader.builtin("fr")                               (API Crystal)
 #
@@ -26,7 +26,7 @@ admonition_caution_label: "ATTENTION"
 admonition_important_label: "IMPORTANT"
 
 # --- Table des matières ---
-# Le défaut crystal-asciidoctor-pdf est déjà "Table des matières",
+# Le défaut asciicrystal-pdf est déjà "Table des matières",
 # on le réaffirme ici pour l'explicite.
 toc_title: "Table des matières"
 

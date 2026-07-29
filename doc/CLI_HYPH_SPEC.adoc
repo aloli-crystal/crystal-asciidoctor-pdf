@@ -5,7 +5,7 @@
 :source-highlighter: rouge
 
 Cette spec décrit la sous-commande `hyph` du binaire
-`bin/asciidoctor-pdf` (nom court interne : `crystal-asciidoctor-pdf`).
+`bin/asciidoctor-pdf` (nom court interne : `asciicrystal-pdf`).
 Elle gère les *patterns de césure Liang* utilisés par le moteur
 Knuth-Plass introduit aux jalons J1–J4 du chantier de composition de
 paragraphes.

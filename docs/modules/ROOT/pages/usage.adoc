@@ -4,7 +4,7 @@
 
 [source,crystal]
 ----
-require "crystal-asciidoctor-pdf"
+require "asciicrystal-pdf"
 
 input = <<-ADOC
 = My Document
@@ -48,7 +48,7 @@ mono_font_path: "fonts/JetBrainsMono-Regular.ttf"
 
 [source,bash]
 ----
-crystal-asciidoctor-pdf document.adoc
+asciicrystal-pdf document.adoc
 ----
 
 === Options
@@ -80,6 +80,6 @@ crystal-asciidoctor-pdf document.adoc
 
 [source,bash]
 ----
-crystal-asciidoctor-pdf --sample
+asciicrystal-pdf --sample
 # => reference.adoc + reference.adoc.pdf
 ----

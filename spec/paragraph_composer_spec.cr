@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-include AsciidoctorPDF
+include AsciicrystalPDF
 
 # Mesure simpliste pour les tests : 1 point PDF par caractère.
 # Permet de calculer à la main les largeurs attendues sans dépendre
@@ -11,7 +11,7 @@ private def seg(text : String, bold : Bool = false) : InlineSegment
   InlineSegment.new(text: text, bold: bold)
 end
 
-describe AsciidoctorPDF::ParagraphComposer do
+describe AsciicrystalPDF::ParagraphComposer do
   describe ".tokenize" do
     it "émet une seule Box pour un mot isolé" do
       tokens = ParagraphComposer.tokenize([seg("hello")], 10.0, &WIDTH_OF_CHAR)

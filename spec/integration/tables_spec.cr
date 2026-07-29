@@ -117,7 +117,7 @@ describe "Tables" do
   end
 
   it "does not duplicate rows when a bold cell ends with a number" do
-    # Régression (parser crystal-asciidoctor ~> 2.0.26.10) : une cellule
+    # Régression (parser asciicrystal ~> 2.0.26.10) : une cellule
     # finissant par un gras à nombre, p.ex. `*Phase 5.2 6.0*`, voyait son
     # `6.0*` final pris pour le multiplicateur de cellule « répéter 6× »,
     # ce qui dupliquait les rangées et déversait le texte dans les

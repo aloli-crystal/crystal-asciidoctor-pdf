@@ -11,8 +11,9 @@ Add to your `shard.yml`:
 [source,yaml]
 ----
 dependencies:
-  crystal-asciidoctor-pdf:
-    github: aloli-crystal/crystal-asciidoctor-pdf
+  asciicrystal-pdf:
+    github: aloli-crystal/asciicrystal-pdf
+    version: "~> 2.3.24.108"
 ----
 
 Run `shards install`.
@@ -21,14 +22,14 @@ Run `shards install`.
 
 [source,bash]
 ----
-git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
-cd crystal-asciidoctor-pdf
+git clone https://github.com/aloli-crystal/asciicrystal-pdf.git
+cd asciicrystal-pdf
 shards build --release
-ln -s "$PWD/bin/crystal-asciidoctor-pdf" ~/bin/
+ln -s "$PWD/bin/asciicrystal-pdf" ~/bin/
 ----
 
 == Dependencies
 
-* https://github.com/aloli-crystal/crystal-asciidoctor[crystal-asciidoctor] (~> 2.0) -- AsciiDoc parser
+* https://github.com/aloli-crystal/asciicrystal[asciicrystal] (~> 2.0) -- AsciiDoc parser
 * https://github.com/aloli-crystal/pdf[pdf] (~> 0.2) -- PDF engine
-* https://github.com/aloli-crystal/crystal-rouge[crystal-rouge] (~> 4.7) -- syntax highlighting
+* https://github.com/aloli-crystal/rouge[rouge] (~> 4.7) -- syntax highlighting

@@ -2,7 +2,7 @@ require "pdf"
 require "country-flags"
 require "./inline_flags"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Segment de texte inline avec ses attributs de style.
   # `sup`/`sub` activent l'exposant / l'indice (taille réduite + décalage
   # vertical au rendu). `mark` active un fond de surlignage. `kbd`,
@@ -30,7 +30,7 @@ module AsciidoctorPDF
     image_height : Float64? = nil,
     line_break : Bool = false
 
-  # Rend le markup inline HTML généré par crystal-asciidoctor sur une page PDF.
+  # Rend le markup inline HTML généré par asciicrystal sur une page PDF.
   # Gère les balises <strong>, <em>, <code>, <a href>, <span style="color:...">, etc.
   module InlineRenderer
     # Parse une chaîne HTML inline et retourne une liste de segments stylisés.
@@ -184,7 +184,7 @@ module AsciidoctorPDF
         return if buffered.empty?
         # Skip whitespace-only segments AVANT le 1er segment réel.
         # Cas typique : HTML `<div class="paragraph">\n<p>beryl...`
-        # injecté par crystal-asciidoctor pour les admonitions et
+        # injecté par asciicrystal pour les admonitions et
         # autres conteneurs — le `\n` entre `<div>` et `<p>` génère
         # sinon un segment text=" " qui décale visuellement le 1er
         # mot vers la droite (de la largeur d'un espace).

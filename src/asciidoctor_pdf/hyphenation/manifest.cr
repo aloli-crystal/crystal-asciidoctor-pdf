@@ -1,4 +1,4 @@
-module AsciidoctorPDF
+module AsciicrystalPDF
   module Hyphenation
     # Manifest des patterns Liang officiellement supportés.
     # Les 7 langues marquées `embedded: true` sont incluses dans

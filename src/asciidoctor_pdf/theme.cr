@@ -1,4 +1,4 @@
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Répertoire data/fonts/ contenant les polices TTF embarquées (DejaVu Sans).
   # Résolu à la compilation par rapport au fichier source.
   FONTS_DIR = File.join(File.dirname(File.dirname(__DIR__)), "data", "fonts")

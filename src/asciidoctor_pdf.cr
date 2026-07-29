@@ -1,4 +1,4 @@
-require "crystal-asciidoctor"
+require "asciicrystal"
 require "pdf"
 
 require "./asciidoctor_pdf/theme"
@@ -16,7 +16,7 @@ require "./asciidoctor_pdf/paragraph_composer"
 require "./asciidoctor_pdf/syntax_highlighter"
 require "./asciidoctor_pdf/converter"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Lue au compile-time depuis `shard.yml` via le macro `read_file`.
   # Cf. note mémoire `feedback_shard_version_macro.md` (mémoire ALOLI).
   VERSION = {{
@@ -31,7 +31,7 @@ module AsciidoctorPDF
   UPSTREAM_VERSION = "2.3.24"
 
   # Version de la gem Ruby asciidoctor (parser) sur laquelle ce shard est aligné
-  # via sa dépendance crystal-asciidoctor.
-  # Doit rester synchronisée avec Asciidoctor::UPSTREAM_VERSION dans crystal-asciidoctor.
+  # via sa dépendance asciicrystal.
+  # Doit rester synchronisée avec Asciicrystal::UPSTREAM_VERSION dans asciicrystal.
   UPSTREAM_ASCIIDOCTOR_VERSION = "2.0.26"
 end

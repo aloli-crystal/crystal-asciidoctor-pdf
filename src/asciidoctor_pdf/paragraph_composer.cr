@@ -1,7 +1,7 @@
 require "./inline_renderer"
 require "./hyphenation"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Moteur de composition de paragraphes inspiré de TeX.
   # Référence : Knuth & Plass, *Breaking Paragraphs into Lines*,
   # Software Practice & Experience, vol. 11, p. 1119-1184, 1981.

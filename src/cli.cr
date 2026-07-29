@@ -6,7 +6,7 @@ require "option_parser"
 # Court-circuite le parsing OptionParser principal (lui-même
 # dédié à la génération PDF).
 if ARGV.first? == "hyph"
-  AsciidoctorPDF::HyphCli.run(ARGV.size > 1 ? ARGV[1..] : [] of String)
+  AsciicrystalPDF::HyphCli.run(ARGV.size > 1 ? ARGV[1..] : [] of String)
   exit 0
 end
 
@@ -24,30 +24,30 @@ attributes = {} of String => String
 # la place un message clair + un renvoi vers l'aide, et on sort en 1.
 begin
   OptionParser.parse do |parser|
-    parser.banner = "Usage : crystal-asciidoctor-pdf [options] fichier.adoc [fichier2.adoc …]"
+    parser.banner = "Usage : asciicrystal-pdf [options] fichier.adoc [fichier2.adoc …]"
     parser.on("-o FILE", "--out-file FILE", "Fichier de sortie PDF (par défaut : fichier.adoc.pdf)") { |f| output_file = f }
-    parser.on("-T NAME", "--theme NAME", "Thème : nom embarqué (#{AsciidoctorPDF::ThemeLoader.builtin_names.join(", ")}) ou chemin YAML") { |f| theme_file = f }
+    parser.on("-T NAME", "--theme NAME", "Thème : nom embarqué (#{AsciicrystalPDF::ThemeLoader.builtin_names.join(", ")}) ou chemin YAML") { |f| theme_file = f }
     parser.on("-a ATTR", "--attribute ATTR", "Attribut nom=valeur") do |a|
       parts = a.split("=", 2)
       attributes[parts[0]] = parts.size > 1 ? parts[1] : ""
     end
-    parser.on("-N", "--no-user-config", "Ignorer la configuration utilisateur (#{AsciidoctorPDF::UserConfig.expected_dir}/config.yml)") { no_user_config = true }
+    parser.on("-N", "--no-user-config", "Ignorer la configuration utilisateur (#{AsciicrystalPDF::UserConfig.expected_dir}/config.yml)") { no_user_config = true }
     parser.on("-n", "--no-open", "Ne PAS ouvrir le PDF (l'ouverture est faite par défaut ; macOS : Aperçu)") { no_open = true }
     parser.on("--sample", "Générer le document de référence (reference.adoc + PDF)") { sample_mode = true }
     parser.on("-h", "--help", "Afficher l'aide") { puts parser; exit 0 }
-    parser.on("-v", "--version", "Afficher la version") { puts "crystal-asciidoctor-pdf #{AsciidoctorPDF::VERSION}"; exit 0 }
+    parser.on("-v", "--version", "Afficher la version") { puts "asciicrystal-pdf #{AsciicrystalPDF::VERSION}"; exit 0 }
     parser.unknown_args { |args| input_files = args }
   end
 rescue ex : OptionParser::MissingOption | OptionParser::InvalidOption
   STDERR.puts "Erreur : #{ex.message}"
-  STDERR.puts "Usage : crystal-asciidoctor-pdf [options] fichier.adoc [fichier2.adoc …]"
-  STDERR.puts "Aide  : crystal-asciidoctor-pdf --help"
+  STDERR.puts "Usage : asciicrystal-pdf [options] fichier.adoc [fichier2.adoc …]"
+  STDERR.puts "Aide  : asciicrystal-pdf --help"
   exit 1
 end
 
 # Chargement de la configuration utilisateur (XDG).
 # Court-circuité par `--no-user-config`.
-user_config = no_user_config ? AsciidoctorPDF::UserConfig.empty : AsciidoctorPDF::UserConfig.load
+user_config = no_user_config ? AsciicrystalPDF::UserConfig.empty : AsciicrystalPDF::UserConfig.load
 
 # Ouverture du PDF : SYSTÉMATIQUE par défaut. Désactivable pour un run
 # via `-n`/`--no-open` (prioritaire), ou de façon persistante via
@@ -56,8 +56,8 @@ user_config = no_user_config ? AsciidoctorPDF::UserConfig.empty : AsciidoctorPDF
 open_after = no_open ? false : (user_config.open != false)
 
 if sample_mode
-  # Le fichier de référence est dans crystal-asciidoctor (le shard cœur)
-  sample_src = File.join(__DIR__, "..", "lib", "crystal-asciidoctor", "data", "samples", "reference.adoc")
+  # Le fichier de référence est dans asciicrystal (le shard cœur)
+  sample_src = File.join(__DIR__, "..", "lib", "asciicrystal", "data", "samples", "reference.adoc")
   # Fallback : chercher dans le shard local
   unless File.exists?(sample_src)
     sample_src = File.join(__DIR__, "..", "data", "samples", "reference.adoc")
@@ -65,10 +65,10 @@ if sample_mode
   sample_dest = File.join(Dir.current, "reference.adoc")
   sample_pdf = File.join(Dir.current, "reference.adoc.pdf")
   File.write(sample_dest, File.read(sample_src))
-  theme = AsciidoctorPDF::Theme.new
+  theme = AsciicrystalPDF::Theme.new
   options = {"docfile" => sample_dest, "outfile" => sample_pdf} of String => String
-  doc = Asciidoctor.load_file(sample_dest, options)
-  converter = AsciidoctorPDF::Converter.new("pdf", theme)
+  doc = Asciicrystal.load_file(sample_dest, options)
+  converter = AsciicrystalPDF::Converter.new("pdf", theme)
   converter.convert(doc)
   puts "Document de référence généré : reference.adoc et reference.adoc.pdf"
   exit 0
@@ -76,14 +76,14 @@ end
 
 if input_files.empty?
   STDERR.puts "Erreur : aucun fichier d'entrée spécifié."
-  STDERR.puts "Usage : crystal-asciidoctor-pdf [options] fichier.adoc [fichier2.adoc …]"
+  STDERR.puts "Usage : asciicrystal-pdf [options] fichier.adoc [fichier2.adoc …]"
   exit 1
 end
 
 # `-o`/`--out-file` impose UN nom de sortie : incompatible avec
 # plusieurs fichiers d'entrée (le second écraserait le PDF du premier).
 # Sans `-o`, chaque fichier produit son propre `<nom>.adoc.pdf` — c'est
-# ce qui permet `crystal-asciidoctor-pdf *.adoc`.
+# ce qui permet `asciicrystal-pdf *.adoc`.
 if !output_file.empty? && input_files.size > 1
   STDERR.puts "Erreur : -o/--out-file ne peut pas servir avec plusieurs fichiers d'entrée."
   STDERR.puts "Sans -o, chaque fichier produit son propre <nom>.adoc.pdf."
@@ -111,7 +111,7 @@ input_files.each do |input_file|
   # Fusion des attributs CLI puis user config dans `options`.
   # Ordre important : les attributs CLI ont la priorité sur le user
   # config ; le document AsciiDoc lui-même peut encore écraser tout ça
-  # via `:attribut: valeur` (gestion par Asciidoctor.load).
+  # via `:attribut: valeur` (gestion par Asciicrystal.load).
   attributes.each { |k, v| options[k] = v }
   user_config.merge_into(options)
 
@@ -133,7 +133,7 @@ input_files.each do |input_file|
   options["safe"] = "unsafe" unless options.has_key?("safe")
 
   begin
-    doc = Asciidoctor.load_file(input_file, options)
+    doc = Asciicrystal.load_file(input_file, options)
 
     # Résolution du thème, par ordre de priorité décroissante :
     #   1. argument CLI `--theme` (nom embarqué OU chemin YAML)
@@ -142,16 +142,16 @@ input_files.each do |input_file|
     #   4. thème par défaut intégré
     theme =
       if !theme_file.empty?
-        AsciidoctorPDF::ThemeLoader.resolve(theme_file)
+        AsciicrystalPDF::ThemeLoader.resolve(theme_file)
       elsif (pdf_theme = doc.attr("pdf-theme")) && !pdf_theme.to_s.empty?
-        AsciidoctorPDF::ThemeLoader.resolve(pdf_theme.to_s)
+        AsciicrystalPDF::ThemeLoader.resolve(pdf_theme.to_s)
       elsif (user_theme = user_config.resolve_theme)
         user_theme
       else
-        AsciidoctorPDF::Theme.new
+        AsciicrystalPDF::Theme.new
       end
 
-    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    converter = AsciicrystalPDF::Converter.new("pdf", theme)
     converter.convert(doc)
 
     puts "PDF généré : #{out_file}"

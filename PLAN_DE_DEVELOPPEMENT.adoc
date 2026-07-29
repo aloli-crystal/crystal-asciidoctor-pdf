@@ -1,8 +1,8 @@
-= Plan de Développement - crystal-asciidoctor-pdf
+= Plan de Développement - asciicrystal-pdf
 :toc: left
 :toclevels: 3
 
-Ce document détaille les prochaines étapes pour le développement du projet `crystal-asciidoctor-pdf`, visant à atteindre une parité fonctionnelle avec la gem Ruby `asciidoctor-pdf` de référence.
+Ce document détaille les prochaines étapes pour le développement du projet `asciicrystal-pdf`, visant à atteindre une parité fonctionnelle avec la gem Ruby `asciidoctor-pdf` de référence.
 
 == 1. État Actuel
 

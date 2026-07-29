@@ -1,4 +1,4 @@
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Transformations typographiques du texte : majuscules, capitales,
   # petites capitales. Portage du `text_transformer.rb` upstream Ruby
   # asciidoctor-pdf 2.3.24.

@@ -1,6 +1,6 @@
 require "yaml"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Erreur levée par `FormBuilder` quand le YAML d'un bloc
   # `[x-form]` est invalide (champ malformé, type inconnu, id
   # dupliqué, etc.).

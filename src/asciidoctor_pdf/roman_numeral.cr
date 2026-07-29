@@ -1,4 +1,4 @@
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Conversion arabe → romain pour la numérotation front-matter
   # (« i, ii, iii, iv, … »). Parité avec `roman_numeral.rb` de
   # Ruby asciidoctor-pdf, sauf qu'ici on émet en *minuscules* par

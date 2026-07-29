@@ -1,7 +1,7 @@
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Helpers pour l'encodage WinAnsi (Windows-1252) utilisé par les
   # polices Type1 standard (Helvetica, Courier) — par défaut dans
-  # crystal-asciidoctor-pdf.
+  # asciicrystal-pdf.
   #
   # WinAnsi couvre ~220 codepoints :
   #

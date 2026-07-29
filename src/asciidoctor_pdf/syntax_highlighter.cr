@@ -1,14 +1,14 @@
 # Coloration syntaxique pour les blocs de code AsciiDoc.
-# Utilise crystal-rouge (233 lexers) pour la tokenisation,
+# Utilise rouge (233 lexers) pour la tokenisation,
 # avec un mapping de couleurs inspiré du thème GitHub.
 
-require "crystal-rouge"
+require "rouge"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Un token de code coloré
   record CodeToken, text : String, color : String
 
-  # Coloration syntaxique via crystal-rouge.
+  # Coloration syntaxique via rouge.
   # Retourne une liste de tokens avec leur couleur hexadécimale.
   module SyntaxHighlighter
     # Couleurs du thème GitHub (fond clair)

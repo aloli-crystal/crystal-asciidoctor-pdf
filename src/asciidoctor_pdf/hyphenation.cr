@@ -1,6 +1,6 @@
 require "./hyphenation/manifest"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Implémentation de l'algorithme **Liang** d'hyphenation par
   # patterns : Franklin Mark Liang, *Word Hy-phen-a-tion by
   # Com-pu-ter*, thèse Stanford, 1983.

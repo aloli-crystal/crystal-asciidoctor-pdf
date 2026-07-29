@@ -1,7 +1,7 @@
 = Roadmap — bugs et gaps connus
 :toc:
 
-Suivi des écarts entre `crystal-asciidoctor-pdf` (portage Crystal) et la
+Suivi des écarts entre `asciicrystal-pdf` (portage Crystal) et la
 gem Ruby `asciidoctor-pdf` 2.3.24 (référence). Issu de l'audit du
 2026-04-29 + retours utilisateur.
 
@@ -64,7 +64,7 @@ moyens / longs (M) à plus long terme.
 | M
 | La colist post-listing rend les ① ②, mais les `<1>` à l'intérieur
   d'un bloc `[source]` apparaissent textuellement. Substitution
-  nécessite intégration côté pipeline `crystal-rouge`.
+  nécessite intégration côté pipeline `rouge`.
 
 | `:lang:` et `/CreationDate` doc-level
 | 🟡
@@ -107,7 +107,7 @@ moyens / longs (M) à plus long terme.
 === Sprint 2 — v2.3.24.34 → v2.3.24.41 (les 🟠 secondaires)
 
 . ✅ **v2.3.24.34** — Tables : colspan + valign + factorisation
-    `render_table_row`. Tiré aussi crystal-asciidoctor 2.0.26.2
+    `render_table_row`. Tiré aussi asciicrystal 2.0.26.2
     (parser `CellSpecEndRx` accepte `\n` avant la spec).
 . ✅ **v2.3.24.35** — Page break : options `[%always]` / `[%recto]` /
     `[%verso]`.
@@ -138,7 +138,7 @@ collapsible). Reste uniquement les 🟡 d'effort moyen :
   * Table rowspan + autofit — pertinent pour les grilles ISO
     complexes
   * Callouts dans le code source des listings — pertinent pour la
-    doc technique annotée (intégration crystal-rouge)
+    doc technique annotée (intégration rouge)
   * `:lang:` et `/CreationDate` doc-level — extension shard `pdf`
     nécessaire
 

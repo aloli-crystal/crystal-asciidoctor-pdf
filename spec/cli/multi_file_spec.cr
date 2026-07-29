@@ -2,10 +2,10 @@ require "../spec_helper"
 require "file_utils"
 
 # Spec d'intégration : conversion de PLUSIEURS fichiers en une seule
-# invocation, p. ex. `crystal-asciidoctor-pdf *.adoc`. Régression : seul
+# invocation, p. ex. `asciicrystal-pdf *.adoc`. Régression : seul
 # le premier fichier était converti, les autres ignorés silencieusement.
 describe "CLI · conversion multi-fichiers" do
-  binary = File.join(__DIR__, "..", "..", "bin", "crystal-asciidoctor-pdf")
+  binary = File.join(__DIR__, "..", "..", "bin", "asciicrystal-pdf")
 
   it "convertit TOUS les fichiers passés (chacun son <nom>.adoc.pdf)" do
     pending! "binaire absent : #{binary}" unless File::Info.executable?(binary)

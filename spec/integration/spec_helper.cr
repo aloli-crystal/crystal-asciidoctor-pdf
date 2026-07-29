@@ -28,7 +28,7 @@ module IntegrationHelper
     # parser to decode in the test. The tests care about rendering
     # semantics (text present, NBSP collapsed, title decoded), not
     # the font choice.
-    theme = AsciidoctorPDF::Theme.new
+    theme = AsciicrystalPDF::Theme.new
     theme.base_font_path = nil
     theme.base_font_bold_path = nil
     theme.base_font_italic_path = nil
@@ -37,8 +37,8 @@ module IntegrationHelper
     theme.mono_font_bold_path = nil
 
     options = {"docfile" => adoc_path, "outfile" => pdf_path} of String => String
-    doc = Asciidoctor.load_file(adoc_path, options)
-    converter = AsciidoctorPDF::Converter.new("pdf", theme)
+    doc = Asciicrystal.load_file(adoc_path, options)
+    converter = AsciicrystalPDF::Converter.new("pdf", theme)
     converter.convert(doc)
 
     File.delete(adoc_path) if File.exists?(adoc_path)

@@ -1,9 +1,9 @@
 require "yaml"
 
-module AsciidoctorPDF
+module AsciicrystalPDF
   # Configuration utilisateur persistante, lue depuis un répertoire
-  # XDG-compatible (`$XDG_CONFIG_HOME/crystal-asciidoctor-pdf/`,
-  # défaut `~/.config/crystal-asciidoctor-pdf/`).
+  # XDG-compatible (`$XDG_CONFIG_HOME/asciicrystal-pdf/`,
+  # défaut `~/.config/asciicrystal-pdf/`).
   #
   # Permet de fixer une fois pour toutes des préférences
   # (thème par défaut, attributs AsciiDoc systématiques, identité
@@ -48,7 +48,7 @@ module AsciidoctorPDF
     include YAML::Serializable::Strict
 
     # Nom du répertoire de configuration sous XDG_CONFIG_HOME.
-    SHARD_NAME = "crystal-asciidoctor-pdf"
+    SHARD_NAME = "asciicrystal-pdf"
 
     # Nom du fichier principal de configuration.
     CONFIG_FILENAME = "config.yml"
@@ -167,7 +167,7 @@ module AsciidoctorPDF
     end
 
     # Construit la liste d'attributs à injecter dans les options
-    # `Asciidoctor.load`. Les attributs explicites du document
+    # `Asciicrystal.load`. Les attributs explicites du document
     # (passés via `cli_options`) ne sont pas écrasés.
     #
     # Les valeurs `Bool` YAML sont converties en chaînes

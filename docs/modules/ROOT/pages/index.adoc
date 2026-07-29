@@ -1,6 +1,6 @@
 = Crystal Asciidoctor PDF
 
-AsciiDoc to PDF converter for Crystal, based on `crystal-asciidoctor` for parsing and `pdf` for PDF generation. Ported from the https://github.com/asciidoctor/asciidoctor-pdf[asciidoctor-pdf] Ruby gem (v2.3.24).
+AsciiDoc to PDF converter for Crystal, based on `asciicrystal` for parsing and `pdf` for PDF generation. Ported from the https://github.com/asciidoctor/asciidoctor-pdf[asciidoctor-pdf] Ruby gem (v2.3.24).
 
 == Features
 

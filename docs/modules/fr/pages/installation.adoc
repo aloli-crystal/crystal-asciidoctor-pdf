@@ -11,8 +11,9 @@ Ajoutez a votre `shard.yml` :
 [source,yaml]
 ----
 dependencies:
-  crystal-asciidoctor-pdf:
-    github: aloli-crystal/crystal-asciidoctor-pdf
+  asciicrystal-pdf:
+    github: aloli-crystal/asciicrystal-pdf
+    version: "~> 2.3.24.108"
 ----
 
 Executez `shards install`.
@@ -21,8 +22,8 @@ Executez `shards install`.
 
 [source,bash]
 ----
-git clone https://github.com/aloli-crystal/crystal-asciidoctor-pdf.git
-cd crystal-asciidoctor-pdf
+git clone https://github.com/aloli-crystal/asciicrystal-pdf.git
+cd asciicrystal-pdf
 shards build --release
-ln -s "$PWD/bin/crystal-asciidoctor-pdf" ~/bin/
+ln -s "$PWD/bin/asciicrystal-pdf" ~/bin/
 ----

@@ -9,7 +9,7 @@
 
 [.lead]
 Document de démonstration de l'extension `[x-form]` du shard
-https://github.com/aloli-crystal/crystal-asciidoctor-pdf[crystal-asciidoctor-pdf].
+https://github.com/aloli-crystal/asciicrystal-pdf[asciicrystal-pdf].
 Ce PDF est *interactif* : ouvrez-le dans Acrobat, Preview, Firefox
 ou Chrome — les champs sont remplissables et la case à cocher
 fonctionne, le tout sans serveur.
@@ -183,7 +183,7 @@ reset:
 
 [source,shell]
 ----
-crystal-asciidoctor-pdf examples/x-form-audit-iso27001.adoc
+asciicrystal-pdf examples/x-form-audit-iso27001.adoc
 # → examples/x-form-audit-iso27001.adoc.pdf
 ----
 

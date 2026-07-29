@@ -3,6 +3,16 @@
 :toc-title: Versions
 :toclevels: 2
 
+== v2.3.24.108 — 2026-07-28
+
+=== Changed (rename)
+
+* Rename the shard `crystal-asciidoctor-pdf` → `asciicrystal-pdf` (drop the `crystal-` prefix and turn `doctor` into `crystal`).
+* Rename the module `AsciidoctorPDF` → `AsciicrystalPDF`; the core namespace `Asciidoctor::` becomes `Asciicrystal::` (via the `asciicrystal` dependency, formerly `crystal-asciidoctor`).
+* The user config directory follows the new name: `${XDG_CONFIG_HOME:-~/.config}/asciicrystal-pdf/`.
+* The PDF `/Producer` string and the `--version` output now read `asciicrystal-pdf`.
+* Ruby-provenance mentions (`asciidoctor-pdf` gem) are preserved in the description and comments.
+
 == v2.3.24.107 — 2026-07-04
 
 === Changed / Fixed (open by default + CLI robustness)

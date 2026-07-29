@@ -341,7 +341,7 @@ Ceci est un bloc d'exemple qui peut contenir du texte formaté, des listes, etc.
 ****
 *À propos de ce document*
 
-Ce document sert de référence exhaustive pour valider le rendu PDF et EPUB produit par l'écosystème Crystal AsciiDoc (crystal-asciidoctor-pdf, crystal-asciidoctor-epub3).
+Ce document sert de référence exhaustive pour valider le rendu PDF et EPUB produit par l'écosystème Crystal AsciiDoc (asciicrystal-pdf, asciicrystal-epub3).
 ****
 
 === Bloc littéral
@@ -422,10 +422,10 @@ Browser --> Utilisateur : Dashboard
 ----
 graph TD
     A[Document AsciiDoc] --> B{Convertisseur}
-    B -->|PDF| C[crystal-asciidoctor-pdf]
-    B -->|EPUB| D[crystal-asciidoctor-epub3]
-    B -->|HTML| E[crystal-asciidoctor]
-    B -->|Reveal.js| F[crystal-asciidoctor-revealjs]
+    B -->|PDF| C[asciicrystal-pdf]
+    B -->|EPUB| D[asciicrystal-epub3]
+    B -->|HTML| E[asciicrystal]
+    B -->|Reveal.js| F[asciicrystal-revealjs]
     C --> G[📄 Document PDF]
     D --> H[📱 E-book EPUB]
     E --> I[🌐 Site web]
