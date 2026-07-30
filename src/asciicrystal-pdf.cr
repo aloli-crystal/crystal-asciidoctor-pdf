@@ -1,1 +1,1 @@
-require "./asciidoctor_pdf"
+require "./asciicrystal_pdf"

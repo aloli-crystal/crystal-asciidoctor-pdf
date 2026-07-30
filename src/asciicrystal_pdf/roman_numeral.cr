@@ -1,7 +1,7 @@
 module AsciicrystalPDF
   # Conversion arabe → romain pour la numérotation front-matter
   # (« i, ii, iii, iv, … »). Parité avec `roman_numeral.rb` de
-  # Ruby asciidoctor-pdf, sauf qu'ici on émet en *minuscules* par
+  # Ruby asciicrystal-pdf, sauf qu'ici on émet en *minuscules* par
   # défaut — c'est la convention typographique des front-matter.
   module RomanNumeral
     # Couples (valeur, symbole) ordonnés du plus grand au plus petit

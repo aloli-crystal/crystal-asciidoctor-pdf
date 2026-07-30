@@ -3,7 +3,7 @@ module AsciicrystalPDF
     # Manifest des patterns Liang officiellement supportés.
     # Les 7 langues marquées `embedded: true` sont incluses dans
     # le binaire via la macro `read_file`. Les autres sont
-    # installables via `asciidoctor-pdf hyph install <lang>` qui
+    # installables via `asciicrystal-pdf hyph install <lang>` qui
     # télécharge depuis CTAN et vérifie le SHA-256 contre cette
     # table.
     #

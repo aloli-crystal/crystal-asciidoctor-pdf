@@ -1,20 +1,20 @@
 require "asciicrystal"
 require "pdf"
 
-require "./asciidoctor_pdf/theme"
-require "./asciidoctor_pdf/theme_loader"
-require "./asciidoctor_pdf/user_config"
-require "./asciidoctor_pdf/form_builder"
-require "./asciidoctor_pdf/form_renderer"
-require "./asciidoctor_pdf/roman_numeral"
-require "./asciidoctor_pdf/win_ansi"
-require "./asciidoctor_pdf/sanitizer"
-require "./asciidoctor_pdf/text_transformer"
-require "./asciidoctor_pdf/inline_renderer"
-require "./asciidoctor_pdf/hyphenation"
-require "./asciidoctor_pdf/paragraph_composer"
-require "./asciidoctor_pdf/syntax_highlighter"
-require "./asciidoctor_pdf/converter"
+require "./asciicrystal_pdf/theme"
+require "./asciicrystal_pdf/theme_loader"
+require "./asciicrystal_pdf/user_config"
+require "./asciicrystal_pdf/form_builder"
+require "./asciicrystal_pdf/form_renderer"
+require "./asciicrystal_pdf/roman_numeral"
+require "./asciicrystal_pdf/win_ansi"
+require "./asciicrystal_pdf/sanitizer"
+require "./asciicrystal_pdf/text_transformer"
+require "./asciicrystal_pdf/inline_renderer"
+require "./asciicrystal_pdf/hyphenation"
+require "./asciicrystal_pdf/paragraph_composer"
+require "./asciicrystal_pdf/syntax_highlighter"
+require "./asciicrystal_pdf/converter"
 
 module AsciicrystalPDF
   # Lue au compile-time depuis `shard.yml` via le macro `read_file`.
@@ -27,7 +27,7 @@ module AsciicrystalPDF
                 .chomp
             }}
 
-  # Version de la gem Ruby asciidoctor-pdf utilisée comme base du portage.
+  # Version de la gem Ruby asciicrystal-pdf utilisée comme base du portage.
   UPSTREAM_VERSION = "2.3.24"
 
   # Version de la gem Ruby asciidoctor (parser) sur laquelle ce shard est aligné

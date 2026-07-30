@@ -150,7 +150,7 @@ module AsciicrystalPDF
     # cascade :
     #
     # 1. `./hyphenation/hyph-<lang>.tex` (projet AsciiDoc courant)
-    # 2. `${XDG_CONFIG_HOME:-~/.config}/asciidoctor-pdf/hyphenation/hyph-<lang>.tex`
+    # 2. `${XDG_CONFIG_HOME:-~/.config}/asciicrystal-pdf/hyphenation/hyph-<lang>.tex`
     # 3. Embarqué au build (les 7 langues FR/EN-US/DE-1996/ES/IT/
     #    PT/NL incluses via `read_file`)
     #
@@ -159,7 +159,7 @@ module AsciicrystalPDF
     module Loader
       # Patterns embarqués au build via la macro `read_file`.
       # Le chemin est relatif au fichier source `hyphenation.cr`
-      # placé dans `src/asciidoctor_pdf/`. Les fichiers sont dans
+      # placé dans `src/asciicrystal_pdf/`. Les fichiers sont dans
       # `data/hyphenation/` à la racine du repo.
       EMBEDDED = {
         "fr"      => {{ read_file("#{__DIR__}/../../data/hyphenation/hyph-fr.tex") }},
@@ -199,7 +199,7 @@ module AsciicrystalPDF
         return File.read(proj) if File.file?(proj)
 
         if (xdg_base = ENV["XDG_CONFIG_HOME"]? || (ENV["HOME"]? ? "#{ENV["HOME"]}/.config" : nil))
-          xdg_file = File.join(xdg_base, "asciidoctor-pdf", "hyphenation", "hyph-#{lang}.tex")
+          xdg_file = File.join(xdg_base, "asciicrystal-pdf", "hyphenation", "hyph-#{lang}.tex")
           return File.read(xdg_file) if File.file?(xdg_file)
         end
 

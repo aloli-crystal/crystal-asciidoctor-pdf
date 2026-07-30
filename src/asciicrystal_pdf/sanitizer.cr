@@ -1,5 +1,5 @@
 module AsciicrystalPDF
-  # Utilitaires texte pour le pipeline asciidoctor-pdf : strip de
+  # Utilitaires texte pour le pipeline asciicrystal-pdf : strip de
   # balises XML / HTML, résolution d'entités HTML, encodage XML.
   #
   # ATTENTION : ce module n'est *pas* un sanitizer de sécurité. Il ne
@@ -8,7 +8,7 @@ module AsciicrystalPDF
   # Pour la vraie sécurité, voir `aloli-crystal/sanitizer-html` (le
   # shard dédié documenté dans CRYSTAL-SANITIZER-HTML-SPECS.adoc).
   #
-  # Portage 1:1 de `sanitizer.rb` (Ruby asciidoctor-pdf 2.3.24).
+  # Portage 1:1 de `sanitizer.rb` (Ruby asciicrystal-pdf 2.3.24).
   module Sanitizer
     # Caractères XML spéciaux : entité → littéral.
     XML_SPECIAL_CHARS = {
@@ -47,7 +47,7 @@ module AsciicrystalPDF
 
     # Reconnaît un tag XML / HTML (forme simple). Le `\0?` final
     # dévore un éventuel null byte (vecteur d'évasion connu, repris
-    # tel quel d'asciidoctor-pdf Ruby).
+    # tel quel d'asciicrystal-pdf Ruby).
     SANITIZE_XML_RX = /<[^>]+>\0?/
 
     # Reconnaît une référence de caractère :

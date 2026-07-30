@@ -4,7 +4,7 @@ module AsciicrystalPDF
   FONTS_DIR = File.join(File.dirname(File.dirname(__DIR__)), "data", "fonts")
 
   # Thème PDF : définit toutes les propriétés visuelles du document PDF généré.
-  # Équivalent du système de thèmes YAML d'asciidoctor-pdf Ruby.
+  # Équivalent du système de thèmes YAML d'asciicrystal-pdf Ruby.
   class Theme
     # --- Page ---
     property page_size : String = "A4"
@@ -18,7 +18,7 @@ module AsciicrystalPDF
     property base_font_color : String = "333333"
     # Alignement par défaut du texte des paragraphes.
     # Valeurs : "left", "center", "right", "justify".
-    # Défaut conforme à la spec asciidoctor-pdf Ruby (base_align: justify).
+    # Défaut conforme à la spec asciicrystal-pdf Ruby (base_align: justify).
     property base_text_align : String = "justify"
 
     # --- Typographie française (extension `x-`) ---
@@ -31,7 +31,7 @@ module AsciicrystalPDF
     property x_french_typography : Bool = false
 
     # --- Code inline (codespan) ---
-    # Spec asciidoctor-pdf Ruby — catégorie `codespan` du thème :
+    # Spec asciicrystal-pdf Ruby — catégorie `codespan` du thème :
     # rendu HTML `<code>` (issu de `` `text` ``) avec fond grisé,
     # bordure optionnelle, padding et couleur de texte.
     property codespan_background_color : String = "f5f5f5"
@@ -153,7 +153,7 @@ module AsciicrystalPDF
     property admonition_box_shadow_offset : Float64 = 2.5
 
     # Étiquettes des admonitions. Défauts en anglais (parité Ruby
-    # asciidoctor-pdf). Pour traduire : soit redéfinir ici via le thème
+    # asciicrystal-pdf). Pour traduire : soit redéfinir ici via le thème
     # YAML (`admonition_note_label: NOTE` etc.), soit per-document via
     # les attributs AsciiDoc `:note-caption: NOTE`, `:tip-caption: …`,
     # `:warning-caption: …`, `:caution-caption: …`,
@@ -248,7 +248,7 @@ module AsciicrystalPDF
     #
     # Le préfixe `x_` (pour `x-` côté YAML) marque cette propriété
     # comme **extension non standard** propre au shard, sans équivalent
-    # dans AsciiDoc / Ruby asciidoctor-pdf — convention héritée de
+    # dans AsciiDoc / Ruby asciicrystal-pdf — convention héritée de
     # `X-*` dans HTTP/MIME.
     property x_title_page_with_toc : Bool = false
 
@@ -265,7 +265,7 @@ module AsciicrystalPDF
     property toc_dot_leader_color : String = "aaaaaa"
 
     # --- En-têtes et pieds de page ---
-    # Convention recto-verso (parité Ruby asciidoctor-pdf) :
+    # Convention recto-verso (parité Ruby asciicrystal-pdf) :
     #   * `header_left` / `header_center` / `header_right`
     #     sont les défauts, appliqués à toutes les pages.
     #   * `header_recto_*` surchargent sur les pages impaires (recto)

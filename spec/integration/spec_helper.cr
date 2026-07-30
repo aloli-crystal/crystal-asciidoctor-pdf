@@ -1,6 +1,6 @@
 require "spec"
 require "compress/zlib"
-require "../../src/asciidoctor_pdf"
+require "../../src/asciicrystal_pdf"
 
 # Integration-test helpers: run the real converter end-to-end on a
 # snippet of AsciiDoc, then read the produced PDF back via the sibling

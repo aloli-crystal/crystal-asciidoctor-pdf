@@ -2,7 +2,7 @@ require "yaml"
 
 module AsciicrystalPDF
   # Charge un thème depuis un fichier YAML et peuple un objet Theme.
-  # Équivalent du ThemeLoader d'asciidoctor-pdf Ruby.
+  # Équivalent du ThemeLoader d'asciicrystal-pdf Ruby.
   module ThemeLoader
     # Thèmes embarqués au moment de la compilation : leur YAML est
     # inliné dans le binaire, pas besoin que les fichiers existent

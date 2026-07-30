@@ -1,7 +1,7 @@
 module AsciicrystalPDF
   # Transformations typographiques du texte : majuscules, capitales,
   # petites capitales. Portage du `text_transformer.rb` upstream Ruby
-  # asciidoctor-pdf 2.3.24.
+  # asciicrystal-pdf 2.3.24.
   #
   # Usage : appliquer juste avant le rendu PDF, sur du texte déjà
   # nettoyé (post-Sanitizer). Pas de gestion du HTML inline ici —

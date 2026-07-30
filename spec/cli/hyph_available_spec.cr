@@ -1,9 +1,9 @@
 require "../spec_helper"
-require "../../src/asciidoctor_pdf/hyph_cli"
+require "../../src/asciicrystal_pdf/hyph_cli"
 require "file_utils"
 require "json"
 
-# Spec d'intégration de `asciidoctor-pdf hyph available`.
+# Spec d'intégration de `asciicrystal-pdf hyph available`.
 #
 # Le test ne touche jamais à `~/.cache` réel : on redirige
 # `XDG_CACHE_HOME` vers un dossier temporaire dédié pour chaque
@@ -17,7 +17,7 @@ describe AsciicrystalPDF::HyphCli do
   prev_hyph = nil.as(String?)
 
   before_each do
-    tmp_cache = File.tempname("asciidoctor-pdf-hyph-cache")
+    tmp_cache = File.tempname("asciicrystal-pdf-hyph-cache")
     prev_xdg = ENV["XDG_CACHE_HOME"]?
     prev_ctan = ENV["CTAN_MIRROR"]?
     prev_hyph = ENV["HYPH_MIRROR"]?

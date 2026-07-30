@@ -295,7 +295,7 @@ module AsciicrystalPDF
       # Override per-document de la taille / orientation par les
       # attributs AsciiDoc `:pdf-page-size:`, `:pdf-page-layout:`.
       # Permet à un doc précis d'imposer A3 paysage sans toucher au
-      # thème global. Parité Ruby asciidoctor-pdf.
+      # thème global. Parité Ruby asciicrystal-pdf.
       pdf_size = node.attr("pdf-page-size")
       pdf_layout = node.attr("pdf-page-layout")
       if pdf_size || pdf_layout
@@ -308,7 +308,7 @@ module AsciicrystalPDF
       @doc.title = @document_title unless @document_title.empty?
       @doc.author = node.attr("author") if node.attr?("author")
       @doc.subject = node.attr("subject") if node.attr?("subject")
-      # Keywords : virgule-séparé est le format Ruby asciidoctor-pdf et
+      # Keywords : virgule-séparé est le format Ruby asciicrystal-pdf et
       # le format conventionnel des métadonnées PDF.
       @doc.keywords = node.attr("keywords") if node.attr?("keywords")
       # Creator : nom de l'application qui a *produit* le contenu (par
@@ -321,7 +321,7 @@ module AsciicrystalPDF
 
       # Numérotation front-matter en chiffres romains : activée par
       # l'attribut document `:pdf-front-matter-numbering: roman`
-      # (parité Ruby asciidoctor-pdf). Quand activée, la garde et la
+      # (parité Ruby asciicrystal-pdf). Quand activée, la garde et la
       # TOC réservée sont marquées :roman, le contenu :arabic ; les
       # deux compteurs repartent de 1 chacun. Sinon, tout en :arabic
       # continu (comportement historique).
@@ -1248,7 +1248,7 @@ module AsciicrystalPDF
 
     # =========================================================================
     # Extension `[x-form]` — formulaires PDF interactifs (AcroForm)
-    # Cf. doc/x-form-spec.adoc et src/asciidoctor_pdf/form_builder.cr
+    # Cf. doc/x-form-spec.adoc et src/asciicrystal_pdf/form_builder.cr
     # =========================================================================
 
     private def collect_x_form_block_attrs(node : Asciicrystal::Block) : Hash(String, String)
@@ -2066,7 +2066,7 @@ module AsciicrystalPDF
 
     def convert_page_break(node : Asciicrystal::AbstractNode) : String
       # Saut de page de base (`<<<` ou `[%always]` — `always` est
-      # accepté par parité Ruby asciidoctor-pdf bien qu'il ne change
+      # accepté par parité Ruby asciicrystal-pdf bien qu'il ne change
       # rien au comportement, le saut étant déjà inconditionnel).
       new_page
 
@@ -2857,7 +2857,7 @@ module AsciicrystalPDF
 
       @current_y -= block_h + 6.0
 
-      # Attribution + citetitle. Ruby asciidoctor-pdf accepte les deux
+      # Attribution + citetitle. Ruby asciicrystal-pdf accepte les deux
       # via `[quote, Auteur, Titre]`.
       attribution = node.attr("attribution")
       citetitle = node.attr("citetitle")
@@ -2882,7 +2882,7 @@ module AsciicrystalPDF
     # Les entrées sont groupées par lettre initiale et affichées sur plusieurs colonnes.
     # Compresse une liste triée de numéros de pages en chaîne lisible
     # avec ranges : `[12, 13, 14, 15, 17, 20, 21]` → `"12-15, 17, 20-21"`.
-    # Comportement Ruby asciidoctor-pdf upstream (option
+    # Comportement Ruby asciicrystal-pdf upstream (option
     # `index_pagenum_sequence_style: range` qui est le défaut).
     private def format_page_ranges(pages : Array(Int32)) : String
       return "" if pages.empty?
@@ -3254,7 +3254,7 @@ module AsciicrystalPDF
     #
     # Extension non standard du shard — préfixe `x-` à la mode des
     # extensions HTTP/MIME pour signaler explicitement l'absence
-    # d'équivalent dans AsciiDoc / Ruby asciidoctor-pdf.
+    # d'équivalent dans AsciiDoc / Ruby asciicrystal-pdf.
     # Résout l'alignement horizontal du titre H1. Cascade :
     #   1. attribut document `:title-page-align: <left|center|right>`
     #   2. propriété de thème `title_page_align`
@@ -3376,7 +3376,7 @@ module AsciicrystalPDF
       page = @current_page.not_nil!
       center_x = @page_width / 2
 
-      # Logo de garde optionnel. Conforme à l'attribut Ruby asciidoctor-pdf
+      # Logo de garde optionnel. Conforme à l'attribut Ruby asciicrystal-pdf
       # `:title-logo-image:` (présent depuis la 2.3) : posé dans la moitié
       # supérieure de la page, centré par défaut. Le titre garde sa
       # position habituelle (mi-hauteur) — les deux ne se chevauchent pas
@@ -3537,7 +3537,7 @@ module AsciicrystalPDF
     end
 
     # Rend le logo de garde quand `:title-logo-image:` est défini.
-    # Format upstream Ruby asciidoctor-pdf, accepté ici à l'identique :
+    # Format upstream Ruby asciicrystal-pdf, accepté ici à l'identique :
     #
     #     :title-logo-image: image::path/logo.svg[align=center, pdfwidth=200]
     #
@@ -3599,7 +3599,7 @@ module AsciicrystalPDF
     # Parse une longueur de mise en page avec unité optionnelle
     # (`4cm`, `40mm`, `1in`, `113pt`, ou nombre nu = points). Renvoie
     # la valeur en POINTS PDF, ou `nil` si non parsable. Sans cette
-    # conversion, `pdfwidth=4cm` (forme courante d'asciidoctor-pdf)
+    # conversion, `pdfwidth=4cm` (forme courante d'asciicrystal-pdf)
     # échouait silencieusement (`"4cm".to_f?` = nil ⇒ largeur par
     # défaut) et le logo était mal dimensionné.
     private def parse_logo_length(s : String?) : Float64?
@@ -3626,7 +3626,7 @@ module AsciicrystalPDF
       # Retire le préfixe de macro image, sous ses DEUX formes :
       #   - `image::cible[…]` (macro bloc, double `:`)
       #   - `image:cible[…]`  (macro inline, simple `:`) ← forme
-      #     standard d'asciidoctor-pdf pour `:title-logo-image:`
+      #     standard d'asciicrystal-pdf pour `:title-logo-image:`
       # Sans la prise en charge du simple `:`, le préfixe `image:`
       # restait collé au chemin (`image:logo.svg`), la résolution
       # échouait et le logo n'apparaissait pas (échec silencieux).
@@ -4300,7 +4300,7 @@ module AsciicrystalPDF
         end
         # Code inline (codespan) : fond grisé optionnel +
         # bordure optionnelle, à la manière du rendu HTML `<code>`.
-        # Conforme à la spec asciidoctor-pdf Ruby — catégorie de
+        # Conforme à la spec asciicrystal-pdf Ruby — catégorie de
         # thème `codespan_*`. Le badge `kbd` (touche de clavier) est
         # un cas dédié juste en dessous, prioritaire sur codespan.
         if seg.mono && !seg.kbd && !@theme.codespan_background_color.empty?
@@ -4492,7 +4492,7 @@ module AsciicrystalPDF
     # dans `themes/fr.yml`, false dans le thème par défaut).
     # Empêche les sauts de ligne inopportuns (« 12 :30 » →
     # « 12<NBSP>:30 ») et respecte la règle de l'Imprimerie nationale.
-    # Hors-spec asciidoctor-pdf Ruby — extension ALOLI, préfixe `x-`.
+    # Hors-spec asciicrystal-pdf Ruby — extension ALOLI, préfixe `x-`.
     private def apply_french_typography(text : String) : String
       return text unless @theme.x_french_typography
       text
@@ -4555,7 +4555,7 @@ module AsciicrystalPDF
 
     # Supprime le markup inline HTML généré par asciidoctor et résout
     # les entités. Délègue au module `Sanitizer` (`sanitizer.cr`),
-    # portage 1:1 du `sanitizer.rb` upstream Ruby asciidoctor-pdf.
+    # portage 1:1 du `sanitizer.rb` upstream Ruby asciicrystal-pdf.
     #
     # ATTENTION : ce n'est PAS une protection contre XSS. Le shard
     # destiné à la sanitisation de sécurité est `aloli-crystal/sanitizer-html`

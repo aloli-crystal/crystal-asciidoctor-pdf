@@ -18,7 +18,7 @@ module AsciicrystalPDF
     # l'utilisateur. Suit la convention ALOLI `feedback_xdg_config_convention`.
     XDG_DIR = File.join(
       ENV["XDG_CONFIG_HOME"]? || (ENV["HOME"]? ? "#{ENV["HOME"]}/.config" : "/tmp"),
-      "asciidoctor-pdf",
+      "asciicrystal-pdf",
       "hyphenation",
     )
 
@@ -32,7 +32,7 @@ module AsciicrystalPDF
     def self.xdg_cache_dir : String
       File.join(
         ENV["XDG_CACHE_HOME"]? || (ENV["HOME"]? ? "#{ENV["HOME"]}/.cache" : "/tmp"),
-        "asciidoctor-pdf",
+        "asciicrystal-pdf",
       )
     end
 
@@ -536,7 +536,7 @@ module AsciicrystalPDF
           STDERR.puts "and still want to install this language, pass --force (-f)"
           STDERR.puts "to bypass this check. SHA-256 verification will still happen"
           STDERR.puts "against the hash stored in our records:"
-          STDERR.puts "  asciidoctor-pdf hyph install #{lang} --force"
+          STDERR.puts "  asciicrystal-pdf hyph install #{lang} --force"
           exit EXIT_MANIFEST_MISSING
         end
         STDERR.puts "WARNING: installing `#{lang}` despite undeclared license."

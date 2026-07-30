@@ -1,5 +1,5 @@
-require "./asciidoctor_pdf"
-require "./asciidoctor_pdf/hyph_cli"
+require "./asciicrystal_pdf"
+require "./asciicrystal_pdf/hyph_cli"
 require "option_parser"
 
 # Sous-commande `hyph` : gestion des patterns de césure Liang.
@@ -101,7 +101,7 @@ input_files.each do |input_file|
 
   # Convention de nommage : mon_document.adoc => mon_document.adoc.pdf
   # (permet de distinguer facilement les fichiers source et PDF,
-  #  et d'éviter toute confusion avec la version Ruby asciidoctor-pdf).
+  #  et d'éviter toute confusion avec la version Ruby asciicrystal-pdf).
   # En multi-fichiers, `output_file` est forcément vide (cf. garde
   # ci-dessus) : chaque entrée calcule donc son propre nom.
   out_file = output_file.empty? ? File.join(File.dirname(input_file), File.basename(input_file) + ".pdf") : output_file
