@@ -4,17 +4,13 @@ shards:
     git: https://github.com/crystal-ameba/ameba.git
     version: 1.6.4
 
+  asciicrystal:
+    git: https://github.com/aloli-crystal/asciicrystal.git
+    version: 2.0.26.13
+
   country-flags:
     git: https://github.com/aloli-crystal/country-flags.git
     version: 0.1.5
-
-  crystal-asciidoctor:
-    git: https://github.com/aloli-crystal/crystal-asciidoctor.git
-    version: 2.0.26.10
-
-  crystal-rouge:
-    git: https://github.com/aloli-crystal/crystal-rouge.git
-    version: 4.7.0.2
 
   emojis:
     git: https://github.com/aloli-crystal/emojis.git
@@ -30,7 +26,11 @@ shards:
 
   pdf:
     git: https://github.com/aloli-crystal/pdf.git
-    version: 1.20.1
+    version: 1.20.2
+
+  rouge:
+    git: https://github.com/aloli-crystal/rouge.git
+    version: 4.7.0.3
 
   stumpy_core:
     git: https://github.com/stumpycr/stumpy_core.git
